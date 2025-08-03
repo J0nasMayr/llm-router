@@ -19,3 +19,7 @@ tmp/
 
 *_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].csv
 *_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].yaml
+
+# Ignore large detailed results files
+*_detailed_results.csv
+*_detailed_results_*.csv

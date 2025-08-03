@@ -79,10 +79,10 @@ make exp04-full
 
 ### Paper Figure Mapping
 
-- **Figure 2 & 3**: `make exp01-full` → Algorithm comparison
+- **Figure 2a, 2b & 3**: `make exp01-full` → Algorithm comparison
 - **Figure 4 & 5**: `make exp02-full` → Feature ablation  
 - **Figure 6**: `make exp03-full` → Lambda trade-off
-- **Figure 7**: `make exp05-full` → Adaptability
+- **Figure 7**: `make exp04-full` → Adaptability
 
 **Note**: The final, polished plots as they appear in the submitted paper are located in the `paper_figures/` directory. The experiment scripts will regenerate the underlying data and create similar plots in the respective `experiments/*/plots/` directories. Minor stylistic differences between the generated and final plots are expected.
 
@@ -94,9 +94,11 @@ Main parameters in `experiments/config/experiments.yaml`:
 - `samples_per_dataset`: 500 (queries per dataset)
 - `lambda_weight`: Accuracy-energy trade-off
 
-Results are saved in `experiments/*/results/` with timestamp.
+Results are saved in `experiments/*/results/`.
 
-## Additional Notes
+## Experimental Notes
 
-- The implementation includes a lightweight logistic regression classifier (`models/exemplary_task_classifier.pkl`) to determine the task type (e.g., summarization, Q&A) from a query's instruction text. This is designed for a real-world scenario where task labels are not explicitly known. However, to ensure experimental consistency and eliminate classification noise from the evaluation of the whole system, the experiments reported in the paper use the ground-truth task label derived directly from the source dataset of each query.
-- Sample size limited to 2500 queries for computational feasibility
+- **Raw Data**: The full `detailed_results` for each experiment are not stored in this repository due to their large size, but are available at our Zenodo archive: [LINK TO ZENODO]. The summary statistics required to generate the paper's plots are included.
+- **Task Type**: The paper's experiments use ground-truth task labels from the datasets to ensure a clean evaluation. For real-world use, the repository includes a lightweight classifier (`models/exemplary_task_classifier.pkl`) to infer task types.
+- **Latency Constraint**: The latency constraint described in the paper (Section 4.1) is a formal part of the framework but was not implemented in the experiments to isolate and focus on the accuracy-energy trade-off.
+- **Sample Size**: Experiments are run on a 2500-query sample for computational feasibility.
