@@ -1,0 +1,29 @@
+pair,p_value_raw,p_value_corrected_bh,significant_bh
+Accuracy vs Largest,0.00398,0.0101,True
+Accuracy vs Smallest,0.00398,0.0101,True
+Largest vs Smallest,0.00398,0.0101,True
+Accuracy vs ε‑Greedy (NC),0.00749,0.0101,True
+Accuracy vs ε‑Greedy (C),0.00749,0.0101,True
+Accuracy vs LinUCB (C),0.00749,0.0101,True
+Accuracy vs Random,0.00749,0.0101,True
+Accuracy vs Thompson Sampling (C),0.00749,0.0101,True
+ε‑Greedy (NC) vs Largest,0.00749,0.0101,True
+ε‑Greedy (NC) vs Smallest,0.00749,0.0101,True
+Largest vs ε‑Greedy (C),0.00749,0.0101,True
+Largest vs LinUCB (C),0.00749,0.0101,True
+Largest vs Random,0.00749,0.0101,True
+Largest vs Thompson Sampling (C),0.00749,0.0101,True
+ε‑Greedy (C) vs Smallest,0.00749,0.0101,True
+LinUCB (C) vs Smallest,0.00749,0.0101,True
+Random vs Smallest,0.00749,0.0101,True
+Smallest vs Thompson Sampling (C),0.00749,0.0101,True
+ε‑Greedy (NC) vs Random,0.00794,0.0101,True
+ε‑Greedy (C) vs Random,0.00794,0.0101,True
+LinUCB (C) vs Random,0.00794,0.0101,True
+Random vs Thompson Sampling (C),0.00794,0.0101,True
+ε‑Greedy (NC) vs LinUCB (C),0.0159,0.0193,True
+ε‑Greedy (NC) vs ε‑Greedy (C),0.0556,0.0622,False
+ε‑Greedy (NC) vs Thompson Sampling (C),0.0556,0.0622,False
+LinUCB (C) vs Thompson Sampling (C),0.151,0.162,False
+ε‑Greedy (C) vs Thompson Sampling (C),0.31,0.321,False
+ε‑Greedy (C) vs LinUCB (C),0.69,0.69,False
