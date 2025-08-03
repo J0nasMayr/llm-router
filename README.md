@@ -22,19 +22,18 @@ make setup
 make exp01-full
 
 # Generate plots from existing results
-make exp01-plot
+make exp01-plot <timestamp>
 ```
 
 ## Repository Structure
 
 ```
 experiments/         # Experiment implementations
-├── 00_warmup/      # Algorithm warm-up analysis
-├── 01_algorithm_comparison/  # Main comparison
-├── 02_feature_ablation/      # Feature importance
-├── 03_lambda_sweep/          # Trade-off analysis
-├── 04_hyperparameter_tuning/ # Parameter sensitivity
-└── 05_adaptability/          # Model pool changes
+├── X0_warmup/      # Algorithm warm-up analysis
+├── X1_algorithm_comparison/  # Main comparison
+├── X2_feature_ablation/      # Feature importance
+├── X3_lambda_sweep/          # Trade-off analysis
+└── X4_adaptability/          # Model pool changes
 
 src/                # Core implementations
 ├── bandit/         # MAB algorithms
@@ -48,7 +47,7 @@ src/                # Core implementations
 - Python 3.10+
 - Docker & docker-compose
 - NVIDIA GPU with 80GB+ VRAM (A100/H100)
-- ~100GB storage
+- 200GB storage
 - HuggingFace account
 
 ### Installation
@@ -60,30 +59,32 @@ src/                # Core implementations
    python -m venv venv && source venv/bin/activate
    pip install -r requirements.txt
    docker-compose -f db/docker-compose-db.yaml up -d
-   gunzip -c db/llm_db_backup.sql.gz | docker exec -i db-llm_db-1 psql -U postgres -d llm_db
+   gunzip -c db/llm_db_backup.sql.gz | docker exec -i db-llm_db-1 psql -U tz -d llm_db
    ```
 
 3. **HuggingFace token**:
    ```bash
-   export HF_TOKEN="your_token_here"
+   export HF_TOKEN="token_here"
    ```
 
 ## Running Experiments
 
 ### Full Experiments
 ```bash
-make exp01-full  # Algorithm comparison (~3h on A100)
-make exp02-full  # Feature ablation (~2h)
-make exp03-full  # Lambda sweep (~2h)
-make exp04-full  # Hyperparameter tuning (~4h)
-make exp05-full  # Adaptability (~1h)
+make exp01-full
+make exp02-full
+make exp03-full
+make exp04-full
 ```
 
 ### Paper Figure Mapping
-- **Figure 3**: `make exp01-full` → Algorithm comparison
-- **Figure 4**: `make exp02-full` → Feature ablation  
-- **Figure 5**: `make exp03-full` → Lambda trade-off
-- **Figure 6**: `make exp05-full` → Adaptability
+
+- **Figure 2 & 3**: `make exp01-full` → Algorithm comparison
+- **Figure 4 & 5**: `make exp02-full` → Feature ablation  
+- **Figure 6**: `make exp03-full` → Lambda trade-off
+- **Figure 7**: `make exp05-full` → Adaptability
+
+**Note**: The final, polished plots as they appear in the submitted paper are located in the `paper_figures/` directory. The experiment scripts will regenerate the underlying data and create similar plots in the respective `experiments/*/plots/` directories. Minor stylistic differences between the generated and final plots are expected.
 
 
 ## Configuration
@@ -93,15 +94,9 @@ Main parameters in `experiments/config/experiments.yaml`:
 - `samples_per_dataset`: 500 (queries per dataset)
 - `lambda_weight`: Accuracy-energy trade-off
 
-## Results
-
-- Contextual bandits outperform non-contextual baselines by 15-20%
-- LinUCB achieves best exploration-exploitation balance
-- Task type and complexity are most informative features
-
 Results are saved in `experiments/*/results/` with timestamp.
 
-## Notes
+## Additional Notes
 
-- We use dataset names as task labels for experimental clarity (see paper Section 4.2)
+- The implementation includes a lightweight logistic regression classifier (`models/exemplary_task_classifier.pkl`) to determine the task type (e.g., summarization, Q&A) from a query's instruction text. This is designed for a real-world scenario where task labels are not explicitly known. However, to ensure experimental consistency and eliminate classification noise from the evaluation of the whole system, the experiments reported in the paper use the ground-truth task label derived directly from the source dataset of each query.
 - Sample size limited to 2500 queries for computational feasibility
