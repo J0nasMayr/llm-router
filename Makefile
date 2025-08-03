@@ -47,53 +47,53 @@ clean: stop-db
 
 # Experiment targets (full runs)
 exp00-full:
-	@echo "Running A2 Warmup experiment..."
+	@echo "Running Warmup experiment..."
 	./venv/bin/python -m experiments.00_warmup.run_experiment
 
 exp02-full:
-	@echo "Running A3 Feature Ablation experiment..."
+	@echo "Running Feature Ablation experiment..."
 	./venv/bin/python -m experiments.02_feature_ablation.run_experiment
 
 exp04-full:
-	@echo "Running A4 Hyperparameter Tuning experiment..."
+	@echo "Running Hyperparameter Tuning experiment..."
 	./venv/bin/python -m experiments.04_hyperparameter_tuning.run_experiment
 
 exp01-full:
-	@echo "Running A5 Algorithm Bakeoff experiment..."
+	@echo "Running Algorithm Comparison experiment..."
 	./venv/bin/python -m experiments.01_algorithm_comparison.run_experiment
 
 exp03-full:
-	@echo "Running A6 Lambda Sweep experiment..."
+	@echo "Running Lambda Sweep experiment..."
 	./venv/bin/python -m experiments.03_lambda_sweep.run_experiment
 
 exp05-full:
-	@echo "Running A8 Adaptability experiment..."
+	@echo "Running Adaptability experiment..."
 	./venv/bin/python -m experiments.05_adaptability.run_experiment
 
 # Plot-only targets (regenerate plots from existing data)
 # Usage: make exp00-plot [TS=20250714_123456]
 exp00-plot:
-	@echo "Generating A2 Warmup plots..."
+	@echo "Generating Warmup plots..."
 	./venv/bin/python -m experiments.00_warmup.plotting $(TS)
 
 exp02-plot:
-	@echo "Generating A3 Feature Ablation plots..."
+	@echo "Generating Feature Ablation plots..."
 	./venv/bin/python -m experiments.02_feature_ablation.plotting $(TS)
 
 exp04-plot:
-	@echo "Generating A4 Hyperparameter Tuning plots..."
+	@echo "Generating Hyperparameter Tuning plots..."
 	./venv/bin/python -m experiments.04_hyperparameter_tuning.plotting $(TS)
 
 exp01-plot:
-	@echo "Generating A5 Algorithm Bakeoff plots..."
+	@echo "Generating Algorithm Comparison plots..."
 	./venv/bin/python -m experiments.01_algorithm_comparison.plotting $(TS)
 
 exp03-plot:
-	@echo "Generating A6 Lambda Sweep plots..."
+	@echo "Generating Lambda Sweep plots..."
 	./venv/bin/python -m experiments.03_lambda_sweep.plotting $(TS)
 
 exp05-plot:
-	@echo "Generating A8 Adaptability plots..."
+	@echo "Generating Adaptability plots..."
 	./venv/bin/python -m experiments.05_adaptability.plotting $(TS)
 
 # Legacy shortcuts 
@@ -106,27 +106,27 @@ exp05: exp05-full
 
 # Clean plot directories
 clean-exp00-plots:
-	@echo "Cleaning A2 plots..."
+	@echo "Cleaning exp00 plots..."
 	@rm -f experiments/00_warmup/plots/*.png experiments/00_warmup/plots/*.jpg
 
 clean-exp02-plots:
-	@echo "Cleaning A3 plots..."
+	@echo "Cleaning exp02 plots..."
 	@rm -f experiments/02_feature_ablation/plots/*.png experiments/02_feature_ablation/plots/*.jpg
 
 clean-exp04-plots:
-	@echo "Cleaning A4 plots..."
+	@echo "Cleaning exp04 plots..."
 	@rm -f experiments/04_hyperparameter_tuning/plots/*.png experiments/04_hyperparameter_tuning/plots/*.jpg
 
 clean-exp01-plots:
-	@echo "Cleaning A5 plots..."
+	@echo "Cleaning exp01 plots..."
 	@rm -f experiments/01_algorithm_comparison/plots/*.png experiments/01_algorithm_comparison/plots/*.jpg
 
 clean-exp03-plots:
-	@echo "Cleaning A6 plots..."
+	@echo "Cleaning exp03 plots..."
 	@rm -f experiments/03_lambda_sweep/plots/*.png experiments/03_lambda_sweep/plots/*.jpg
 
 clean-exp05-plots:
-	@echo "Cleaning A8 plots..."
+	@echo "Cleaning exp05 plots..."
 	@rm -f experiments/05_adaptability/plots/*.png experiments/05_adaptability/plots/*.jpg
 
 # Clean all plots
@@ -138,17 +138,17 @@ run-all-full:
 	@echo "Starting all experiments in screen sessions with logging..."
 	@mkdir -p logs
 	@screen -L -Logfile logs/exp_00.log -dmS exp_00 ./venv/bin/python -m experiments.00_warmup.run_experiment
-	@echo "Started A2 in screen session 'exp_00' (log: logs/exp_00.log)"
+	@echo "Started Warmup in screen session 'exp_00' (log: logs/exp_00.log)"
 	@screen -L -Logfile logs/exp_02.log -dmS exp_02 ./venv/bin/python -m experiments.02_feature_ablation.run_experiment
-	@echo "Started A3 in screen session 'exp_02' (log: logs/exp_02.log)"
+	@echo "Started Feature Ablation in screen session 'exp_02' (log: logs/exp_02.log)"
 	@screen -L -Logfile logs/exp_04.log -dmS exp_04 ./venv/bin/python -m experiments.04_hyperparameter_tuning.run_experiment
-	@echo "Started A4 in screen session 'exp_04' (log: logs/exp_04.log)"
+	@echo "Started Hyperparameter Tuning in screen session 'exp_04' (log: logs/exp_04.log)"
 	@screen -L -Logfile logs/exp_01.log -dmS exp_01 ./venv/bin/python -m experiments.01_algorithm_comparison.run_experiment
-	@echo "Started A5 in screen session 'exp_01' (log: logs/exp_01.log)"
+	@echo "Started Algorithm Comparison in screen session 'exp_01' (log: logs/exp_01.log)"
 	@screen -L -Logfile logs/exp_03.log -dmS exp_03 ./venv/bin/python -m experiments.03_lambda_sweep.run_experiment
-	@echo "Started A6 in screen session 'exp_03' (log: logs/exp_03.log)"
+	@echo "Started Lambda Sweep in screen session 'exp_03' (log: logs/exp_03.log)"
 	@screen -L -Logfile logs/exp_05.log -dmS exp_05 ./venv/bin/python -m experiments.05_adaptability.run_experiment
-	@echo "Started A8 in screen session 'exp_05' (log: logs/exp_05.log)"
+	@echo "Started Adaptability in screen session 'exp_05' (log: logs/exp_05.log)"
 	@echo "All experiments started! Logs are in logs/ directory."
 	@echo "Use 'screen -ls' to see sessions and 'screen -r exp_XX' to attach."
 
@@ -162,23 +162,23 @@ check-status:
 # Run all plot generations
 run-all-plot:
 	@echo "Generating plots for all experiments..."
-	@echo "=== A2 Warmup ==="
-	@./venv/bin/python -m experiments.00_warmup.plotting || echo "A2 plot generation failed"
+	@echo "=== Warmup ==="
+	@./venv/bin/python -m experiments.00_warmup.plotting || echo "Warmup plot generation failed"
 	@echo ""
-	@echo "=== A3 Feature Ablation ==="
-	@./venv/bin/python -m experiments.02_feature_ablation.plotting || echo "A3 plot generation failed"
+	@echo "=== Feature Ablation ==="
+	@./venv/bin/python -m experiments.02_feature_ablation.plotting || echo "Feature Ablation plot generation failed"
 	@echo ""
-	@echo "=== A4 Hyperparameter Tuning ==="
-	@./venv/bin/python -m experiments.04_hyperparameter_tuning.plotting || echo "A4 plot generation failed"
+	@echo "=== Hyperparameter Tuning ==="
+	@./venv/bin/python -m experiments.04_hyperparameter_tuning.plotting || echo "Hyperparameter Tuning plot generation failed"
 	@echo ""
-	@echo "=== A5 Algorithm Bakeoff ==="
-	@./venv/bin/python -m experiments.01_algorithm_comparison.plotting || echo "A5 plot generation failed"
+	@echo "=== Algorithm Comparison ==="
+	@./venv/bin/python -m experiments.01_algorithm_comparison.plotting || echo "Algorithm Comparison plot generation failed"
 	@echo ""
-	@echo "=== A6 Lambda Sweep ==="
-	@./venv/bin/python -m experiments.03_lambda_sweep.plotting || echo "A6 plot generation failed"
+	@echo "=== Lambda Sweep ==="
+	@./venv/bin/python -m experiments.03_lambda_sweep.plotting || echo "Lambda Sweep plot generation failed"
 	@echo ""
-	@echo "=== A8 Adaptability ==="
-	@./venv/bin/python -m experiments.05_adaptability.plotting || echo "A8 plot generation failed"
+	@echo "=== Adaptability ==="
+	@./venv/bin/python -m experiments.05_adaptability.plotting || echo "Adaptability plot generation failed"
 	@echo ""
 	@echo "All plot generation complete!"
 
