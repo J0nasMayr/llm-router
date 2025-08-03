@@ -110,7 +110,7 @@ def generate_hyperparameter_performance_plot(summary_df: pd.DataFrame, exp_dirs:
                     ax.set_ylabel("Mean Final Regret")
 
                 plt.tight_layout()
-                plot_filename = plots_dir / f"a4_hyperparam_perf_{algo}.png"
+                plot_filename = plots_dir / f"04_hyperparameter_tuning_hyperparam_perf_{algo}.png"
                 fig.savefig(plot_filename, bbox_inches="tight")
                 logger.info(f"Saved hyperparameter performance plot: {plot_filename}")
                 plt.close(fig)
@@ -163,7 +163,7 @@ def generate_hyperparameter_performance_plot(summary_df: pd.DataFrame, exp_dirs:
                 g.legend.set_title(f"{style_param}")
                 plt.tight_layout(rect=[0, 0, 1, 0.97])
 
-                plot_filename = plots_dir / f"a4_hyperparam_perf_{algo}.png"
+                plot_filename = plots_dir / f"04_hyperparameter_tuning_hyperparam_perf_{algo}.png"
                 g.savefig(plot_filename, bbox_inches="tight")
                 logger.info(f"Saved hyperparameter performance plot: {plot_filename}")
                 plt.close(g.fig)
@@ -254,7 +254,7 @@ def generate_a4_model_choice_timeline(results_df, exp_dirs, strategy_name):
     plt.yticks(model_order)
     plt.grid(True, linestyle="--", alpha=0.4)
     plt.tight_layout(rect=[0, 0, 0.9, 1])
-    filename = output_dir / f"a4_model_choice_timeline_{strategy_name}.png"
+    filename = output_dir / f"04_hyperparameter_tuning_model_choice_timeline_{strategy_name}.png"
     try:
         plt.savefig(filename, dpi=300, bbox_inches="tight")
         logger.info(f"Saved model choice timeline plot to {filename}")
@@ -328,7 +328,7 @@ def generate_best_strategy_timeline_plot(summary_df: pd.DataFrame, exp_dirs: dic
         param_str = _format_params_for_filename(best_params)
         strategy_name_for_file = f"{best_algo}{param_str}"  # For filename
         f"{best_algo} ({', '.join(f'{k}={v}' for k, v in best_params.items())})"  # For plot title/logging
-        file_prefix = f"a4_detailed_results_{strategy_name_for_file}"
+        file_prefix = f"04_hyperparameter_tuning_detailed_results_{strategy_name_for_file}"
         results_dir = Path(exp_dirs.get("results", None))
 
         if not results_dir or not results_dir.exists():

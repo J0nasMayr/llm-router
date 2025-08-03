@@ -78,7 +78,7 @@ def generate_a8_cumulative_regret_plot(
     plt.tight_layout()
 
     # --- Plot Saving ---
-    filename = output_dir / "a8_cumulative_regret.png"
+    filename = output_dir / "05_adaptability_cumulative_regret.png"
     plt.savefig(filename, dpi=300)
     logger.info(f"Saved cumulative regret plot to {filename}")
     plt.close()
@@ -204,7 +204,7 @@ def generate_a8_model_selection_plot(
     )
 
     # --- Plot Saving ---
-    filename = output_dir / "a8_model_selection_frequency.png"
+    filename = output_dir / "05_adaptability_model_selection_frequency.png"
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     logger.info(f"Saved model selection frequency plot to {filename}")
     plt.close()
@@ -343,7 +343,7 @@ def generate_a8_model_choice_timeline(
     # plt.xticks(rotation=45)
 
     # --- Plot Saving ---
-    filename = output_dir / "a8_model_choice_timeline.png"
+    filename = output_dir / "05_adaptability_model_choice_timeline.png"
     plt.savefig(filename, dpi=300, bbox_inches="tight")
     logger.info(f"Saved model choice timeline plot to {filename}")
     plt.close()
