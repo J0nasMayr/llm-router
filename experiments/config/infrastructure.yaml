@@ -2,8 +2,8 @@ database:
   host: "localhost"
   port: 5438
   database: "llm_db"
-  user: "tz"
-  password: "hpc_llm"
+  user: "postgres"
+  password: "CHANGE_ME"
 
 redis:
   host: "localhost"

@@ -3,6 +3,6 @@ random_seed: 42
 samples_per_dataset: 500
 
 # paths
-cache_dir: "/data/tziller/hf_cache"
+cache_dir: "~/.cache/huggingface"
 preprocessed_dir: "data/preprocessed"
 hf_token: "XXXXX"

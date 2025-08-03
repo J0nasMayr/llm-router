@@ -10,7 +10,7 @@ feature_extraction:
     embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
     embedding_dim: 384
     instruction_max_length: 200
-    classifier_path: "/home/ubuntu/repos/contextual-llm-router/models/proper_task_classifier.pkl"
+    classifier_path: "models/proper_task_classifier.pkl"
     
   semantic_clustering:
     num_clusters: 9

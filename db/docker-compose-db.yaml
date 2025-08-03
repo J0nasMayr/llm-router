@@ -3,14 +3,14 @@ services:
     image: postgres:15
     environment:
       POSTGRES_DB: llm_db
-      POSTGRES_USER: tz
-      POSTGRES_PASSWORD: hpc_llm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: XXXXX
     ports:
       - "5432:5432"
   
   redis:
     image: redis:7
-    command: ["redis-server", "--requirepass", "hpc_llm"]
+    command: ["redis-server", "--requirepass", "XXXXX"]
     ports:
       - "6380:6379"
 
