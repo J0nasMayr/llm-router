@@ -88,7 +88,7 @@ def create_bandit_instance(
                 seed=seed,
             )
         else:
-            logger.error(f"Unsupported algorithm name for A3 experiment: {algo_name}")
+            logger.error(f"Unsupported algorithm name for feature ablation experiment: {algo_name}")
             return None
     except KeyError as e:
         logger.error(

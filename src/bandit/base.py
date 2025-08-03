@@ -2,7 +2,6 @@
 from abc import ABC, abstractmethod
 
 
-
 class BaseBandit(ABC):
     """Base class for multi-armed bandit algorithms"""
 

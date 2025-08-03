@@ -1,4 +1,3 @@
-
 # src/bandit/thompson.py
 import logging
 

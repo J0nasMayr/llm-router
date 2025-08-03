@@ -1,5 +1,5 @@
 """
-Model Pool Adaptability Experiment (A8)
+Model Pool Adaptability Experiment
 
 This experiment evaluates how well bandit algorithms adapt to changes in the
 available model pool. It simulates adding/removing models mid-experiment to
@@ -60,13 +60,13 @@ def main():
         "feature_extraction",
         config_dir="experiments/config",
     )
-    a8_config = configs["experiments"][EXPERIMENT_NAME]
-    a8_config.get("plotting", {})
-    algo_name = a8_config.get("active_algorithm")
+    exp_config = configs["experiments"][EXPERIMENT_NAME]
+    exp_config.get("plotting", {})
+    algo_name = exp_config.get("active_algorithm")
     if not algo_name:
-        logger.error("'active_algorithm' key not found in A8 config. Exiting.")
+        logger.error("'active_algorithm' key not found in config. Exiting.")
         return
-    all_algo_params_dict = a8_config.get("algorithms", {})
+    all_algo_params_dict = exp_config.get("algorithms", {})
     algo_params = all_algo_params_dict.get(algo_name)
     if algo_params is None:
         logger.error(
@@ -74,9 +74,9 @@ def main():
         )
         return
     reg_lambda = algo_params.get("lambda_") or algo_params.get("regularization")
-    change_point_idx = a8_config.get("change_point_query_index")
-    model_to_add = a8_config.get("model_to_add")
-    model_to_remove = a8_config.get("model_to_remove")
+    change_point_idx = exp_config.get("change_point_query_index")
+    model_to_add = exp_config.get("model_to_add")
+    model_to_remove = exp_config.get("model_to_remove")
     if (
         change_point_idx is None
         or not isinstance(change_point_idx, int)
@@ -90,12 +90,12 @@ def main():
         logger.warning(
             "Neither 'model_to_add' nor 'model_to_remove' specified. Experiment will run without adaptation."
         )
-    lambda_weight = a8_config["lambda_weight"]
-    feature_config = a8_config.get("features", ["all"])
-    n_runs = a8_config["n_runs"]
-    base_seed = a8_config["random_seed"]
-    dataset_names = a8_config.get("datasets", ["all"])
-    samples_per_dataset = a8_config.get("samples_per_dataset", 500)
+    lambda_weight = exp_config["lambda_weight"]
+    feature_config = exp_config.get("features", ["all"])
+    n_runs = exp_config["n_runs"]
+    base_seed = exp_config["random_seed"]
+    dataset_names = exp_config.get("datasets", ["all"])
+    samples_per_dataset = exp_config.get("samples_per_dataset", 500)
 
     logger.info(
         f"Starting {EXPERIMENT_NAME} ({algo_name}) | Runs: {n_runs} | Lambda: {lambda_weight}"
@@ -418,21 +418,21 @@ def main():
         logger.warning("Results DataFrame is empty, cannot perform debug checks.")
     logger.info("--- End Debugging --- ")
 
-    logger.info("Generating A8 plots...")
+    logger.info("Generating adaptability plots...")
     try:
         from .plotting import (
-            generate_a8_cumulative_regret_plot,
-            generate_a8_model_choice_timeline,
-            generate_a8_model_selection_plot,
+            generate_cumulative_regret_plot,
+            generate_model_choice_timeline,
+            generate_model_selection_plot,
         )
 
         cum_regret_title = f"{EXPERIMENT_NAME} ({algo_name}, $\\lambda={lambda_weight}$)\nMean Cumulative Regret"
-        generate_a8_cumulative_regret_plot(
+        generate_cumulative_regret_plot(
             results_df, exp_dirs, title=cum_regret_title, change_point=change_point_idx
         )
         logger.info(f"Cumulative regret plot saved to {exp_dirs['plots']}")
         selection_plot_title = f"{EXPERIMENT_NAME} ({algo_name}, $\\lambda={lambda_weight}$)\nModel Selection Frequency Over Time"
-        generate_a8_model_selection_plot(
+        generate_model_selection_plot(
             results_df,
             exp_dirs,
             title=selection_plot_title,
@@ -450,7 +450,7 @@ def main():
         )
         logger.info(f"Model selection plot saved to {exp_dirs['plots']}")
         timeline_plot_title = f"{EXPERIMENT_NAME} ({algo_name}, $\\lambda={lambda_weight}$)\nModel Choice Timeline"
-        generate_a8_model_choice_timeline(
+        generate_model_choice_timeline(
             results_df,
             exp_dirs,
             title=timeline_plot_title,

@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 # --- Cumulative Regret Plotting ---
-def generate_a8_cumulative_regret_plot(
+def generate_cumulative_regret_plot(
     results_df, exp_dirs, title=None, change_point=None
 ):
-    """Generates a plot of cumulative regret over time for the A8 experiment."""
+    """Generates a plot of cumulative regret over time for the adaptability experiment."""
     # --- Input Validation ---
     if results_df.empty:
         logger.warning("Results DataFrame is empty. Skipping cumulative regret plot.")
@@ -85,7 +85,7 @@ def generate_a8_cumulative_regret_plot(
 
 
 # --- Model Selection Frequency Plotting ---
-def generate_a8_model_selection_plot(
+def generate_model_selection_plot(
     results_df,
     exp_dirs,
     title=None,
@@ -211,7 +211,7 @@ def generate_a8_model_selection_plot(
 
 
 # --- Model Choice Timeline Plotting ---
-def generate_a8_model_choice_timeline(
+def generate_model_choice_timeline(
     results_df,
     exp_dirs,
     title=None,
@@ -374,14 +374,14 @@ def main():
     config_path = Path(__file__).parent.parent / "config" / "experiments.yaml"
     with open(config_path, "r") as f:
         experiments_config = yaml.safe_load(f)
-    a8_config = experiments_config["05_adaptability"]
+    exp_config = experiments_config["05_adaptability"]
 
     # Extract parameters for plot titles
-    algo_name = a8_config.get("active_algorithm", "Unknown")
-    lambda_weight = a8_config.get("lambda_weight", 0)
-    change_point_idx = a8_config.get("change_point_query_index", None)
-    model_to_add = a8_config.get("model_to_add")
-    model_to_remove = a8_config.get("model_to_remove")
+    algo_name = exp_config.get("active_algorithm", "Unknown")
+    lambda_weight = exp_config.get("lambda_weight", 0)
+    change_point_idx = exp_config.get("change_point_query_index", None)
+    model_to_add = exp_config.get("model_to_add")
+    model_to_remove = exp_config.get("model_to_remove")
 
     # Get all models that were ever available
     (
@@ -400,7 +400,7 @@ def main():
 
     # Generate model selection frequency plot only
     selection_plot_title = f"05_adaptability ({algo_name}, $\\lambda={lambda_weight}$)\nModel Selection Frequency Over Time"
-    generate_a8_model_selection_plot(
+    generate_model_selection_plot(
         results_df,
         exp_dirs,
         title=selection_plot_title,

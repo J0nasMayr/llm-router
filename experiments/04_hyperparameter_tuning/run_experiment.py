@@ -218,9 +218,9 @@ def main():
     # ========================================================================
 
     all_detailed_run_results = []
-    logger.info(f"[A4 Setup] Initial len(query_ids): {len(query_ids)}")
-    logger.info(f"[A4 Setup] Initial query_ids sample (first 10): {query_ids[:10]}")
-    logger.info(f"[A4 Setup] Initial query_ids sample (last 10): {query_ids[-10:]}")
+    logger.info(f"[Hyperparameter Tuning Setup] Initial len(query_ids): {len(query_ids)}")
+    logger.info(f"[Hyperparameter Tuning Setup] Initial query_ids sample (first 10): {query_ids[:10]}")
+    logger.info(f"[Hyperparameter Tuning Setup] Initial query_ids sample (last 10): {query_ids[-10:]}")
     query_sequence = query_ids.copy()
 
     for algo_name, base_algo_params in algorithms_to_tune.items():
@@ -245,7 +245,7 @@ def main():
                 random.seed(seed)
                 np.random.seed(seed)
                 logger.info(
-                    f"[A4 Run {r+1}] Instantiating {algo_name} with params: {specific_params} | Reg Lambda: {current_reg_lambda}"
+                    f"[Run {r+1}] Instantiating {algo_name} with params: {specific_params} | Reg Lambda: {current_reg_lambda}"
                 )
                 algo = create_bandit_instance(
                     algo_name=algo_name,
@@ -263,7 +263,7 @@ def main():
                 random.shuffle(query_sequence)
                 if r == 0:
                     logger.info(
-                        f"[A4 Run {r+1}] Initial query sequence sample (first 20): {query_sequence[:20]}"
+                        f"[Run {r+1}] Initial query sequence sample (first 20): {query_sequence[:20]}"
                     )
                 for qid_idx, qid in enumerate(
                     tqdm(

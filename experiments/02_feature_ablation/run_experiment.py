@@ -143,15 +143,15 @@ def main():
         "feature_extraction",
         config_dir="experiments/config",
     )
-    a3_config = configs["experiments"][EXPERIMENT_NAME]
-    algo_name = a3_config.get("active_algorithm")
+    exp_config = configs["experiments"][EXPERIMENT_NAME]
+    algo_name = exp_config.get("active_algorithm")
 
     if not algo_name:
         logger.error(
             f"'active_algorithm' key not found in configuration for {EXPERIMENT_NAME}. Exiting."
         )
         return
-    all_algo_params_dict = a3_config.get("algorithms", {})
+    all_algo_params_dict = exp_config.get("algorithms", {})
     algo_params = all_algo_params_dict.get(algo_name)
     if algo_params is None:
         logger.error(
@@ -162,11 +162,11 @@ def main():
     if reg_lambda is None:
         reg_lambda = algo_params.get("regularization")
 
-    lambda_weight = a3_config["lambda_weight"]
+    lambda_weight = exp_config["lambda_weight"]
     defaults = configs["experiments"]["defaults"]
-    feature_sets = a3_config["feature_sets"]
-    n_runs = a3_config["n_runs"]
-    base_seed = a3_config["random_seed"]
+    feature_sets = exp_config["feature_sets"]
+    n_runs = exp_config["n_runs"]
+    base_seed = exp_config["random_seed"]
     dataset_names = defaults.get("datasets", ["all"])
     samples_per_dataset = defaults.get("samples_per_dataset", 500)
     logger.info(

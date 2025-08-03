@@ -22,7 +22,7 @@ def generate_reward_barplot(
     title: str = "Average Performance by Feature Set",
 ):
     """Generates a bar plot comparing average reward across feature sets."""
-    logger.info("Generating A3 Feature Ablation reward bar plot...")
+    logger.info("Generating Feature Ablation reward bar plot...")
 
     if summary_stats.empty:
         logger.warning(
@@ -78,7 +78,7 @@ def generate_regret_boxplot(
 ):
     """Generates a box plot showing the distribution of final cumulative regret per feature set."""
 
-    logger.info("Generating A3 final cumulative regret box plot...")
+    logger.info("Generating Feature Ablation final cumulative regret box plot...")
 
     if final_regret_df.empty:
         logger.warning("Final regret DataFrame is empty. Cannot generate box plot.")

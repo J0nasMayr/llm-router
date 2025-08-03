@@ -177,8 +177,8 @@ def generate_hyperparameter_performance_plot(summary_df: pd.DataFrame, exp_dirs:
 # ============================================================================
 # MODEL CHOICE TIMELINE PLOTTING
 # ============================================================================
-def generate_a4_model_choice_timeline(results_df, exp_dirs, strategy_name):
-    """Generates a timeline plot showing individual model choices over time for a specific A4 strategy."""
+def generate_model_choice_timeline(results_df, exp_dirs, strategy_name):
+    """Generates a timeline plot showing individual model choices over time for a specific strategy."""
 
     if results_df is None or results_df.empty:
         logger.warning(
@@ -286,7 +286,7 @@ def _format_params_for_filename(params_dict):
 def generate_best_strategy_timeline_plot(summary_df: pd.DataFrame, exp_dirs: dict):
     """Finds the best strategy in the summary, loads its detailed data, and plots the model choice timeline."""
 
-    logger.info("Generating model choice timeline for the best A4 strategy...")
+    logger.info("Generating model choice timeline for the best strategy...")
 
     if (
         summary_df.empty
@@ -347,7 +347,7 @@ def generate_best_strategy_timeline_plot(summary_df: pd.DataFrame, exp_dirs: dic
             logger.info(
                 f"Loaded detailed results for best strategy ({len(detailed_df)} rows). Generating timeline plot..."
             )
-            generate_a4_model_choice_timeline(
+            generate_model_choice_timeline(
                 detailed_df, exp_dirs, strategy_name_for_file
             )
         else:

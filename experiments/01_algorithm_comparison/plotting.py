@@ -1,5 +1,5 @@
 # ============================================================================
-# PLOTTING FUNCTIONS FOR A5 ALGORITHM BAKEOFF
+# PLOTTING FUNCTIONS FOR ALGORITHM COMPARISON
 # ============================================================================
 
 import logging
@@ -106,23 +106,23 @@ def get_regret_plot_styles(algorithms_to_plot: list) -> (dict, dict):
 # ============================================================================
 
 
-def generate_a5_pareto_plot(
+def generate_pareto_plot(
     a5_summary_df: pd.DataFrame,
     all_norm_results_df: pd.DataFrame,
     exp_dirs: dict,
     models_df: pd.DataFrame = None,
 ):
     """
-    Generates the Pareto plot comparing A1 baselines/models with the A5 tuned algorithm results.
+    Generates the Pareto plot comparing baselines/models with the tuned algorithm results.
 
     Args:
-        a5_summary_df (pd.DataFrame): Aggregated results from A5 simulation (Algorithm, Mean Accuracy, Mean Energy).
+        a5_summary_df (pd.DataFrame): Aggregated results from algorithm comparison (Algorithm, Mean Accuracy, Mean Energy).
                                       This MUST contain results for BOTH A5 algorithms AND A1 baselines simulated within A5.
         all_norm_results_df (pd.DataFrame): DataFrame containing normalized results for **all individual A1 models** (for background/frontier).
         exp_dirs (dict): Experiment directories.
         models_df (pd.DataFrame, optional): DataFrame containing model metadata (like parameter count). Defaults to None.
     """
-    logger.info("Generating A5 Algorithm Bakeoff Pareto plot...")
+    logger.info("Generating Algorithm Comparison Pareto plot...")
     fig, ax = plt.subplots(figsize=(10, 7))
     all_processed_points = []
     if all_norm_results_df is not None and not all_norm_results_df.empty:
