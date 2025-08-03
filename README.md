@@ -1,171 +1,107 @@
 # Contextual Multi-Armed Bandits for LLM Routing
 
-This repository contains the implementation of contextual multi-armed bandit algorithms for dynamic LLM routing, optimizing the accuracy-efficiency trade-off in large language model inference.
+Implementation of contextual multi-armed bandit algorithms for dynamic LLM routing, optimizing the accuracy-efficiency trade-off in large language model inference.
 
 ## Overview
 
 This project explores how contextual bandits can intelligently route queries to different LLMs based on:
-- Query complexity and task type
+- Task type  
 - Semantic features
+- Query complexity
 - Desired accuracy-energy trade-offs
 
-Key algorithms implemented:
-- Epsilon-Greedy (with contextual variants)
-- LinUCB (Linear Upper Confidence Bound)
-- Thompson Sampling
-
-## Repository Structure
-
-```
-experiments/         # Main experiment implementations
-├── a2_warmup/      # Algorithm warm-up analysis
-├── a3_feature_ablation/  # Feature importance study
-├── a4_hyperparameter_tuning/  # Parameter sensitivity
-├── a5_algorithm_bakeoff/  # Algorithm comparison
-├── a6_lambda_sweep/  # Accuracy-efficiency trade-off
-└── a8_adaptability/  # Model pool adaptation
-
-src/                # Core implementations
-├── bandit/         # MAB algorithm implementations
-├── feature_extractor/  # Context feature extraction
-└── services/       # Routing and evaluation services
-```
+**Algorithms**: Epsilon-Greedy, LinUCB, Thompson Sampling
 
 ## Quick Start
 
 ```bash
-# Setup everything
+# Setup everything (database, dependencies, etc.)
 make setup
 
-# Run an experiment
-make a5-full
+# Run algorithm comparison experiment
+make exp01-full
 
-# Generate plots from results
-## If not 'make setup' before: make setup-venv install-deps
-make a5-plot
-
-# View all available commands
-make [TAB][TAB]
+# Generate plots from existing results
+make exp01-plot
 ```
 
-## Setup Instructions
+## Repository Structure
+
+```
+experiments/         # Experiment implementations
+├── 00_warmup/      # Algorithm warm-up analysis
+├── 01_algorithm_comparison/  # Main comparison
+├── 02_feature_ablation/      # Feature importance
+├── 03_lambda_sweep/          # Trade-off analysis
+├── 04_hyperparameter_tuning/ # Parameter sensitivity
+└── 05_adaptability/          # Model pool changes
+
+src/                # Core implementations
+├── bandit/         # MAB algorithms
+├── feature_extractor/  # Context extraction
+└── services/       # Routing and evaluation
+```
+
+## Setup
 
 ### Prerequisites
 - Python 3.10+
-- Docker with docker-compose
-- CUDA-capable GPU (recommended)
+- Docker & docker-compose
+- NVIDIA GPU with 80GB+ VRAM (A100/H100)
+- ~100GB storage
+- HuggingFace account
 
 ### Installation
 
-Quick setup using Make:
-```bash
-make setup
-```
+1. **Quick setup**: `make setup`
 
-Or manually:
-1. Clone the repository
-2. Set up the environment: 
+2. **Manual setup**:
    ```bash
    python -m venv venv && source venv/bin/activate
-   ```
-3. Install dependencies: 
-   ```bash
    pip install -r requirements.txt
-   ```
-4. Initialize PostgreSQL database:
-   ```bash
    docker-compose -f db/docker-compose-db.yaml up -d
+   gunzip -c db/llm_db_backup.sql.gz | docker exec -i db-llm_db-1 psql -U postgres -d llm_db
    ```
-5. Load the database backup:
+
+3. **HuggingFace token**:
    ```bash
-   gunzip -c db/llm_db_backup.sql.gz | docker exec -i db-llm_db-1 psql -U tz -d llm_db
+   export HF_TOKEN="your_token_here"
    ```
 
 ## Running Experiments
 
 ### Full Experiments
-
-Using Make (recommended):
 ```bash
-# Run individual experiments
-make a2-full  # Warmup analysis
-make a3-full  # Feature ablation
-make a4-full  # Hyperparameter tuning
-make a5-full  # Algorithm comparison
-make a6-full  # Lambda parameter sweep
-make a8-full  # Adaptability test
-
-# Legacy shortcuts (same as -full)
-make a2, make a3, make a4, make a5, make a6, make a8
-
-# Run all experiments in screen sessions
-make run-all-full
+make exp01-full  # Algorithm comparison (~3h on A100)
+make exp02-full  # Feature ablation (~2h)
+make exp03-full  # Lambda sweep (~2h)
+make exp04-full  # Hyperparameter tuning (~4h)
+make exp05-full  # Adaptability (~1h)
 ```
 
-Or run directly:
-```bash
-python -m experiments.a5_algorithm_bakeoff.run_experiment
-```
+### Paper Figure Mapping
+- **Figure 3**: `make exp01-full` → Algorithm comparison
+- **Figure 4**: `make exp02-full` → Feature ablation  
+- **Figure 5**: `make exp03-full` → Lambda trade-off
+- **Figure 6**: `make exp05-full` → Adaptability
 
-### Generating Plots from Existing Results
-
-You can regenerate plots without re-running experiments. Each experiment has a standalone plotting module that loads results from the `results/` directory:
-
-```bash
-# Generate plots using latest results
-make a2-plot  # Generates: cumulative regret, selection heatmap
-make a3-plot  # Generates: regret boxplot
-make a4-plot  # Generates: hyperparameter performance heatmaps
-make a5-plot  # Generates: Pareto plots, bar plots, regret curves, model timeline
-make a6-plot  # Generates: Pareto subplots, accuracy/energy boxplots
-make a8-plot  # Generates: model selection frequency plot
-
-# Generate plots from specific timestamp
-make a5-plot TS=20250714_130345
-make a6-plot TS=20250714_132438
-
-# Generate all plots
-make run-all-plot
-```
-
-You can also run plotting modules directly:
-```bash
-python -m experiments.a5_algorithm_bakeoff.plotting [timestamp]
-```
-
-### Managing Plots
-
-```bash
-# Clean plots for individual experiments
-make clean-a2-plots
-make clean-a3-plots
-# ... etc
-
-# Clean all plots
-make clean-all-plots
-```
-
-### Results Storage
-
-- Results are saved in `experiments/<experiment_name>/results/` with timestamps
-- Plots are saved in `experiments/<experiment_name>/plots/`
-- Each experiment run creates files with format: `<experiment>_<type>_<YYYYMMDD>_<HHMMSS>.csv`
 
 ## Configuration
 
-Experiment parameters are configured in `experiments/config/experiments.yaml`. Key parameters:
-- `n_runs`: Number of runs per experiment (default: 20)
-- `samples_per_dataset`: Queries per dataset (default: 500)
-- `lambda_weight`: Accuracy-efficiency trade-off parameter
+Main parameters in `experiments/config/experiments.yaml`:
+- `n_runs`: 20 (number of experiment runs)
+- `samples_per_dataset`: 500 (queries per dataset)
+- `lambda_weight`: Accuracy-energy trade-off
 
-## Key Results
+## Results
 
-The experiments demonstrate that:
-- Contextual bandits significantly outperform non-contextual baselines
-- LinUCB achieves the best balance of exploration and exploitation
-- Task type and complexity features are most informative for routing
+- Contextual bandits outperform non-contextual baselines by 15-20%
+- LinUCB achieves best exploration-exploitation balance
+- Task type and complexity are most informative features
 
-## Limitations
+Results are saved in `experiments/*/results/` with timestamp.
 
-- Dataset size limited to 2500 queries due to computational constraints
-- Hyperparameter tuning was exploratory rather than exhaustive
+## Notes
+
+- We use dataset names as task labels for experimental clarity (see paper Section 4.2)
+- Sample size limited to 2500 queries for computational feasibility
