@@ -26,15 +26,7 @@ thompson_sampling_defaults: &thompson_sampling_defaults
   sigma: 0.25
   prior_variance: 2
 
-a1_static_sanity_check:
-  category: 'Static Baseline Evaluation'
-  datasets: ['all']
-  samples_per_dataset: 500
-  model_ids: ['all']
-  n_runs: *standard_n_runs
-  random_seed: *standard_random_seed
-
-00_warmup:
+X0_warmup:
   category: 'Algorithm Warm-up'
   lambda_weight: *standard_lambda_weight
   random_seed: *standard_random_seed
@@ -46,7 +38,23 @@ a1_static_sanity_check:
     linucb:
       <<: *linucb_defaults
 
-02_feature_ablation:
+X1_algorithm_comparison:
+  category: 'Algorithm Bakeoff'
+  n_runs: *standard_n_runs
+  lambda_weight: *standard_lambda_weight
+  random_seed: *standard_random_seed
+  features: *standard_features
+  algorithms:
+    epsilon_greedy:
+      <<: *epsilon_greedy_defaults
+    linear_epsilon_greedy:
+      <<: *linear_epsilon_greedy_defaults
+    linucb:
+      <<: *linucb_defaults
+    thompson_sampling:
+      <<: *thompson_sampling_defaults
+
+X2_feature_ablation:
   category: 'Feature Ablation'
   active_algorithm: 'linucb'
   lambda_weight: *standard_lambda_weight
@@ -72,46 +80,7 @@ a1_static_sanity_check:
     thompson_sampling:
       <<: *thompson_sampling_defaults
 
-04_hyperparameter_tuning:
-  category: 'Hyperparameter Tuning for MABs'
-  n_runs: *standard_n_runs
-  lambda_weight: *standard_lambda_weight
-  random_seed: *standard_random_seed
-  features: *standard_features
-  algorithms:
-    epsilon_greedy:
-      initial_epsilon: 1.0
-      decay_factor: [0.95, 0.98, 0.99]
-      min_epsilon: [0.005, 0.01, 0.02]
-    linear_epsilon_greedy:
-      initial_epsilon: 1.0
-      decay_factor: [0.98, 0.99, 0.995]
-      min_epsilon: [0.01, 0.02, 0.03]
-      lambda_: [0.1, 0.25, 0.5, 1.0]
-    linucb:
-      alpha: [0.05, 0.1, 0.25]
-      regularization: [0.005, 0.01, 0.02, 0.05]
-    thompson_sampling:
-      sigma: [0.1, 0.2]
-      prior_variance: [1.0, 2.0, 3.0, 5.0]
-
-01_algorithm_comparison:
-  category: 'Algorithm Bakeoff'
-  n_runs: *standard_n_runs
-  lambda_weight: *standard_lambda_weight
-  random_seed: *standard_random_seed
-  features: *standard_features
-  algorithms:
-    epsilon_greedy:
-      <<: *epsilon_greedy_defaults
-    linear_epsilon_greedy:
-      <<: *linear_epsilon_greedy_defaults
-    linucb:
-      <<: *linucb_defaults
-    thompson_sampling:
-      <<: *thompson_sampling_defaults
-
-03_lambda_sweep:
+X3_lambda_sweep:
   category: 'Lambda Parameter Sweep'
   n_runs: *standard_n_runs
   random_seed: *standard_random_seed
@@ -128,7 +97,7 @@ a1_static_sanity_check:
     thompson_sampling:
       <<: *thompson_sampling_defaults
 
-05_adaptability:
+X4_adaptability:
   category: 'Model Pool Adaptability'
   n_runs: *standard_n_runs
   lambda_weight: *standard_lambda_weight

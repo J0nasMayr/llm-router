@@ -3,7 +3,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_DB: llm_db
-      POSTGRES_USER: postgres
+      POSTGRES_USER: tz
       POSTGRES_PASSWORD: XXXXX
     ports:
       - "5432:5432"

@@ -13,7 +13,7 @@ feature_extraction:
     classifier_path: "models/exemplary_task_classifier.pkl"
     
   semantic_clustering:
-    num_clusters: 9
+    num_clusters: 3
     embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
     
   complexity:

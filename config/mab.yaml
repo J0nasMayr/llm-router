@@ -2,6 +2,6 @@ epsilon-greedy:
   name: epsilon-greedy
   epsilon: 0.1
   num_actions: 2
-  random_seed: 42
+  random_seed: 40
   type: epsilon-greedy
   value: 0.0
