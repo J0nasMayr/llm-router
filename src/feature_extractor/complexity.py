@@ -9,7 +9,6 @@ class ComplexityExtractor(BaseFeatureExtractor):
 
     def __init__(self, config=None):
         super().__init__(config)
-        print(f"ComplexityExtractor: {self.config.get('bins', None)}")
         self.complexity_bins = self.config.get("bins", [3])
 
     def extract(self, query_text, metadata=None):

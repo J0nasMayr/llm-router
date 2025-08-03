@@ -1,1 +1,1 @@
-# Initialize A5 module
+# Initialize algorithm comparison module

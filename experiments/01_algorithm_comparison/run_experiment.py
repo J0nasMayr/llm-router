@@ -30,7 +30,7 @@ from scipy.stats import mannwhitneyu
 from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
-from .plotting import generate_a5_pareto_plot_wh
+from .plotting import generate_pareto_plot_wh
 
 # ============================================================================
 # CONFIGURATION
@@ -1061,7 +1061,7 @@ def main():
 
             all_models_across_subplots = set()
 
-            from .plotting import generate_a5_model_choice_timeline
+            from .plotting import generate_model_choice_timeline
 
             for i, bandit_name in enumerate(bandit_algorithms_run):
                 ax = axes[i]

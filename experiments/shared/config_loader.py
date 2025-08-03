@@ -44,7 +44,7 @@ def load_config(*config_keys, config_dir=None):
     loaded_configs = {}
 
     for key in configs_to_load:
-        print(f"Loading config '{key}' from {config_dir}")
+        logger.debug(f"Loading config '{key}' from {config_dir}")
         if key not in CONFIG_FILES:
             logger.warning(f"Unknown config key '{key}'. Skipping.")
             continue

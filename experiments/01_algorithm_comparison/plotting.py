@@ -440,7 +440,7 @@ def generate_pareto_plot(
     logger.info(f"A5 Pareto plot saved to {exp_dirs['plots'] / plot_filename}")
 
 
-def generate_a5_pareto_plot_wh(
+def generate_pareto_plot_wh(
     a5_summary_df: pd.DataFrame,
     a5_detailed_results_df: pd.DataFrame,
     raw_results_data_df: pd.DataFrame,
@@ -1583,7 +1583,7 @@ def _capitalize_model_name(model_id: str) -> str:
     return "-".join(part.capitalize() for part in model_id.split("-"))
 
 
-def generate_a5_model_choice_timeline(
+def generate_model_choice_timeline(
     detailed_results_df, algo_name, ax, all_model_ids
 ):
     """Generates a timeline plot for a single algorithm's LAST run onto a given axis,
