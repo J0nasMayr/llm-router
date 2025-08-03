@@ -81,7 +81,7 @@ class DataProcessor:
         """Process dataset and convert to DataFrame"""        
         if seed is None:
             general_config = load_config("general")
-            seed = general_config.get("random_seed", 42)
+            seed = general_config.get("random_seed", 40)
         
         if n_samples is not None and n_samples < len(dataset):
             random.seed(seed)

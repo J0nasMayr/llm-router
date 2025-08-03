@@ -108,7 +108,7 @@ def get_experiment_timestamp(experiment_name: str, results_dir: Path, file_patte
     Get timestamp for experiment data, either from command line or latest file.
     
     Args:
-        experiment_name: Name of the experiment (e.g., '00_warmup')
+        experiment_name: Name of the experiment (e.g., 'X0_warmup')
         results_dir: Path to results directory
         file_pattern: Glob pattern to find result files (e.g., '*_detailed_results_*.csv')
     
