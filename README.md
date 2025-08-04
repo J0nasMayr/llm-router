@@ -98,7 +98,7 @@ Results are saved in `experiments/*/results/`.
 
 ## Experimental Notes
 
-- **Raw Data**: The full `detailed_results` for each experiment are not stored in this repository due to their large size, but are available at our Zenodo archive: [LINK TO ZENODO]. The summary statistics required to generate the paper's plots are included.
-- **Task Type**: The paper's experiments use ground-truth task labels from the datasets to ensure a clean evaluation. For real-world use, the repository includes a lightweight classifier (`models/exemplary_task_classifier.pkl`) to infer task types.
+- **Raw Data**: Large `detailed_results` files are excluded from the repository due to their size. The summary statistics required to generate the paper's plots are included.
+- **Task Type**: The implementation includes a lightweight logistic regression classifier (`models/exemplary_task_classifier.pkl`) to determine the task type (e.g., summarization, Q&A) from a query's instruction text. This is designed for a real-world scenario where task labels are not explicitly known for the whole population of queries. However, to eliminate classification noise from the evaluation of the whole system, the experiments reported in the paper use the ground-truth task label derived directly from the source dataset of each query.
 - **Latency Constraint**: The latency constraint described in the paper (Section 4.1) is a formal part of the framework but was not implemented in the experiments to isolate and focus on the accuracy-energy trade-off.
 - **Sample Size**: Experiments are run on a 2500-query sample for computational feasibility.
