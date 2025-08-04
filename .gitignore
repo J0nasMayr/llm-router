@@ -17,9 +17,10 @@ docs/
 thesis_text/
 tmp/
 
-*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].csv
-*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9].yaml
-
-# Ignore specific large detailed results files
 experiments/X3_lambda_sweep/results/*_detailed_results_*.csv
 experiments/X3_lambda_sweep/results/X3_lambda_sweep_detailed_results.csv
+
+experiments/*/results/*_summary_stats_*.csv
+experiments/*/results/*_metadata_*.yaml
+experiments/*/results/*_run_means_*.csv
+experiments/*/results/*_significance_tests_*.csv
