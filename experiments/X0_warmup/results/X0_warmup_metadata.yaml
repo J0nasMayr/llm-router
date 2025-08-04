@@ -1,0 +1,319 @@
+experiment_name: X0_warmup
+run_id: X0_warmup_20250804_010922
+run_timestamp: '2025-08-04T01:09:22.142639'
+configs_used:
+  datasets:
+    datasets:
+      mmlu:
+        load_params:
+          path: cais/mmlu
+          name: all
+        split: test
+        columns:
+          input1: question
+          input2: choices
+          reference: answer
+        preprocessing:
+          input1_prefix: 'Answer with a single letter only.
+
+            Question: '
+          input2_prefix: 'Options:
+
+            '
+          output_prefix: 'Answer: '
+          reference_mapping: index_to_letter
+        extraction:
+          method: multiple_choice
+          pattern: ([A-D])
+        generation:
+          max_new_tokens: 1
+          stop_sequence:
+          - '#'
+      gsm8k:
+        load_params:
+          path: gsm8k
+          name: main
+        split: test
+        columns:
+          input1: question
+          reference: answer
+        preprocessing:
+          input1_prefix: 'Solve this step by step: '
+        extraction:
+          method: regex
+          pattern: (\d+)
+        generation:
+          max_new_tokens: 256
+          stop_sequence:
+          - '
+
+            '
+      cnn_dailymail:
+        load_params:
+          path: cnn_dailymail
+          name: 3.0.0
+        split: test
+        columns:
+          input1: article
+          reference: highlights
+        preprocessing:
+          input1_prefix: 'Summarize: '
+        extraction:
+          method: raw
+        generation:
+          max_new_tokens: 256
+          stop_sequence:
+          - '###'
+  models:
+    phi2:
+      name: microsoft/phi-2
+      parameter_count: 2
+      type: general
+    phi3:
+      name: microsoft/Phi-3-mini-4k-instruct
+      parameter_count: 3
+      type: general
+    qwen2.5-7b:
+      name: Qwen/Qwen2.5-7B
+      parameter_count: 7
+      type: general
+    qwen2.5-14b:
+      name: Qwen/Qwen2.5-14B-Instruct
+      parameter_count: 14
+      type: general
+    qwen2.5-3b:
+      name: Qwen/Qwen2.5-3B-Instruct
+      parameter_count: 3
+      type: general
+    qwen2.5-1.5b:
+      name: Qwen/Qwen2.5-1.5B-Instruct
+      parameter_count: 1.5
+      type: general
+    qwen2.5-0.5b:
+      name: Qwen/Qwen2.5-0.5B-Instruct
+      parameter_count: 0.5
+      type: general
+    mistral-7b:
+      name: mistralai/Mistral-7B-Instruct-v0.3
+      parameter_count: 7
+      type: general
+    gemma-3-27b:
+      name: google/gemma-3-27b-it
+      parameter_count: 27
+      type: general
+    gemma-3-12b:
+      name: google/gemma-3-12b-it
+      parameter_count: 12
+      type: general
+    gemma-3-4b:
+      name: google/gemma-3-4b-it
+      parameter_count: 4
+      type: general
+    gemma-3-1b:
+      name: google/gemma-3-1b-it
+      parameter_count: 1
+      type: general
+    phi-4-mini:
+      name: microsoft/Phi-4-mini-instruct
+      parameter_count: 4
+      type: general
+    phi-4:
+      name: microsoft/phi-4
+      parameter_count: 15
+      type: general
+    llama-3.1-8b:
+      name: meta-llama/Llama-3.1-8B-Instruct
+      parameter_count: 8
+      type: general
+    llama-3.2-3b:
+      name: meta-llama/Llama-3.2-3B-Instruct
+      parameter_count: 3
+      type: general
+    llama-3.2-1b:
+      name: meta-llama/Llama-3.2-1B-Instruct
+      parameter_count: 1
+      type: general
+    Yi-34B:
+      name: 01-ai/Yi-34B
+      parameter_count: 34
+      type: general
+    aya-expanse-32b:
+      name: CohereForAI/aya-expanse-32b
+      parameter_count: 32
+      type: general
+  mab:
+    epsilon_greedy:
+      initial_epsilon: 0.1
+      decay_factor: 0.995
+      min_epsilon: 0.01
+    contextual_epsilon_greedy:
+      initial_epsilon: 0.1
+      decay_factor: 0.995
+      min_epsilon: 0.01
+    linear_epsilon_greedy:
+      initial_epsilon: 0.5
+      decay_factor: 0.995
+      min_epsilon: 0.01
+      lambda_: 0.1
+    linucb:
+      alpha: 0.1
+      regularization: 0.1
+    thompson_sampling:
+      sigma: 0.1
+      prior_variance: 2.0
+  experiments:
+    defaults:
+      datasets:
+      - all
+      samples_per_dataset: 500
+      model_ids:
+      - all
+      random_seed: 40
+      lambda_weight: 0.5
+      n_runs: 5
+      features: &id001
+      - dataset_index
+      - complexity
+      - semantic_cluster
+    epsilon_greedy_defaults:
+      initial_epsilon: 1.0
+      decay_factor: 0.98
+      min_epsilon: 0.01
+    linear_epsilon_greedy_defaults:
+      initial_epsilon: 1.0
+      decay_factor: 0.985
+      min_epsilon: 0.01
+      lambda_: 0.25
+    linucb_defaults:
+      alpha: 0.1
+      regularization: 0.05
+    thompson_sampling_defaults:
+      sigma: 0.25
+      prior_variance: 2
+    X0_warmup:
+      category: Algorithm Warm-up
+      lambda_weight: 0.5
+      random_seed: 40
+      algorithms:
+        epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.98
+          min_epsilon: 0.01
+        contextual_epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.985
+          min_epsilon: 0.01
+          lambda_: 0.25
+        linucb:
+          alpha: 0.1
+          regularization: 0.05
+    X1_algorithm_comparison:
+      category: Algorithm Bakeoff
+      n_runs: 5
+      lambda_weight: 0.5
+      random_seed: 40
+      features: *id001
+      algorithms:
+        epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.98
+          min_epsilon: 0.01
+        linear_epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.985
+          min_epsilon: 0.01
+          lambda_: 0.25
+        linucb:
+          alpha: 0.1
+          regularization: 0.05
+        thompson_sampling:
+          sigma: 0.25
+          prior_variance: 2
+    X2_feature_ablation:
+      category: Feature Ablation
+      active_algorithm: linucb
+      lambda_weight: 0.5
+      random_seed: 40
+      n_runs: 5
+      feature_sets:
+      - none
+      - task
+      - cluster
+      - complex
+      - task_cluster
+      - task_complex
+      - cluster_complex
+      - full
+      exclude_models: []
+      algorithms:
+        epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.98
+          min_epsilon: 0.01
+        linear_epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.985
+          min_epsilon: 0.01
+          lambda_: 0.25
+        linucb:
+          alpha: 0.1
+          regularization: 0.05
+        thompson_sampling:
+          sigma: 0.25
+          prior_variance: 2
+    X3_lambda_sweep:
+      category: Lambda Parameter Sweep
+      n_runs: 5
+      random_seed: 40
+      lambda_weight: 0.5
+      features: *id001
+      lambda_values:
+      - 0.0
+      - 0.1
+      - 0.2
+      - 0.3
+      - 0.4
+      - 0.5
+      - 0.6
+      - 0.7
+      - 0.8
+      - 0.9
+      - 1.0
+      algorithms:
+        epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.98
+          min_epsilon: 0.01
+        linear_epsilon_greedy:
+          initial_epsilon: 1.0
+          decay_factor: 0.985
+          min_epsilon: 0.01
+          lambda_: 0.25
+        linucb:
+          alpha: 0.1
+          regularization: 0.05
+        thompson_sampling:
+          sigma: 0.25
+          prior_variance: 2
+    X4_adaptability:
+      category: Model Pool Adaptability
+      n_runs: 5
+      lambda_weight: 0.5
+      random_seed: 40
+      features: *id001
+      change_point_query_index: 1000
+      model_to_add: gemma-3-12b
+      model_to_remove: llama-3.1-8b
+      active_algorithm: linucb
+      algorithms:
+        linucb:
+          alpha: 0.1
+          regularization: 0.05
+        thompson_sampling:
+          sigma: 0.25
+          prior_variance: 2
+algorithms_compared:
+- random
+- epsilon_greedy
+n_runs: 5
+base_random_seed: 40
