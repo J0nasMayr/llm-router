@@ -85,6 +85,122 @@ def generate_cumulative_regret_plot(
 
 
 # --- Model Selection Frequency Plotting ---
+def generate_model_selection_heatmap(
+    results_df,
+    exp_dirs,
+    title=None,
+    change_point=None,
+    model_added=None,
+    model_removed=None,
+    all_models_ever=None,
+    bin_size=25,  # Number of queries per bin
+):
+    """
+    Generates a heatmap showing model selection frequency over time.
+    This provides a cleaner alternative to the stacked area chart for better readability.
+    """
+    # --- Input Validation ---
+    if results_df.empty:
+        logger.warning("Results DataFrame is empty. Skipping model selection heatmap.")
+        return
+
+    # --- Output Directory Setup ---
+    output_dir = exp_dirs["plots"]
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Column Validation ---
+    if (
+        "chosen_model" not in results_df.columns
+        or "query_index" not in results_df.columns
+    ):
+        logger.error(
+            "Required columns ('chosen_model', 'query_index') not found. Skipping model selection heatmap."
+        )
+        return
+
+    # --- Data Binning ---
+    max_query_index = results_df["query_index"].max()
+    bins = np.arange(0, max_query_index + bin_size, bin_size)
+    labels = bins[:-1]
+    results_df["query_bin"] = pd.cut(
+        results_df["query_index"], bins=bins, labels=labels, right=False
+    )
+
+    # --- Frequency Calculation ---
+    selection_counts = (
+        results_df.groupby(["run_id", "query_bin", "chosen_model"])
+        .size()
+        .unstack(fill_value=0)
+    )
+    mean_selection_counts = selection_counts.groupby(level="query_bin").mean()
+    mean_selection_freq = mean_selection_counts.apply(lambda x: x / x.sum(), axis=1)
+
+    # --- Data Preparation for Plotting ---
+    if all_models_ever:
+        for model in all_models_ever:
+            if model not in mean_selection_freq.columns:
+                mean_selection_freq[model] = 0.0
+        # Sort models by average selection frequency (most used first)
+        model_avg_freq = mean_selection_freq.mean().sort_values(ascending=False)
+        mean_selection_freq = mean_selection_freq[model_avg_freq.index]
+
+    # --- Plot Creation ---
+    fig, ax = plt.subplots(figsize=(16, max(8, len(mean_selection_freq.columns) * 0.4)))
+
+    # --- Heatmap Generation ---
+    # Transpose for better visualization (models on y-axis, time on x-axis)
+    heatmap_data = mean_selection_freq.T
+    
+    # Create heatmap with custom colormap for better contrast
+    # Using 'plasma' colormap which provides better differentiation for low values
+    # Alternative options: 'viridis', 'plasma', 'inferno', 'RdYlBu_r', 'coolwarm'
+    im = ax.imshow(
+        heatmap_data.values,
+        cmap='RdYlBu_r',
+        aspect='auto',
+        interpolation='nearest',
+        vmin=0,
+        vmax=1
+    )
+
+    # --- Colorbar ---
+    cbar = plt.colorbar(im, ax=ax, shrink=0.8)
+    cbar.set_label('Selection Frequency', fontsize=14)
+    cbar.ax.tick_params(labelsize=14)
+
+    # --- Axis Configuration ---
+    ax.set_xticks(range(0, len(heatmap_data.columns), max(1, len(heatmap_data.columns) // 10)))
+    ax.set_xticklabels([str(int(heatmap_data.columns[i])) for i in ax.get_xticks() if i < len(heatmap_data.columns)], 
+                       rotation=45, ha='right', fontsize=14)
+    
+    ax.set_yticks(range(len(heatmap_data.index)))
+    ax.set_yticklabels(heatmap_data.index, fontsize=14)
+    
+    # --- Change Point Annotation ---
+    if change_point is not None:
+        change_bin = change_point // bin_size
+        if change_bin < len(heatmap_data.columns):
+            ax.axvline(x=change_bin, color='black', linestyle='--', linewidth=2, alpha=0.9)
+            ax.text(change_bin, -0.8, f'Adaptation Point', 
+                   ha='center', va='top', fontsize=14, color='white',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='black', alpha=0.8))
+
+    # --- Labels and Styling ---
+    ax.set_xlabel(f'Query Epoch (Window Size = {bin_size})', fontsize=14)
+    ax.set_ylabel('Models', fontsize=14)
+    ax.grid(False)  # Turn off grid for cleaner heatmap
+    
+    if title:
+        ax.set_title(title, fontsize=14, pad=20)
+
+    # --- Layout and Saving ---
+    plt.tight_layout()
+    filename = output_dir / "a8_model_selection_heatmap.pdf"
+    plt.savefig(filename, dpi=300, bbox_inches="tight")
+    logger.info(f"Saved model selection heatmap to {filename}")
+    plt.close()
+
+
 def generate_model_selection_plot(
     results_df,
     exp_dirs,
@@ -404,6 +520,18 @@ def main():
         results_df,
         exp_dirs,
         title=selection_plot_title,
+        change_point=change_point_idx,
+        model_added=model_to_add,
+        model_removed=model_to_remove,
+        all_models_ever=all_models_ever,
+    )
+
+    # Generate model selection heatmap (new cleaner representation)
+    heatmap_plot_title = f"Model Selection Heatmap"
+    generate_model_selection_heatmap(
+        results_df,
+        exp_dirs,
+        title=heatmap_plot_title,
         change_point=change_point_idx,
         model_added=model_to_add,
         model_removed=model_to_remove,
