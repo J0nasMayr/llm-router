@@ -52,6 +52,8 @@ class InferenceService:
         model_configs,
         device_id=0,
         energy_method="pynvml",
+        tier="cloud",
+        dedicated_queue=None
     ):
         self.redis_client = redis_client
         self.general_configs = general_configs
@@ -63,6 +65,8 @@ class InferenceService:
         self.loaded_model = None
         self.loaded_model_id = None
         self.tokenizer = None
+        self.tier = tier
+        self.queue_name = dedicated_queue or f"llm_inference_tasks_{self.tier}"
 
     def _load_model(self, model_id):
         """Load model if not already loaded"""
@@ -179,10 +183,10 @@ class InferenceService:
 
     def run(self):
         """Main worker loop"""
-        logger.info(f"Worker started on {self.device}")
+        logger.info(f"Worker started on {self.device} listening to queue: {self.queue_name}")
 
         while True:
-            task = self.redis_client.get_next_task(timeout=1)
+            task = self.redis_client.get_next_task(queue_name=self.queue_name, timeout=1)
             if not task:
                 time.sleep(0.1)
                 continue
@@ -235,6 +239,7 @@ def main():
         choices=["pynvml", "zeus"],
         help="Energy measurement method",
     )
+    parser.add_argument("--tier", default="cloud", choices=["cloud", "edge"], help="Is this an edge or cloud worker?")
     args = parser.parse_args()
     redis_client = RedisClient(
         host=args.redis_host, port=args.redis_port, password=args.redis_password
@@ -248,6 +253,7 @@ def main():
         model_configs,
         device_id=args.device,
         energy_method=args.energy_method,
+        tier=args.tier
     )
     worker.run()
 

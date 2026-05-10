@@ -27,7 +27,7 @@ class RedisClient:
             self._dummy_store = {}
             self._dummy_queue = []
 
-        self.task_queue = "llm_inference_tasks"
+        self.default_queue = "llm_inference_tasks"
         self.result_prefix = "result:"
 
     def _is_connected(self):
@@ -37,7 +37,7 @@ class RedisClient:
         except Exception:
             return False
 
-    def enqueue_task(self, task_data):
+    def enqueue_task(self, task_data, queue_name=None):
         """Add task to queue and return task ID"""
         task_id = (
             f"task:{int(time.time() * 1000)}:{task_data.get('query_id', 'unknown')}"
@@ -45,10 +45,13 @@ class RedisClient:
         task_data["id"] = task_id
         task_json = json.dumps(task_data)
 
+        # Use the provided queue or fall back to default
+        target_queue = queue_name or self.default_queue
+
         if self._is_connected():
             # Store task data and add to queue using Redis
             self.redis.set(task_id, task_json)
-            self.redis.lpush(self.task_queue, task_id)
+            self.redis.lpush(target_queue, task_id)
         else:
             # Use in-memory storage for testing
             print("In memory")
@@ -57,11 +60,13 @@ class RedisClient:
 
         return task_id
 
-    def get_next_task(self, timeout=1):
+    def get_next_task(self, queue_name=None, timeout=1):
         """Get next task from queue, waiting up to timeout seconds"""
+        target_queue = queue_name or self.default_queue
+
         if self._is_connected():
             # Use BRPOP to wait for a task with timeout
-            result = self.redis.brpop(self.task_queue, timeout)
+            result = self.redis.brpop(target_queue, timeout)
             if not result:
                 return None
 

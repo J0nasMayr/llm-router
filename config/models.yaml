@@ -2,93 +2,112 @@ phi2:
   name: "microsoft/phi-2"
   parameter_count: 2
   type: "general"
+  tier: "edge"
   
 phi3:
   name: "microsoft/Phi-3-mini-4k-instruct"
   parameter_count: 3
   type: "general"
+  tier: "edge"
 
 qwen2.5-7b:
   name: "Qwen/Qwen2.5-7B"
   parameter_count: 7
   type: "general"
+  tier: "edge"
 
 qwen2.5-14b:
   name: "Qwen/Qwen2.5-14B-Instruct"
   parameter_count: 14
   type: "general"
+  tier: "cloud"
 
 qwen2.5-3b:
   name: "Qwen/Qwen2.5-3B-Instruct"
   parameter_count: 3
   type: "general"
+  tier: "edge"
 
 qwen2.5-1.5b:
   name: "Qwen/Qwen2.5-1.5B-Instruct"
   parameter_count: 1.5
   type: "general"
+  tier: "edge"
 
 qwen2.5-0.5b:
   name: "Qwen/Qwen2.5-0.5B-Instruct"
   parameter_count: 0.5
   type: "general"
+  tier: "edge"
 
 mistral-7b:
   name: "mistralai/Mistral-7B-Instruct-v0.3"
   parameter_count: 7
   type: "general"
+  tier: "edge"
 
 gemma-3-27b:
   name: "google/gemma-3-27b-it"
   parameter_count: 27
   type: "general"
+  tier: "cloud"
 
 gemma-3-12b:
   name: "google/gemma-3-12b-it"
   parameter_count: 12
   type: "general"
+  tier: "cloud"
 
 gemma-3-4b:
   name: "google/gemma-3-4b-it"
   parameter_count: 4
   type: "general"
+  tier: "edge"
 
 gemma-3-1b:
   name: "google/gemma-3-1b-it"
   parameter_count: 1
   type: "general"
+  tier: "edge"
 
 phi-4-mini:
   name: "microsoft/Phi-4-mini-instruct"
   parameter_count: 4
   type: "general"
+  tier: "edge"
 
 phi-4:
   name: "microsoft/phi-4"
   parameter_count: 15
   type: "general"
+  tier: "cloud"
 
 llama-3.1-8b:
   name: "meta-llama/Llama-3.1-8B-Instruct"
   parameter_count: 8
   type: "general"
+  tier: "edge"
 
 llama-3.2-3b:
   name: "meta-llama/Llama-3.2-3B-Instruct"
   parameter_count: 3
   type: "general"
+  tier: "edge"
 
 llama-3.2-1b:
   name: "meta-llama/Llama-3.2-1B-Instruct"
   parameter_count: 1
   type: "general"
+  tier: "edge"
 
 yi-34b:
   name: "01-ai/Yi-34B"
   parameter_count: 34
   type: "general"
+  tier: "cloud"
 
 aya-expanse-32b:
   name: "CohereForAI/aya-expanse-32b"
   parameter_count: 32
   type: "general"
+  tier: "cloud"

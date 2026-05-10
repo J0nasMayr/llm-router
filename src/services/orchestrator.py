@@ -15,6 +15,7 @@ class Orchestrator:
         router_service,
         evaluation_service,
         queue_client,
+        model_configs,
         trade_off_lambda=0.5,
     ):
         self.feature_service = feature_service
@@ -22,6 +23,7 @@ class Orchestrator:
         self.evaluation_service = evaluation_service
         self.queue_client = queue_client
         self.trade_off_lambda = trade_off_lambda
+        self.model_configs = model_configs
         self.model_usage_counts = {}
 
     async def process_query(
@@ -51,7 +53,15 @@ class Orchestrator:
             "evaluation_metric": evaluation_metric,
             "generation_parameters": generation_parameters,
         }
-        task_id = self.queue_client.enqueue_task(task)
+
+        # Determine the tier based on the selected model
+        # Default to cloud if something goes wrong
+        model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
+        target_queue = f"llm_inference_tasks_{model_tier}"
+
+        # Pass the targeted queue to the redis client
+        task_id = self.queue_client.enqueue_task(task, queue_name=target_queue)
+
         response = {"task_id": task_id, "model_id": model_id}
         if not wait_for_result:
             return response
