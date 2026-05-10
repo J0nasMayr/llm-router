@@ -240,6 +240,11 @@ def main():
         help="Energy measurement method",
     )
     parser.add_argument("--tier", default="cloud", choices=["cloud", "edge"], help="Is this an edge or cloud worker?")
+    parser.add_argument(
+        "--dedicated-queue",
+        default=None,
+        help="Override the default tier queue with a specific queue name (e.g. llm_tasks_node_3)",
+    )
     args = parser.parse_args()
     redis_client = RedisClient(
         host=args.redis_host, port=args.redis_port, password=args.redis_password
@@ -253,7 +258,8 @@ def main():
         model_configs,
         device_id=args.device,
         energy_method=args.energy_method,
-        tier=args.tier
+        tier=args.tier,
+        dedicated_queue=args.dedicated_queue,
     )
     worker.run()
 

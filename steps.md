@@ -1,16 +1,3 @@
-# Execution paths
-
-
-[router.py](./src/api/router.py) is the entry point for inference; This is where the `api-endpoint` for inference is defined/served.
-
-[orchestrator.py](./src/services/orchestrator.py) then does steps:
-- extract_features ([feature_service.py](./src/services/feature_service.py))
-- select_model ([router_service.py](./src/services/router_service.py))
-- enqueue_task ([redis_client.py](./src/queue/redis_client.py))
-- get_result ([redis_client.py](./src/queue/redis_client.py))
-
-
-
 # Extend this to edge as well as cloud:
 - Have a clear distinction between edge and cloud models. (this is done using `tier` in [models.py](./config/models.yaml))
 - Separate the redis queue into two different queues `llm_tasks_edge` and `llm_tasks_cloud`
@@ -47,3 +34,13 @@
 - Once the MAB selects a model (e.g., llama-3.1-8b, which is an edge model), the Orchestrator checks the list of surviving nodes that belong to that model's tier.
 - If there are multiple valid nodes for that tier, it selects the optimal one (e.g., the node with the lowest expected latency).
 - The task is then enqueued specifically to that chosen node's queue (e.g., llm_tasks_node_3).
+
+# Implement dynamic resource allocation per model
+
+- For this I have several candidate papers that maybe already do something similar:
+    - https://dl.acm.org/doi/pdf/10.1145/3771576
+    - https://arxiv.org/pdf/2407.09486
+    - https://www.usenix.org/system/files/atc25-tian.pdf
+    - https://arxiv.org/pdf/2509.23384v3
+- There is also this paper that summarizes general schedulers/routers:
+    - https://www.techrxiv.org/doi/pdf/10.36227/techrxiv.176238087.79673350/v1
