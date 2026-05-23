@@ -43,10 +43,19 @@ class RouterService:
 
             return EpsilonGreedy(model_ids)
 
-    def select_model(self, features):
-        """Select model based on features"""
+    def select_model(self, features, available_models=None):
+        """Select model based on features, optionally constrained to a subset of arms.
+
+        available_models: iterable of model_ids that are physically viable right now
+            (e.g. surviving the orchestrator's resource-state filter). Bandits that
+            support masking will set scores of excluded arms to -inf; if a bandit
+            ignores the kwarg, behavior reduces to the unmasked select.
+        """
         context = features.get("context_vector") if features else None
-        return self.bandit.select_model(context)
+        try:
+            return self.bandit.select_model(context, available_models=available_models)
+        except TypeError:
+            return self.bandit.select_model(context)
 
     def update(self, context, model_id, reward):
         """Update the bandit algorithm with the observed reward."""

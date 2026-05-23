@@ -69,7 +69,7 @@ class ThompsonSampling(BaseBandit):
                 f"Attempted to re-initialize model {model_id}, which already exists."
             )
 
-    def select_model(self, context=None):
+    def select_model(self, context=None, available_models=None):
         if context is None:
             context = np.zeros(self.context_dimension)
         context = np.asarray(context).reshape(-1)
@@ -79,6 +79,7 @@ class ThompsonSampling(BaseBandit):
             )
             context = np.zeros(self.context_dimension)
 
+        allowed = set(available_models) if available_models else None
         best_model, highest_reward = None, float("-inf")
         sampled_weights_all = {}
         for model_id in self.model_ids:
@@ -103,12 +104,15 @@ class ThompsonSampling(BaseBandit):
                 )
 
             expected_reward = np.dot(weights, context)
+            if allowed is not None and model_id not in allowed:
+                expected_reward = float("-inf")
             sampled_weights_all[model_id] = weights.tolist()
             if expected_reward > highest_reward:
                 highest_reward, best_model = expected_reward, model_id
 
         if best_model is None:
-            best_model = np.random.choice(self.model_ids)
+            pool = list(allowed) if allowed else self.model_ids
+            best_model = np.random.choice(pool)
         self.decisions.append({"model": best_model, "context": context.tolist()})
         return best_model
 

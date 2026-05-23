@@ -4,7 +4,6 @@
 - Add `tier` and `dedicated_queue` to the inference service to separate between the queues
 - Support this behaviour in the redis client and the orchestrator.
 
-
 # Filter nodes based on resource states
 ## Implement Node-Level Telemetry
 

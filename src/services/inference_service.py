@@ -1,7 +1,9 @@
 # src/worker.py
 import argparse
 import logging
+import threading
 import time
+from collections import deque
 
 # os.environ['TORCH_USE_CUDA_DSA'] = '1'
 import torch
@@ -53,11 +55,15 @@ class InferenceService:
         device_id=0,
         energy_method="pynvml",
         tier="cloud",
-        dedicated_queue=None
+        dedicated_queue=None,
+        node_id=None,
+        telemetry_interval=5.0,
+        telemetry_window=20,
     ):
         self.redis_client = redis_client
         self.general_configs = general_configs
         self.model_configs = model_configs
+        self.device_id = device_id
         self.device = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
         self.energy_measurement = EnergyMeasurement.create(
             method=energy_method, device_id=device_id
@@ -66,7 +72,13 @@ class InferenceService:
         self.loaded_model_id = None
         self.tokenizer = None
         self.tier = tier
-        self.queue_name = dedicated_queue or f"llm_inference_tasks_{self.tier}"
+        self.node_id = node_id or f"{tier}-{device_id}"
+        self.queue_name = dedicated_queue or f"llm_tasks_node_{self.node_id}"
+        self.telemetry_interval = telemetry_interval
+        self._latency_window = deque(maxlen=telemetry_window)
+        self._latency_lock = threading.Lock()
+        self._telemetry_stop = threading.Event()
+        self._telemetry_thread = None
 
     def _load_model(self, model_id):
         """Load model if not already loaded"""
@@ -113,6 +125,8 @@ class InferenceService:
         with torch.no_grad():
             outputs = model.generate(inputs.input_ids, **gen_params)
         latency = time.time() - start_time
+        with self._latency_lock:
+            self._latency_window.append(latency)
         energy = self.energy_measurement.stop()
         output_tokens = outputs.shape[1] - input_tokens
         output_text = tokenizer.decode(
@@ -181,9 +195,70 @@ class InferenceService:
 
         return inputs, input_tokens, gen_params
 
+    def _avg_task_latency(self):
+        with self._latency_lock:
+            if not self._latency_window:
+                return 0.0
+            return sum(self._latency_window) / len(self._latency_window)
+
+    def _hardware_state(self):
+        """Best-effort hardware snapshot. Keeps cost low; fields optional."""
+        state = {"device": self.device}
+        if torch.cuda.is_available():
+            try:
+                free, total = torch.cuda.mem_get_info(self.device_id)
+                state["gpu_memory_used_gb"] = round((total - free) / (1024**3), 3)
+                state["gpu_memory_total_gb"] = round(total / (1024**3), 3)
+            except Exception:
+                pass
+        return state
+
+    def _publish_telemetry(self):
+        payload = {
+            "node_id": self.node_id,
+            "tier": self.tier,
+            "queue_name": self.queue_name,
+            "queue_length": self.redis_client.get_queue_length(self.queue_name),
+            "avg_task_latency": self._avg_task_latency(),
+            "hardware_state": self._hardware_state(),
+            "updated_at": time.time(),
+        }
+        try:
+            self.redis_client.set_node_telemetry(
+                self.node_id,
+                payload,
+                ttl_seconds=int(self.telemetry_interval * 3) + 1,
+            )
+        except Exception as e:
+            logger.warning(f"Telemetry publish failed for {self.node_id}: {e}")
+
+    def _telemetry_loop(self):
+        while not self._telemetry_stop.is_set():
+            self._publish_telemetry()
+            self._telemetry_stop.wait(self.telemetry_interval)
+
+    def start_telemetry(self):
+        if self._telemetry_thread and self._telemetry_thread.is_alive():
+            return
+        self._telemetry_stop.clear()
+        self._telemetry_thread = threading.Thread(
+            target=self._telemetry_loop, name=f"telemetry-{self.node_id}", daemon=True
+        )
+        self._telemetry_thread.start()
+        logger.info(f"Telemetry loop started for node {self.node_id}")
+
+    def stop_telemetry(self):
+        self._telemetry_stop.set()
+        if self._telemetry_thread:
+            self._telemetry_thread.join(timeout=2.0)
+
     def run(self):
         """Main worker loop"""
-        logger.info(f"Worker started on {self.device} listening to queue: {self.queue_name}")
+        logger.info(
+            f"Worker started on {self.device} as node={self.node_id} tier={self.tier} "
+            f"listening to queue: {self.queue_name}"
+        )
+        self.start_telemetry()
 
         while True:
             task = self.redis_client.get_next_task(queue_name=self.queue_name, timeout=1)
@@ -243,7 +318,18 @@ def main():
     parser.add_argument(
         "--dedicated-queue",
         default=None,
-        help="Override the default tier queue with a specific queue name (e.g. llm_tasks_node_3)",
+        help="Override the default per-node queue (e.g. llm_tasks_node_3)",
+    )
+    parser.add_argument(
+        "--node-id",
+        default=None,
+        help="Stable identifier for this worker. Defaults to <tier>-<device>.",
+    )
+    parser.add_argument(
+        "--telemetry-interval",
+        type=float,
+        default=5.0,
+        help="Seconds between telemetry publishes to Redis.",
     )
     args = parser.parse_args()
     redis_client = RedisClient(
@@ -260,6 +346,8 @@ def main():
         energy_method=args.energy_method,
         tier=args.tier,
         dedicated_queue=args.dedicated_queue,
+        node_id=args.node_id,
+        telemetry_interval=args.telemetry_interval,
     )
     worker.run()
 

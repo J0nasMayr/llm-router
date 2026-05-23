@@ -51,23 +51,29 @@ class LinUCB(BaseBandit):
         self.rewards = {}
         self.ucb_scores = {}
 
-    def select_model(self, context=None):
+    def select_model(self, context=None, available_models=None):
         if context is None:
             context = np.zeros(self.context_dimension)
 
         context = np.asarray(context).reshape(-1)
 
+        allowed = set(available_models) if available_models else None
         best_model = None
         highest_ucb = float("-inf")
         all_ucb_scores = {}
 
         for model_id in self.model_ids:
             ucb = self._compute_ucb(model_id, context)
+            if allowed is not None and model_id not in allowed:
+                ucb = float("-inf")
             all_ucb_scores[model_id] = ucb
 
             if ucb > highest_ucb:
                 highest_ucb = ucb
                 best_model = model_id
+
+        if best_model is None and allowed:
+            best_model = next(iter(allowed))
 
         self.decisions.append(
             {

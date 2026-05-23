@@ -34,12 +34,13 @@ class EpsilonGreedy(BaseBandit):
 
         self.decisions = []
 
-    def select_model(self, context=None):
+    def select_model(self, context=None, available_models=None):
+        candidates = self._candidates(available_models)
         if random.random() < self.epsilon:
-            selected_model = random.choice(self.model_ids)
+            selected_model = random.choice(candidates)
             self.decisions.append({"type": "exploration", "model": selected_model})
             return selected_model
-        selected_model = self._get_best_model()
+        selected_model = self._get_best_model(candidates)
         self.decisions.append({"type": "exploitation", "model": selected_model})
         return selected_model
 
@@ -48,10 +49,18 @@ class EpsilonGreedy(BaseBandit):
         self.reward_sums[model_id] += reward
         self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_factor)
 
-    def _get_best_model(self):
+    def _candidates(self, available_models):
+        if not available_models:
+            return list(self.model_ids)
+        allowed = set(available_models)
+        filtered = [m for m in self.model_ids if m in allowed]
+        return filtered if filtered else list(self.model_ids)
+
+    def _get_best_model(self, candidates=None):
+        candidates = candidates or list(self.model_ids)
         avg_rewards = {}
         untried_models = []
-        for model in self.model_ids:
+        for model in candidates:
             if self.counts[model] > 0:
                 avg_rewards[model] = self.reward_sums[model] / self.counts[model]
             else:
@@ -68,7 +77,7 @@ class EpsilonGreedy(BaseBandit):
         else:
 
             logger.warning("_get_best_model fallback triggered. Choosing random model.")
-            return random.choice(self.model_ids)
+            return random.choice(candidates)
 
     def reset(self):
         self.reward_sums = {model: 0.0 for model in self.model_ids}
@@ -186,20 +195,28 @@ class ContextualEpsilonGreedy(BaseBandit):
 
         return context
 
-    def select_model(self, context=None):
+    def select_model(self, context=None, available_models=None):
         context_key = self._context_key(context)
+        candidates = self._candidates(available_models)
         if random.random() < self.epsilon:
-            selected_model = random.choice(self.model_ids)
+            selected_model = random.choice(candidates)
             self.decisions.append(
                 {"type": "exploration", "model": selected_model, "context": context_key}
             )
             return selected_model
-        selected_model = self._get_best_model_for_context(context_key)
+        selected_model = self._get_best_model_for_context(context_key, candidates)
         self.decisions.append(
             {"type": "exploitation", "model": selected_model, "context": context_key}
         )
         self.choices_per_context[context_key].append(selected_model)
         return selected_model
+
+    def _candidates(self, available_models):
+        if not available_models:
+            return list(self.model_ids)
+        allowed = set(available_models)
+        filtered = [m for m in self.model_ids if m in allowed]
+        return filtered if filtered else list(self.model_ids)
 
     def update(self, model_id, reward, context=None):
         context_key = self._context_key(context)
@@ -210,18 +227,19 @@ class ContextualEpsilonGreedy(BaseBandit):
         self.global_reward_sums[model_id] += reward
         self.epsilon = max(self.min_epsilon, self.epsilon * self.decay_factor)
 
-    def _get_best_model_for_context(self, context_key):
+    def _get_best_model_for_context(self, context_key, candidates=None):
+        candidates = candidates or list(self.model_ids)
         if context_key is not None:
-            for model_id in self.model_ids:
+            for model_id in candidates:
                 if self.context_counts[context_key][model_id] == 0:
                     return model_id
             avg_rewards = {}
-            for model_id in self.model_ids:
+            for model_id in candidates:
                 avg_rewards[model_id] = self._get_context_average_reward(
                     context_key, model_id
                 )
             return max(avg_rewards, key=avg_rewards.get)
-        return self._get_best_global_model()
+        return self._get_best_global_model(candidates)
 
     def _get_context_average_reward(self, context_key, model_id):
         if context_key is None:
@@ -239,12 +257,13 @@ class ContextualEpsilonGreedy(BaseBandit):
         else:
             return float("inf")
 
-    def _get_best_global_model(self):
-        for model_id in self.model_ids:
+    def _get_best_global_model(self, candidates=None):
+        candidates = candidates or list(self.model_ids)
+        for model_id in candidates:
             if self.global_counts[model_id] == 0:
                 return model_id
         avg_rewards = {
-            model: self._get_global_average_reward(model) for model in self.model_ids
+            model: self._get_global_average_reward(model) for model in candidates
         }
         return max(avg_rewards, key=avg_rewards.get)
 
@@ -437,25 +456,32 @@ class LinearEpsilonGreedy(BaseBandit):
             f"LinearEpsilonGreedy initialized with d={context_dimension}, lambda={lambda_}"
         )
 
-    def select_model(self, context):
+    def select_model(self, context, available_models=None):
         """Selects a model using epsilon-greedy strategy based on linear reward prediction."""
+        allowed = set(available_models) if available_models else None
+        candidates = (
+            [m for m in self.model_ids if m in allowed] if allowed else list(self.model_ids)
+        )
+        if not candidates:
+            candidates = list(self.model_ids)
+
         if context is None:
 
             logger.warning(
                 "LinearEpsilonGreedy received None context, selecting randomly."
             )
-            return random.choice(self.model_ids)
+            return random.choice(candidates)
         context = np.asarray(context).reshape(-1)
         if context.shape[0] != self.context_dimension:
             logger.error(
                 f"Context dimension mismatch. Expected {self.context_dimension}, got {context.shape}. Selecting randomly."
             )
-            return random.choice(self.model_ids)
+            return random.choice(candidates)
         if random.random() < self.epsilon:
-            return random.choice(self.model_ids)
+            return random.choice(candidates)
         else:
             predictions = {}
-            for mid in self.model_ids:
+            for mid in candidates:
                 predictions[mid] = context @ self.theta[mid]
             max_pred = -np.inf
             best_models = []

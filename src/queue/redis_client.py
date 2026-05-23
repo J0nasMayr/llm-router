@@ -29,6 +29,7 @@ class RedisClient:
 
         self.default_queue = "llm_inference_tasks"
         self.result_prefix = "result:"
+        self.telemetry_prefix = "telemetry:node:"
 
     def _is_connected(self):
         """Check if Redis connection is active"""
@@ -130,6 +131,48 @@ class RedisClient:
             time.sleep(0.1)
 
         return None
+
+    def get_queue_length(self, queue_name):
+        """Return the number of pending tasks in the given queue."""
+        if self._is_connected():
+            try:
+                return int(self.redis.llen(queue_name))
+            except Exception:
+                return 0
+        return sum(1 for tid in self._dummy_queue if tid.startswith("task:"))
+
+    def set_node_telemetry(self, node_id, payload, ttl_seconds=15):
+        """Publish a node's telemetry snapshot under telemetry:node:<node_id> with TTL."""
+        key = f"{self.telemetry_prefix}{node_id}"
+        body = json.dumps(payload)
+        if self._is_connected():
+            self.redis.set(key, body, ex=ttl_seconds)
+        else:
+            # Dummy store ignores TTL — fine for tests.
+            self._dummy_store[key] = body
+
+    def get_all_node_telemetry(self):
+        """Return list of telemetry payloads for every active node (TTL'd entries auto-expire)."""
+        results = []
+        if self._is_connected():
+            try:
+                for key in self.redis.scan_iter(match=f"{self.telemetry_prefix}*"):
+                    raw = self.redis.get(key)
+                    if raw:
+                        try:
+                            results.append(json.loads(raw))
+                        except json.JSONDecodeError:
+                            continue
+            except Exception:
+                return []
+            return results
+        for key, raw in self._dummy_store.items():
+            if key.startswith(self.telemetry_prefix):
+                try:
+                    results.append(json.loads(raw))
+                except json.JSONDecodeError:
+                    continue
+        return results
 
     async def wait_for_result(self, task_id, timeout=60):
         """Async wait for result with timeout"""
