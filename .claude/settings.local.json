@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:dl.acm.org)",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:www.usenix.org)",
+      "WebFetch(domain:www.techrxiv.org)",
+      "WebFetch(domain:api.semanticscholar.org)"
+    ]
+  }
+}

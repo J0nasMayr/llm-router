@@ -1,0 +1,40 @@
+\documentclass[english]{DPSbachelor}
+
+\usepackage{pdfpages}
+\usepackage{hyperref}
+\usepackage[numbers]{natbib}
+\usepackage{listings}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{rotating}
+
+\bibliographystyle{plainnat}
+
+\begin{document}
+    \title{}
+
+    \author{}
+    \matriculationnumber{}
+    \mailaddress{}
+    \date{\today}
+    \supervisor{}
+
+    \maketitle
+    \abstract{\input{sources/abstract}}
+
+    \include{sources/declaration}
+
+    \tableofcontents
+
+    \include{sources/introduction}
+    \include{sources/relatedWork}
+    \include{sources/model}
+    \include{sources/evaluation}
+    \include{sources/conclusion}
+
+    \appendix
+
+    Please, find attached a checklist recommended by SIGPLAN that will be extremely valuable to follow during the evaluation of your work. 
+    \includepdf[pages=-]{figures/checklist.pdf}
+
+\end{document}

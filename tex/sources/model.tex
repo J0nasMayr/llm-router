@@ -1,0 +1,44 @@
+\chapter{System Model}
+\label{chapter:model}
+
+The objective of this work is to dynamically orchestrate Large Language Model (LLM) inference tasks across an Edge-Cloud continuum. The system aims to maximize inference accuracy while minimizing physical energy consumption. Furthermore, real-time latency constraints dictated by the hardware's current operational state are considered.
+
+\section{Problem Formulation}
+
+Consider a distributed computing environment consisting of a set of available servers, comprising both resource-constrained edge nodes and high-capacity cloud nodes. Let $M = \{m_1, m_2, \dots, m_K\}$ denote the heterogeneous pool of LLMs deployed across this continuum. A subset of smaller models $M_{edge} \subset M$ is deployed at the edge, while larger, high-precision models $M_{cloud} \subset M$ reside in the cloud.
+
+The system processes a sequential stream of user queries over time. At each discrete time step $t$, a user submits a query $q_t$. Upon arrival, the system must select exactly one model $m_t \in M$ to execute the inference.
+
+To ensure Quality of Service (QoS), the system must satisfy a strict latency deadline, $T_{max}$. The total latency $T(m_k, q_t)$ of executing query $q_t$ on model $m_k$ is the sum of the network transmission delay and the inference processing delay. This delay is highly dependent on the real-time hardware state of the node hosting $m_k$, specifically its pending workload queue $W_k$ and its available Key-Value Cache (KVC) memory $M_k^{free}$. If a node is currently overloaded, its processing delay will be larger. Consequently, at time $t$, the system filters out any models that cannot satisfy the deadline, establishing a dynamic set of feasible models:
+$$ M_t^* = \{m \in M \mid T(m, q_t) \le T_{max}\} $$
+For the selected model $m_t \in M_t^*$, the system observes an inference accuracy $Acc(m_t, q_t)$ and a physical energy consumption $E(m_t, q_t)$. The routing problem is formulated as a multi-objective optimization task maximizing the scalarized reward $r_t$:
+$$ r_t = \alpha \cdot Acc(m_t, q_t) - \beta \cdot E(m_t, q_t) $$
+where $\alpha$ and $\beta$ are user-defined weighting parameters that specify the trade-off between output quality and energy efficiency. Because the true accuracy and energy consumption are only observed for the selected model after execution, the system must continuously learn the optimal routing policy online.
+
+
+\section{Proposed Method}
+
+To solve the routing problem defined above, this thesis proposes a four-stage scheduling pipeline. The architecture bridges real-time hardware telemetry with semantic prompt analysis to achieve resource-aware and prompt-aware inference.
+
+\noindent
+The proposed architecture operates through the following sequential stages:
+
+\textbf{1. Telemetry and Feasibility Filtering:} 
+Continuous monitoring agents are deployed on all edge and cloud nodes. These agents asynchronously broadcast their real-time hardware states - specifically $W_k$ and $M_k^{free}$ - back to the central scheduler. To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the Edge tier. This allows it to be the initial point of contact and intercept incoming queries. When query $q_t$ arrives, the scheduler calculates the expected latency $T(m_k, q_t)$ for all models. Nodes lacking sufficient memory or exhibiting excessive queue lengths are temporarily pruned, yielding the feasible set $M_t^*$. This stage guarantees that the system never routes a prompt to a node incapable of meeting the latency deadline, preventing bottlenecks.
+
+\textbf{2. Semantic Context Extraction:}
+Simultaneously, the incoming query $q_t$ is passed through a lightweight context generator. This module extracts key semantic features from the prompt to evaluate its complexity without performing full inference. Following the methodology established by GreenServ, the module extracts three specific features: Task Type (using a lightweight classifier), Semantic Cluster (via embedding-based topic clustering), and Text Complexity (via the Flesch Reading Ease formula). These categorical and numerical features are combined into a multi-dimensional context vector $x_t \in \mathbb{R}^d$.
+
+\textbf{3. Contextual Bandit Routing:}
+With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a Contextual Multi-Armed Bandit (MAB) algorithm to make the final routing decision. Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm is utilized. The algorithm assumes a linear relationship between the context $x_t$ and the expected reward of each model arm. LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models. The model $m_t$ that yields the highest upper confidence bound is selected, and the query is dispatched over the network to the corresponding edge or cloud node.
+
+\textbf{4. Execution and Policy Update (Feedback Loop):}
+The selected node executes the inference task and returns the generated response to the user. Following execution, the system logs the actual physical energy consumed by the GPU $E(m_t, q_t)$ and computes the accuracy of the response $Acc(m_t, q_t)$ to calculate the final reward $r_t$. This scalar reward is fed back into the LinUCB agent, which updates its parameter matrices. This continuous feedback loop ensures that the scheduler adapts to distribution shifts in user queries and gracefully handles the dynamic integration or degradation of models within the computing continuum.
+
+% Architectural Diagram
+\begin{figure}[htbp]
+    \centering
+    \framebox{\parbox{0.9\textwidth}{\centering \vspace{2cm} \textit{Visualizing the flow from User Query $\rightarrow$ Telemetry Filter $\rightarrow$ Context Extractor $\rightarrow$ LinUCB Router $\rightarrow$ Edge/Cloud Nodes} \vspace{2cm}}}
+    \caption{Overview of the Proposed Edge-Cloud Collaborative Scheduling Architecture.}
+    \label{fig:architecture}
+\end{figure}

@@ -24,3 +24,7 @@ All this information can be found in the steps.md file.
 
 ## Rules
 - Do not commit anything. Simply edit the code and then let me have a look.
+
+# The latex source in /tex
+
+This is my bachelor thesis right now. The folder division is quite straight forward with /tex/figures, /tex/sources and 3 files in /tex.

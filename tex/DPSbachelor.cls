@@ -1,0 +1,236 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{DPSbachelor}[2007/09/19 DPS bachelor theses document class]
+\newif\if@mainmatter\@mainmattertrue
+% \LoadClass[a4paper,12pt,abstracton,twoside]{scrreprt}
+\LoadClass[a4paper,12pt,abstract=true,twoside]{scrreprt}
+\RequirePackage[english,ngerman]{babel}
+\RequirePackage{a4}
+\RequirePackage{graphicx}
+\RequirePackage{listings}
+\RequirePackage{setspace}
+\usepackage{scrlayer-scrpage}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{amsthm}
+\RequirePackage{floatflt}
+\RequirePackage[latin1]{inputenc}
+\RequirePackage[%
+ bookmarks,%
+ plainpages=false,%
+ pdfpagelabels,%
+ colorlinks=false,%
+ pdfborder={0 0 0},%
+]{hyperref}
+\DeclareOption{english}{\AtBeginDocument{\selectlanguage{english}}}
+\DeclareOption{german}{\AtBeginDocument{\selectlanguage{ngerman}}}
+\ExecuteOptions{german}
+\ProcessOptions\relax
+
+\AtBeginDocument{%
+ \global\newbox\absbox%
+ \renewcommand\abstractname{%
+  \iflanguage{english}{Abstract}{Zusammenfassung }%
+ }
+ \newcommand\ackname{%
+  \iflanguage{english}{Acknowledgments}{Danksagung}%
+ }
+ \definetoday
+}
+
+\newcommand\definetoday{%
+ \renewcommand*\today{%
+  \iflanguage{english}{%
+   \number\day\space \ifcase\month\or%
+    January\or%
+    February\or%
+    March\or%
+    April\or%
+    May\or%
+    June\or%
+    July\or%
+    August\or%
+    September\or%
+    October\or%
+    November\or%
+    December\or%
+   \fi\space \number\year
+  }{%
+   \number\day.~\ifcase\month\or%
+    J\"anner\or%
+    Februar\or%
+    M\"arz\or%
+    April\or%
+    Mai\or%
+    Juni\or%
+    Juli\or%
+    August\or%
+    September\or%
+    Oktober\or%
+    November\or%
+    Dezember%
+   \fi\space \number\year
+  }%
+ }
+}
+
+\newcommand\@bibfile{references}
+\newcommand\bibfile[1]{\renewcommand\@bibfile{#1}}
+\newcommand*\@mailaddress\@empty
+\global\let\@matriculationnumber\@empty
+\newcommand*\mailaddress[1]{\gdef\@mailaddress{#1}}
+\newcommand*\matriculationnumber[1]{\gdef\@matriculationnumber{#1}}
+\newcommand*\@plaintitle\@empty
+\newcommand*\@plainauthor\@empty
+\newcommand*\plaintitle[1]{\gdef\@plaintitle{#1}}
+\newcommand*\plainauthor[1]{\gdef\@plainauthor{#1}}
+
+\let\@OLDappendix\appendix
+\renewcommand\appendix{%
+ \backmatter
+ \phantomsection{\addcontentsline{toc}{chapter}{\bibname}}
+ \bibliographystyle{plain}
+ \bibliography{\@bibfile}
+ \@OLDappendix
+}
+
+\newcommand\kindname{%
+ \iflanguage{english}{Bachelor~Thesis}{Bachelorarbeit}%
+}
+
+\newcommand\supervisorname{%
+ \iflanguage{english}{Supervisors}{Betreuer}%
+}
+
+\newcommand\university{%
+ \iflanguage{english}{Leopold--Franzens--University \\ Innsbruck \\ }
+ {Leopold--Franzens--Universität \\ Innsbruck \\ }
+}
+
+\newcommand\institute{%
+ \iflanguage{english}{Institute of Computer Science \\ Distributed and Parallel Systems \\}
+ {Institut für Informatik \\ Forschungsgruppe DPS \\ (Distributed and Parallel Systems) \\}%
+}
+
+\subject{\kindname}
+
+
+\newcommand{\supervisor}[1]{%
+ \def\@supervisor{#1}
+ \publishers{\textbf{\supervisorname:} #1}
+}
+
+\renewcommand\abstract[1]{%
+ \global\setbox\absbox=\hbox{#1}%
+}
+
+\global\let\@acknowledgments\@empty
+
+\newcommand\acknowledgments[1]{\def\@acknowledgments{#1}}
+
+\newcommand*\frontmatter{%
+ \if@twoside\cleardoublepage\else\clearpage\fi
+  \@mainmatterfalse\pagenumbering{roman}%
+}
+
+\newcommand*\mainmatter{%
+ \if@twoside\cleardoublepage\else\clearpage\fi
+  \@mainmattertrue\pagenumbering{arabic}%
+}
+
+\newcommand*\backmatter{%
+\if@openright\cleardoublepage\else\clearpage\fi
+  \@mainmatterfalse%
+}
+
+\renewcommand*\maketitle[1][-1]{{
+ \frontmatter
+ \thispagestyle{empty}
+ \let\footnotesize\small
+ \let\footnoterule\relax
+ \let\footnote\thanks
+ \renewcommand*\thefootnote{\@fnsymbol\c@footnote}
+ \let\@oldmakefnmark\@makefnmark
+ \renewcommand*{\@makefnmark}{\rlap\@oldmakefnmark}
+ 
+ \begin{floatingfigure}[l]{6cm}
+ \begin{center}
+  \includegraphics[width=6cm]{figures/university_logo.jpg}
+  \end{center}
+ \end{floatingfigure}
+ \ \vspace{8em}
+ 
+ \begin{flushright}
+  {\textsf 
+   {\LARGE \university}
+   \vspace{\stretch{1}}
+   {\textbf {\large \institute \ }}
+   \vspace{\stretch{2}}
+   {\LARGE \\ \textbf{\@title} \\ \ }
+   \vspace{\stretch{1}}
+   {\textbf {\large \\ \kindname \\ \ }}
+   {\large \\ \@publishers \\ \ }
+   \vspace{\stretch{1}}
+   {\bfseries
+    {\large \\ \@author}
+   }
+    {\bfseries
+    {\large \\ \@matriculationnumber}
+   }
+
+   \vspace{\stretch{1}}
+   {\large \\ Innsbruck, Austria \\ \today{} \\ \ }
+  }
+ \end{flushright}
+ 
+ \setcounter{footnote}{0}%
+ \global\let\thanks\relax
+ \global\let\maketitle\relax
+ \global\let\@thanks\@empty
+ \global\let\@author\@empty
+ \global\let\@date\@empty
+ \global\let\@title\@empty
+ \global\let\@extratitle\@empty
+ \global\let\@titlehead\@empty
+ \global\let\@subject\@empty
+ \global\let\@publishers\@empty
+ \global\let\@uppertitleback\@empty
+ \global\let\@lowertitleback\@empty
+ \global\let\@dedication\@empty
+ \global\let\author\relax
+ \global\let\title\relax
+ \global\let\extratitle\relax
+ \global\let\titlehead\relax
+ \global\let\subject\relax
+ \global\let\publishers\relax
+ \global\let\uppertitleback\relax
+ \global\let\lowertitleback\relax
+ \global\let\dedication\relax
+ \global\let\date\relax
+ \global\let\and\relax
+}}
+
+\let\@OLDtableofcontents\tableofcontents
+\renewcommand\tableofcontents{%
+ \pagestyle{empty}
+ \cleardoublepage
+ \begin{center}
+ \normalfont\sectfont\nobreak\abstractname
+ \@endparpenalty\@M
+ \end{center}
+ \unhbox\absbox
+ \par\vfil\null
+ \ifx\@acknowledgments\@empty{}\else
+  \cleardoublepage
+  \chapter*{\ackname}
+  \@acknowledgments
+  \cleardoublepage
+ \fi
+ \@OLDtableofcontents
+ \cleardoublepage
+ \mainmatter
+ \pagestyle{scrheadings}
+ \setheadsepline{0.5pt}
+ \automark[section]{chapter}
+ \onehalfspacing
+}
+\endinput

@@ -1,0 +1,81 @@
+\chapter{Related Work}
+\label{chapter:relatedWork}
+
+\section{LLM Serving and Resource Management}
+
+LLM Serving systems try to optimize the way LLM inference tasks map to specific hardware resources.
+Current systems often separate and classify different tasks to further enhance this mapping. BROS \cite{bros} distinguishes between latency-critical (RT) requests and throughput-oriented (BE) requests. EconoServe \cite{econoserve} makes a similar distinction between prompt processing tasks (PT) and generation tasks (GT). An important aspect of optimization in these systems is advanced KV Cache (KVC) handling. BROS designs a bidirectional KVC management mechanism to best fit hybrid RT and BE requests, while EconoServe maintains separate queues for PT and GT requests and designs its own KVC pipelining method.
+
+Beyond memory, energy consumption has emerged as a critical serving constraint. DynamoLLM \cite{dynamollm} introduces a broad energy-management framework that dynamically reconfigures the number of active instances, model parallelism, and GPU frequencies in response to fluctuating workloads. This allows the system to minimize power consumption and carbon emissions while strictly satisfying latency constraints.
+
+Finally, systems like NexusSched \cite{nexussched} look at the layer above and try to bridge the "information gap" between the central cluster router and the individual inference engines.
+Instead of relying on naive metrics like queue length, NexusSched uses forward-looking telemetry - such as predicted latency and available KVC - to make proactive routing decisions across the cluster.
+
+However, while these infrastructure-level serving systems excel in maximizing hardware utilization and energy efficiency, they generally treat prompts as generic computational blocks and lack deeper semantic awareness.
+
+
+\section{Prompt-Aware LLM Routing}
+
+While LLM serving asks the question "How?", LLM routing tries to optimize the answer to "Who?".
+Here, the choice between models of different sizes and specializations is made. This is evidently the most important factor to find the best trade-off between resource consumption and inference accuracy \cite{greenserv, frugalgpt, routellm}.
+
+A brute-force approach to make this choice is presented by CARGO \cite{cargo}, which sends each prompt to multiple LLMs and grades the answers using separate "judge" LLMs. These results are then used to train a routing regression model used for deployment.
+
+The most logical and the most studied approach is to make this choice by inspecting/analyzing the input prompt and route based on its features.
+TagRouter \cite{tagrouter} uses custom semantic Tags to classify prompts and lets the historically best model for these tags do the inference.
+Marinelli et al. \cite{noft} suggest the new metric "Number of Thoughts" to describe the prompt's complexity. This single value is then predicted through a random forest and used for routing.
+The IRT-Router \cite{irtrouter} scores responses across 25 predefined abilities and uses Item Response Theory to make the router improve over time.
+
+Although using the input prompt as the only anchor for this choice might already seem like the best approach, there are still clear limitations to be noted \cite{lookahead}. Lookahead \cite{lookahead} introduces an additional lookahead routing framework that predicts potential model outputs without full inference. Thus, enabling more informative routing.
+GreenServ \cite{greenserv}, the work this paper is largely based on, explicitly optimizes the tradeoff between accuracy and latency/energy.
+To achieve this, GreenServ extracts three features from each prompt: The Task Type, the Semantic Cluster, and the Text Complexity.
+The Task Type is used to express the intent (e.g. is this a math problem, or a summarization task?).
+The Semantic Cluster groups the query by topic or domain. And the Text Complexity describes how complex the prompt itself is.
+After this, the reinforcement learning concept contextual multi-armed bandit is used to create a router that is learning continuously and online. The features of the prompt are fed into the router, the bandit selects a model and lastly updates its preferences based on the received reward.
+
+While the approaches above thoroughly inspect and optimize routing decisions, they solely deploy their models in a single cloud environment. This makes them blind to the capabilities and possible benefits of edge computing and the computing continuum in general.
+
+\section{Research Gap and Thesis Contribution}
+
+While infrastructure-level serving systems excel at maximizing hardware utilization and managing memory, they treat prompts as generic computational blocks.
+In contrast, advanced semantic routers like GreenServ are highly intelligent in regard to prompt complexity, but operate under the assumption of infinite centralized cloud resources, remaining blind to physical network topologies and real-time hardware constraints. Currently, no system effectively combines deep semantic prompt analysis with strict, real-time physical resource limits across distributed environments.
+
+This thesis bridges this gap by proposing a novel Collaborative Inference framework within the Edge-Cloud Continuum. By combining the strict, resource-aware telemetry of modern serving systems with the intelligent, prompt-aware multi-armed bandit routing of GreenServ, this work introduces a complete scheduling architecture. 
+
+The resulting system dynamically evaluates the real-time resource state of edge and cloud devices - filtering out nodes lacking the compute to meet strict latency deadlines - before analyzing the semantic complexity of the incoming prompt. It then dynamically selects the optimal execution location (distributing tasks between lightweight Edge models and powerful Cloud models). This ensures that inference accuracy is maximized for complex prompts while strictly adhering to real-time physical resource limits and energy efficiency goals.
+
+
+\begin{sidewaystable}[htbp]
+\centering
+\footnotesize
+\caption{Detailed Summary of Related Work in LLM Serving and Routing}
+\label{tab:related_work_summary}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textheight}{p{2cm} p{1.8cm} p{1.8cm} X X} 
+\toprule
+\textbf{Paper} & \textbf{Focus Area} & \textbf{Goals \newline (Acc, Lat, Res)} & \textbf{Detailed Methodology} & \textbf{Prompt Analysis Method} \\
+\midrule
+BROS \cite{bros} & Serving & No, Yes, Yes & Implements a bidirectional KVC allocation strategy that dynamically shares cache blocks between latency-critical and throughput-oriented requests. & None (Treats requests as generic computational loads). \\
+
+EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Separates prompt processing and generation into separate queues, utilizing a novel KVC pipelining technique to maximize GPU sharing. & None. \\
+
+DynamoLLM \cite{dynamollm} & Serving & No, Yes, Yes & Employs hierarchical controllers to dynamically scale active instances, model parallelism, and GPU frequencies based on traffic. & Workload profiling (Analyzes request lengths and arrival rates, but lacks semantic awareness). \\
+
+NexusSched \cite{nexussched} & Serving \newline (Cluster) & No, Yes, Yes & Uses forward-looking telemetry (predicted processing latency and available KVC) to make proactive routing decisions across distributed engines. & None. \\
+
+CARGO \cite{cargo} & Routing & Yes, No, Yes & Uses LLM-as-a-judge to score historical model answers, training a regression model to predict model confidence for incoming queries. & Encodes the input prompt into an embedding vector to feed into the routing regression model. \\
+
+TagRouter \cite{tagrouter} & Routing & Yes, No, Yes & Maps incoming queries to specific models that have historically performed best for the identified semantic tags. & Extracts custom semantic tags using a lightweight classifier prior to inference. \\
+
+Marinelli et al. \cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Analyzes prompt metadata to estimate the required ``Number of Thoughts'' (reasoning complexity). \\
+
+IRT-Router \cite{irtrouter} & Routing & Yes, No, Yes & Applies Item Response Theory (IRT) to mathematically model both the latent abilities of 20+ LLMs and the difficulty of incoming prompts. & Estimates the latent difficulty of the prompt across 25 predefined cognitive abilities. \\
+
+Lookahead \cite{lookahead} & Routing & Yes, No, No & Prevents blind routing by predicting potential model outputs (fast drafting) without full inference to gauge which model is best suited. & Employs fast-drafting/partial inference to preview the generation trajectory of the prompt. \\
+
+GreenServ \cite{greenserv} & Routing & Yes, Yes, Yes & Utilizes a Contextual Multi-Armed Bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. & Extracts Task Type, Semantic Cluster (via embeddings), and Text Complexity (Flesch Reading Ease). \\
+
+\textbf{This work} & \textbf{Routing \& Serving} & \textbf{Yes, Yes, Yes} & \textbf{Two-stage pipeline: mathematically filters out nodes unable to meet hardware/latency constraints, then routes via a semantic LinUCB MAB.} & \textbf{Extracts Task Type, Semantic Cluster, and Text Complexity (adapted from GreenServ).} \\
+\bottomrule
+\end{tabularx}
+\end{sidewaystable}
