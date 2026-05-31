@@ -16,60 +16,102 @@ class Orchestrator:
         evaluation_service,
         queue_client,
         model_configs,
-        trade_off_lambda=0.5,
+        alpha=0.5,
+        beta=0.5,
         sla_max_latency_seconds=60.0,
+        min_free_gpu_memory_gb=0.5,
+        network_delay_by_tier=None,
     ):
         self.feature_service = feature_service
         self.router_service = router_service
         self.evaluation_service = evaluation_service
         self.queue_client = queue_client
-        self.trade_off_lambda = trade_off_lambda
+        self.alpha = alpha
+        self.beta = beta
         self.model_configs = model_configs
         self.model_usage_counts = {}
         self.sla_max_latency_seconds = sla_max_latency_seconds
+        self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
+        self.network_delay_by_tier = network_delay_by_tier or {
+            "edge": 0.0,
+            "cloud": 0.05,
+        }
 
-    def _expected_latency(self, telemetry):
-        """expected_latency = (queue_length + 1) * avg_task_latency.
+    def _network_delay(self, tier):
+        return float(self.network_delay_by_tier.get(tier, 0.0))
 
-        avg_task_latency of 0 means the node hasn't processed anything yet — treat
-        as immediately available rather than infinitely fast: the (+1) ensures we
-        still account for the new task.
+    def _node_free_memory_gb(self, telemetry):
+        hw = telemetry.get("hardware_state") or {}
+        if "gpu_memory_free_gb" in hw:
+            return float(hw["gpu_memory_free_gb"])
+        # Older telemetry only reports used/total — derive free if both present.
+        total = hw.get("gpu_memory_total_gb")
+        used = hw.get("gpu_memory_used_gb")
+        if total is not None and used is not None:
+            return max(0.0, float(total) - float(used))
+        return None
+
+    def _avg_latency_for_model(self, telemetry, model_id):
+        """Per-model avg latency on this node, falling back to the node-wide avg
+        when this model hasn't run here yet."""
+        per_model = telemetry.get("latency_by_model") or {}
+        if model_id in per_model:
+            return float(per_model[model_id])
+        return float(telemetry.get("avg_task_latency", 0.0) or 0.0)
+
+    def _expected_latency(self, telemetry, model_id):
+        """expected_latency = network_delay(tier) + (queue_length + 1) * avg_task_latency.
+
+        avg_task_latency of 0 means the node hasn't processed this model yet —
+        treat as immediately available rather than infinitely fast: the (+1)
+        still accounts for the new task.
         """
-        avg = float(telemetry.get("avg_task_latency", 0.0) or 0.0)
+        avg = self._avg_latency_for_model(telemetry, model_id)
         qlen = int(telemetry.get("queue_length", 0) or 0)
-        return (qlen + 1) * avg
+        return self._network_delay(telemetry.get("tier")) + (qlen + 1) * avg
 
     def _filter_nodes(self, telemetry_list):
-        """Return (surviving_nodes, available_models). Each surviving node gets an
-        `expected_latency` field added. available_models is the set of model_ids
-        whose tier has at least one surviving node."""
+        """Filter nodes by free GPU memory and return the survivors. Latency is
+        evaluated per-model later in `_node_options_for_model`, since T(m,q)
+        depends on the chosen model's per-model average latency."""
         surviving = []
-        surviving_tiers = set()
         for t in telemetry_list:
-            elat = self._expected_latency(t)
-            if elat <= self.sla_max_latency_seconds:
-                t = {**t, "expected_latency": elat}
-                surviving.append(t)
-                if t.get("tier"):
-                    surviving_tiers.add(t["tier"])
-        available_models = [
-            mid
-            for mid, cfg in self.model_configs.items()
-            if cfg.get("tier") in surviving_tiers
-        ]
-        return surviving, available_models
+            free_gb = self._node_free_memory_gb(t)
+            if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
+                continue
+            surviving.append(t)
+        return surviving
 
-    def _pick_node_for_model(self, model_id, surviving_nodes):
-        """Return queue_name of the surviving node with the lowest expected_latency
-        whose tier matches the chosen model. None if no match."""
+    def _node_options_for_model(self, model_id, surviving_nodes):
+        """Return [(node, expected_latency)] of nodes whose tier matches `model_id`
+        and whose per-model expected latency satisfies the SLA. Sorted by latency."""
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
+            return []
+        options = []
+        for n in surviving_nodes:
+            if n.get("tier") != target_tier:
+                continue
+            elat = self._expected_latency(n, model_id)
+            if elat <= self.sla_max_latency_seconds:
+                options.append((n, elat))
+        options.sort(key=lambda x: x[1])
+        return options
+
+    def _available_models(self, surviving_nodes):
+        """Models with at least one feasible node under the per-model SLA."""
+        return [
+            mid
+            for mid in self.model_configs
+            if self._node_options_for_model(mid, surviving_nodes)
+        ]
+
+    def _pick_queue_for_model(self, model_id, surviving_nodes):
+        options = self._node_options_for_model(model_id, surviving_nodes)
+        if not options:
             return None
-        candidates = [n for n in surviving_nodes if n.get("tier") == target_tier]
-        if not candidates:
-            return None
-        best = min(candidates, key=lambda n: n.get("expected_latency", float("inf")))
-        return best.get("queue_name") or f"llm_tasks_node_{best.get('node_id')}"
+        best_node, _ = options[0]
+        return best_node.get("queue_name") or f"llm_tasks_node_{best_node.get('node_id')}"
 
     async def process_query(
         self,
@@ -84,18 +126,22 @@ class Orchestrator:
     ):
         """Process a query through the routing pipeline"""
 
-        # Stage 1: pull telemetry and filter nodes by expected-latency SLA.
+        # Stage 1: 
+        # - Pull telemetry, prune nodes lacking free GPU memory
+        # - Derive the per-model feasible set from per-model expected latency
         telemetry_list = []
         try:
             telemetry_list = self.queue_client.get_all_node_telemetry() or []
         except Exception as e:
             logger.warning(f"Telemetry fetch failed, falling back to tier routing: {e}")
-        surviving_nodes, available_models = self._filter_nodes(telemetry_list)
+        surviving_nodes = self._filter_nodes(telemetry_list)
+        available_models = self._available_models(surviving_nodes)
 
         features = self.feature_service.extract_features(query_text, metadata)
         if model_id is None:
-            # Stage 2: bandit chooses among physically viable arms (mask).
-            # Empty available_models (no telemetry yet) => bandit sees all arms.
+            # Stage 2: 
+            # - Bandit chooses among physically viable arms (mask)
+            # - Empty available_models (no telemetry yet) => bandit sees all arms
             model_id = self.router_service.select_model(
                 features,
                 available_models=available_models or None,
@@ -112,10 +158,10 @@ class Orchestrator:
             "generation_parameters": generation_parameters,
         }
 
-        # Stage 3: pick the optimal surviving node of the chosen model's tier.
-        # Falls back to the step-1 tier-broadcast queue when no telemetry is
-        # available (cold start) or no node matches.
-        target_queue = self._pick_node_for_model(model_id, surviving_nodes)
+        # Stage 3: 
+        # Pick the lowest-latency surviving node of the chosen model's tier
+        # Falls back to the tier-broadcast queue when no telemetry is available (cold start) or no node matches
+        target_queue = self._pick_queue_for_model(model_id, surviving_nodes)
         if target_queue is None:
             model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
             target_queue = f"llm_inference_tasks_{model_tier}"
@@ -158,7 +204,8 @@ class Orchestrator:
                     output_tokens=output_tokens,
                     evaluation_metric=evaluation_metric or "exact_match",
                     extraction_method=extraction_method or "raw",
-                    lambda_weight=self.trade_off_lambda,
+                    alpha=self.alpha,
+                    beta=self.beta,
                 )
                 self.router_service.update(features, model_id, metrics["reward"])
                 response["metrics"] = metrics

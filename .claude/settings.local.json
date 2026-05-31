@@ -5,7 +5,8 @@
       "WebFetch(domain:arxiv.org)",
       "WebFetch(domain:www.usenix.org)",
       "WebFetch(domain:www.techrxiv.org)",
-      "WebFetch(domain:api.semanticscholar.org)"
+      "WebFetch(domain:api.semanticscholar.org)",
+      "Bash(python -m py_compile src/services/orchestrator.py src/services/inference_service.py src/services/evaluation_service.py)"
     ]
   }
 }

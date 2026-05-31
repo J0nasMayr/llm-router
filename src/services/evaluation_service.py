@@ -72,9 +72,16 @@ class EvaluationService:
         output_tokens,
         evaluation_metric="exact_match",
         extraction_method="raw",
-        lambda_weight=0.5,
+        alpha=0.5,
+        beta=0.5,
     ):
-        """Evaluate response and calculate reward combining accuracy and efficiency."""
+        """Evaluate response and calculate reward r = alpha*Acc - beta*E.
+
+        Both accuracy and energy are normalized to [0,1]. We keep the
+        energy-efficiency convention (1 - normalized_energy) so larger reward is
+        better, which matches `r = alpha*Acc - beta*E` up to an additive constant
+        — the bandit only cares about relative differences between arms.
+        """
 
         accuracy = self.evaluate(
             response, reference, task_type, extraction_method, evaluation_metric
@@ -85,7 +92,7 @@ class EvaluationService:
         normalized_accuracy = self.normalize_metric(
             evaluation_metric, accuracy, task_type
         )
-        reward = (1 - lambda_weight) * normalized_accuracy + lambda_weight * (
+        reward = alpha * normalized_accuracy + beta * (
             1 - energy_metrics["normalized_energy"]
         )
 

@@ -75,7 +75,8 @@ class InferenceService:
         self.node_id = node_id or f"{tier}-{device_id}"
         self.queue_name = dedicated_queue or f"llm_tasks_node_{self.node_id}"
         self.telemetry_interval = telemetry_interval
-        self._latency_window = deque(maxlen=telemetry_window)
+        self._telemetry_window = telemetry_window
+        self._latency_by_model = {}
         self._latency_lock = threading.Lock()
         self._telemetry_stop = threading.Event()
         self._telemetry_thread = None
@@ -126,7 +127,11 @@ class InferenceService:
             outputs = model.generate(inputs.input_ids, **gen_params)
         latency = time.time() - start_time
         with self._latency_lock:
-            self._latency_window.append(latency)
+            window = self._latency_by_model.get(model_id)
+            if window is None:
+                window = deque(maxlen=self._telemetry_window)
+                self._latency_by_model[model_id] = window
+            window.append(latency)
         energy = self.energy_measurement.stop()
         output_tokens = outputs.shape[1] - input_tokens
         output_text = tokenizer.decode(
@@ -195,11 +200,19 @@ class InferenceService:
 
         return inputs, input_tokens, gen_params
 
-    def _avg_task_latency(self):
+    def _latency_by_model_snapshot(self):
+        """Per-model average latency plus a node-wide average."""
         with self._latency_lock:
-            if not self._latency_window:
-                return 0.0
-            return sum(self._latency_window) / len(self._latency_window)
+            per_model = {
+                mid: (sum(window) / len(window))
+                for mid, window in self._latency_by_model.items()
+                if window
+            }
+        if per_model:
+            overall = sum(per_model.values()) / len(per_model)
+        else:
+            overall = 0.0
+        return per_model, overall
 
     def _hardware_state(self):
         """Best-effort hardware snapshot. Keeps cost low; fields optional."""
@@ -207,6 +220,7 @@ class InferenceService:
         if torch.cuda.is_available():
             try:
                 free, total = torch.cuda.mem_get_info(self.device_id)
+                state["gpu_memory_free_gb"] = round(free / (1024**3), 3)
                 state["gpu_memory_used_gb"] = round((total - free) / (1024**3), 3)
                 state["gpu_memory_total_gb"] = round(total / (1024**3), 3)
             except Exception:
@@ -214,12 +228,14 @@ class InferenceService:
         return state
 
     def _publish_telemetry(self):
+        latency_by_model, overall_avg = self._latency_by_model_snapshot()
         payload = {
             "node_id": self.node_id,
             "tier": self.tier,
             "queue_name": self.queue_name,
             "queue_length": self.redis_client.get_queue_length(self.queue_name),
-            "avg_task_latency": self._avg_task_latency(),
+            "avg_task_latency": overall_avg,
+            "latency_by_model": latency_by_model,
             "hardware_state": self._hardware_state(),
             "updated_at": time.time(),
         }
