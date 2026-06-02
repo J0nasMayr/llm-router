@@ -284,6 +284,7 @@ OUTPUT sources/relatedWork.aux
 INPUT ./sources/relatedWork.tex
 INPUT ./sources/relatedWork.tex
 INPUT sources/relatedWork.tex
+INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmti12.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmex7.tfm
 INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
@@ -299,7 +300,6 @@ OUTPUT sources/model.aux
 INPUT ./sources/model.tex
 INPUT ./sources/model.tex
 INPUT sources/model.tex
-INPUT /usr/local/texlive/2025/texmf-dist/fonts/tfm/public/cm/cmti12.tfm
 INPUT ./sources/evaluation.tex
 INPUT ./sources/evaluation.tex
 OUTPUT sources/evaluation.aux

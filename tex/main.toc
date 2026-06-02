@@ -5,11 +5,12 @@
 \contentsline {chapter}{\numberline {2}Related Work}{2}{chapter.2}%
 \contentsline {section}{\numberline {2.1}LLM Serving and Resource Management}{2}{section.2.1}%
 \contentsline {section}{\numberline {2.2}Prompt-Aware LLM Routing}{3}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Research Gap and Thesis Contribution}{4}{section.2.3}%
-\contentsline {chapter}{\numberline {3}System Model}{6}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Problem Formulation}{6}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Proposed Method}{7}{section.3.2}%
-\contentsline {chapter}{\numberline {4}Evaluation}{10}{chapter.4}%
-\contentsline {chapter}{\numberline {5}Conclusions and future work}{11}{chapter.5}%
-\contentsline {chapter}{Bibliography}{12}{section*.3}%
+\contentsline {section}{\numberline {2.3}Dynamic Resource Allocation for LLM Serving}{4}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Research Gap and Thesis Contribution}{5}{section.2.4}%
+\contentsline {chapter}{\numberline {3}System Model}{8}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Problem Formulation}{8}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Proposed Method}{9}{section.3.2}%
+\contentsline {chapter}{\numberline {4}Evaluation}{12}{chapter.4}%
+\contentsline {chapter}{\numberline {5}Conclusions and future work}{13}{chapter.5}%
+\contentsline {chapter}{Bibliography}{14}{section*.3}%
 \providecommand \tocbasic@end@toc@file {}\tocbasic@end@toc@file 
