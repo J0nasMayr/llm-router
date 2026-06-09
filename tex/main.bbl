@@ -1,0 +1,100 @@
+\begin{thebibliography}{17}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Barrak et~al.(2025)Barrak, Fourati, Olchawa, Ksontini, and Zoghlami]{cargo}
+Amine Barrak, Yosr Fourati, Michael Olchawa, Emna Ksontini, and Khalil Zoghlami.
+\newblock {CARGO}: A framework for confidence-aware routing of large language models, 2025.
+\newblock URL \url{https://arxiv.org/abs/2509.14899}.
+
+\bibitem[Chen et~al.(2023)Chen, Zaharia, and Zou]{frugalgpt}
+Lingjiao Chen, Matei Zaharia, and James Zou.
+\newblock Frugalgpt: How to use large language models while reducing cost and improving performance, 2023.
+\newblock URL \url{https://arxiv.org/abs/2305.05176}.
+
+\bibitem[Chen et~al.(2025)Chen, Wei, Bai, Xiong, and Wu]{tagrouter}
+Zhou Chen, Zhiqiang Wei, Yuqi Bai, Xue Xiong, and Jianmin Wu.
+\newblock Tagrouter: Learning route to {LLM}s through tags for open-domain text generation tasks.
+\newblock In \emph{Findings of the Association for Computational Linguistics: ACL 2025}, pages 21539--21564, 2025.
+\newblock URL \url{https://aclanthology.org/2025.findings-acl.1110}.
+
+\bibitem[Gu et~al.(2026)Gu, Wang, David N{\'u}{\~{n}}ez~Araya, Huang, and Gerndt]{hasgpu}
+Jianfeng Gu, Puxuan Wang, Isaac David N{\'u}{\~{n}}ez~Araya, Kai Huang, and Michael Gerndt.
+\newblock Has-gpu: Efficient hybrid auto-scaling with fine-grained gpu allocation for slo-aware serverless inferences.
+\newblock In Wolfgang~E. Nagel, Diana Goehringer, and Pedro~C. Diniz, editors, \emph{Euro-Par 2025: Parallel Processing}, pages 159--174, Cham, 2026. Springer Nature Switzerland.
+\newblock ISBN 978-3-031-99854-6.
+
+\bibitem[Heisler et~al.(2025)Heisler, Yousefijamarani, Wang, Wang, Shi, Sadri, Yu, Li, Li, Singh, Xing, Jang, Chang, Zhang, Chen, Jing, Shan, Li, Bai, Zhang, Wang, Wang, Beschastnikh, Xiong, Zhang, and Fan]{llm_serving_survey}
+Morgan~Lindsay Heisler, Zahra Yousefijamarani, Xinglu Wang, Qian Wang, Ge~Shi, Hanieh Sadri, Timothy Yu, Yifei Li, Haley Li, Gursimran Singh, Linzi Xing, Daesik Jang, Hong Chang, Qintao Zhang, Kan Chen, Shuming Jing, Yizhou Shan, Yi~Li, Xiaolong Bai, Yu~Zhang, Tianzheng Wang, Jiannan Wang, Ivan Beschastnikh, Ying Xiong, Yong Zhang, and Zhenan Fan.
+\newblock {LLM} inference scheduling: A survey of techniques, frameworks, and trade-offs.
+\newblock Technical report, TechRxiv, 2025.
+\newblock URL \url{https://doi.org/10.36227/techrxiv.176238087.79673350/v1}.
+
+\bibitem[Huang et~al.(2025)Huang, Shi, Zhu, Chen, and Quan]{lookahead}
+Canbin Huang, Tianyuan Shi, Yuhua Zhu, Ruijun Chen, and Xiaojun Quan.
+\newblock Lookahead routing for large language models, 2025.
+\newblock URL \url{https://arxiv.org/abs/2510.19506}.
+
+\bibitem[Huang et~al.(2024)Huang, Chen, Gong, Hawk, Bright, Xie, Huang, and Ji]{enova}
+Tao Huang, Pengfei Chen, Kyoka Gong, Jocky Hawk, Zachary Bright, Wenxin Xie, Kecheng Huang, and Zhi Ji.
+\newblock {ENOVA}: Autoscaling towards cost-effective and stable serverless {LLM} serving, 2024.
+\newblock URL \url{https://arxiv.org/abs/2407.09486}.
+
+\bibitem[Jaiswal et~al.(2025)Jaiswal, Jain, Simmhan, Parayil, Mallick, Wang, Amant, Bansal, Ruhle, Kulkarni, Kofsky, and Rajmohan]{sageserve}
+Shashwat Jaiswal, Kunal Jain, Yogesh Simmhan, Anjaly Parayil, Ankur Mallick, Rujia Wang, Renee~St. Amant, Chetan Bansal, Victor Ruhle, Anoop Kulkarni, Steve Kofsky, and Saravan Rajmohan.
+\newblock {SageServe}: Optimizing {LLM} serving on cloud data centers with forecast aware auto-scaling.
+\newblock \emph{Proceedings of the {ACM} on Measurement and Analysis of Computing Systems ({POMACS})}, 9\penalty0 (3):\penalty0 Article 61, 2025.
+\newblock \doi{10.1145/3771576}.
+\newblock URL \url{https://doi.org/10.1145/3771576}.
+
+\bibitem[Marinelli et~al.(2025)Marinelli, Pichlmeier, and Bisztray]{noft}
+Ryan Marinelli, Josef Pichlmeier, and Tamas Bisztray.
+\newblock Harnessing chain-of-thought metadata for task routing and adversarial prompt detection, 2025.
+\newblock URL \url{https://arxiv.org/abs/2503.21464}.
+
+\bibitem[Ong et~al.(2024)Ong, Almahairi, Wu, Chiang, Wu, Gonzalez, Kadous, and Stoica]{routellm}
+Isaac Ong, Amjad Almahairi, Vincent Wu, Wei-Lin Chiang, Tianhao Wu, Joseph~E. Gonzalez, M.~Waleed Kadous, and Ion Stoica.
+\newblock Routellm: Learning to route {LLM}s with preference data, 2024.
+\newblock URL \url{https://arxiv.org/abs/2406.18665}.
+
+\bibitem[Shen and Sen(2025)]{econoserve}
+Haiying Shen and Tanmoy Sen.
+\newblock Econoserve: Maximizing multi-resource utilization with {SLO} guarantees in {LLM} serving, 2025.
+\newblock URL \url{https://arxiv.org/abs/2411.06364}.
+
+\bibitem[Song et~al.(2025)Song, Huang, Cheng, Gao, Xu, Zhao, Wang, and Wu]{irtrouter}
+Wei Song, Zhenya Huang, Cheng Cheng, Weibo Gao, Bihan Xu, GuanHao Zhao, Fei Wang, and Runze Wu.
+\newblock {IRT}-router: Effective and interpretable multi-{LLM} routing via item response theory.
+\newblock In \emph{Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)}, pages 15628--15644, 2025.
+\newblock URL \url{https://aclanthology.org/2025.acl-long.761}.
+
+\bibitem[Stojkovic et~al.(2024)Stojkovic, Zhang, Goiri, Torrellas, and Choukse]{dynamollm}
+Jovan Stojkovic, Chaojie Zhang, Inigo Goiri, Josep Torrellas, and Esha Choukse.
+\newblock Dynamollm: Designing {LLM} inference clusters for performance and energy efficiency, 2024.
+\newblock URL \url{https://arxiv.org/abs/2408.00741}.
+
+\bibitem[Tian et~al.(2025)Tian, Qin, Tam, Li, Wang, Zhao, Zhang, and Xu]{clone}
+Chunlin Tian, Xinpeng Qin, Kahou Tam, Li~Li, Zijian Wang, Yuanzhe Zhao, Minglei Zhang, and Chengzhong Xu.
+\newblock {CLONE}: Customizing {LLMs} for efficient latency-aware inference at the edge.
+\newblock In \emph{Proceedings of the 2025 {USENIX} Annual Technical Conference ({USENIX ATC} '25)}, 2025.
+\newblock URL \url{https://www.usenix.org/conference/atc25/presentation/tian}.
+
+\bibitem[Wan et~al.(2025)Wan, Zhao, Jiang, Guo, and Wu]{bros}
+Borui Wan, Juntao Zhao, Chenyu Jiang, Chuanxiong Guo, and Chuan Wu.
+\newblock Efficient {LLM} serving on hybrid real-time and best-effort requests, 2025.
+\newblock URL \url{https://arxiv.org/abs/2504.09590}.
+
+\bibitem[Zhang et~al.(2025)Zhang, Xi, Chen, Li, Mo, and Wu]{nexussched}
+Yue Zhang, Alex Xi, Yuansheng Chen, Jialun Li, Xuan Mo, and WeiGang Wu.
+\newblock A predictive and synergistic two-layer scheduling framework for {LLM} serving, 2025.
+\newblock URL \url{https://arxiv.org/abs/2509.23384}.
+
+\bibitem[Ziller et~al.(2026)Ziller, Ilager, Bartocci, Mariani, Tundo, and Brandic]{greenserv}
+Thomas Ziller, Shashikant Ilager, Ezio Bartocci, Leonardo Mariani, Alessandro Tundo, and Ivona Brandic.
+\newblock Greenserv: Energy-efficient context-aware dynamic routing for multi-model {LLM} inference, 2026.
+\newblock URL \url{https://arxiv.org/abs/2601.17551}.
+
+\end{thebibliography}
