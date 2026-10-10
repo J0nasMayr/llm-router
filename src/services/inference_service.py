@@ -74,6 +74,13 @@ class InferenceService:
         self.tier = tier
         self.node_id = node_id or f"{tier}-{device_id}"
         self.queue_name = dedicated_queue or f"llm_tasks_node_{self.node_id}"
+        # Listen on the per-node queue (targeted dispatch) AND the tier
+        # broadcast queue the orchestrator falls back to when no telemetry is
+        # available yet (cold start). Node queue first so targeted tasks win.
+        self.listen_queues = [self.queue_name]
+        tier_queue = f"llm_inference_tasks_{self.tier}"
+        if tier_queue not in self.listen_queues:
+            self.listen_queues.append(tier_queue)
         self.telemetry_interval = telemetry_interval
         self._telemetry_window = telemetry_window
         self._latency_by_model = {}
@@ -272,12 +279,12 @@ class InferenceService:
         """Main worker loop"""
         logger.info(
             f"Worker started on {self.device} as node={self.node_id} tier={self.tier} "
-            f"listening to queue: {self.queue_name}"
+            f"listening to queues: {self.listen_queues}"
         )
         self.start_telemetry()
 
         while True:
-            task = self.redis_client.get_next_task(queue_name=self.queue_name, timeout=1)
+            task = self.redis_client.get_next_task(queue_name=self.listen_queues, timeout=1)
             if not task:
                 time.sleep(0.1)
                 continue

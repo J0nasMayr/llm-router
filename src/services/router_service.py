@@ -26,11 +26,13 @@ class RouterService:
     def _create_bandit(self, algorithm_name, model_ids, context_dimension):
         """Create a bandit algorithm instance using explicit mapping"""
         try:
-            module_name = algorithm_name.lower()
-            class_name = self.ALGORITHM_MAP.get(algorithm_name.lower())
+            # Config names may use hyphens (e.g. "epsilon-greedy"); module and
+            # map names use underscores.
+            module_name = algorithm_name.lower().replace("-", "_")
+            class_name = self.ALGORITHM_MAP.get(module_name)
             if not class_name:
                 class_name = "".join(
-                    word.capitalize() for word in algorithm_name.split("_")
+                    word.capitalize() for word in module_name.split("_")
                 )
             module = importlib.import_module(f"src.bandit.{module_name}")
             bandit_class = getattr(module, class_name)
@@ -57,7 +59,11 @@ class RouterService:
         except TypeError:
             return self.bandit.select_model(context)
 
-    def update(self, context, model_id, reward):
-        """Update the bandit algorithm with the observed reward."""
+    def update(self, features, model_id, reward):
+        """Update the bandit algorithm with the observed reward.
 
+        Extracts the numeric context vector from the features dict, mirroring
+        `select_model` — the bandit must see the same context in both calls.
+        """
+        context = features.get("context_vector") if features else None
         self.bandit.update(model_id, reward, context=context)

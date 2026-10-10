@@ -1,6 +1,7 @@
 # src/services/orchestrator.py
 import asyncio
 import logging
+import random
 import time
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,8 @@ class Orchestrator:
         sla_max_latency_seconds=60.0,
         min_free_gpu_memory_gb=0.5,
         network_delay_by_tier=None,
+        allocation_controller=None,
+        result_timeout_seconds=None,
     ):
         self.feature_service = feature_service
         self.router_service = router_service
@@ -31,11 +34,26 @@ class Orchestrator:
         self.model_configs = model_configs
         self.model_usage_counts = {}
         self.sla_max_latency_seconds = sla_max_latency_seconds
+        # How long to wait for a worker result. Must exceed the SLA deadline,
+        # otherwise a request that just meets the SLA still times out here.
+        self.result_timeout_seconds = (
+            result_timeout_seconds
+            if result_timeout_seconds is not None
+            else sla_max_latency_seconds + 30.0
+        )
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.network_delay_by_tier = network_delay_by_tier or {
             "edge": 0.0,
             "cloud": 0.05,
         }
+        # Optional allocation controller (HAS-GPU-style trigger + ENOVA LP).
+        # When set, routing restricts to nodes the LP marked eligible for the
+        # model, and uses LP-produced weights for weighted selection.
+        self.allocation_controller = allocation_controller
+        # Per-model arrival counters consumed by the controller via
+        # consume_rps_window(); reset after each consumption.
+        self._rps_counters = {}
+        self._rps_window_start = time.time()
 
     def _network_delay(self, tier):
         return float(self.network_delay_by_tier.get(tier, 0.0))
@@ -82,15 +100,28 @@ class Orchestrator:
             surviving.append(t)
         return surviving
 
+    def _allocation_weights(self, model_id):
+        """LP-produced {node_id: weight} for the model, or None if no controller
+        or no entry yet. Empty dict means the LP has run but no node is eligible."""
+        if self.allocation_controller is None:
+            return None
+        if not self.allocation_controller.has_eligibility():
+            return None
+        return dict(self.allocation_controller.eligibility_for(model_id))
+
     def _node_options_for_model(self, model_id, surviving_nodes):
         """Return [(node, expected_latency)] of nodes whose tier matches `model_id`
-        and whose per-model expected latency satisfies the SLA. Sorted by latency."""
+        and whose per-model expected latency satisfies the SLA. Sorted by latency.
+        When an LP eligibility map is present, restrict candidates to its keys."""
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
             return []
+        weights = self._allocation_weights(model_id)
         options = []
         for n in surviving_nodes:
             if n.get("tier") != target_tier:
+                continue
+            if weights is not None and n.get("node_id") not in weights:
                 continue
             elat = self._expected_latency(n, model_id)
             if elat <= self.sla_max_latency_seconds:
@@ -110,8 +141,37 @@ class Orchestrator:
         options = self._node_options_for_model(model_id, surviving_nodes)
         if not options:
             return None
-        best_node, _ = options[0]
+        weights = self._allocation_weights(model_id)
+        if weights:
+            # Weighted random selection over SLA-passing options; falls back
+            # to lowest-latency when no LP weight is available for the survivors.
+            pool = [(n, weights.get(n.get("node_id"), 0.0)) for n, _ in options]
+            total = sum(w for _, w in pool)
+            if total > 0:
+                pick = random.random() * total
+                acc = 0.0
+                for node, w in pool:
+                    acc += w
+                    if pick <= acc:
+                        best_node = node
+                        break
+                else:
+                    best_node = pool[-1][0]
+            else:
+                best_node = options[0][0]
+        else:
+            best_node = options[0][0]
         return best_node.get("queue_name") or f"llm_tasks_node_{best_node.get('node_id')}"
+
+    def consume_rps_window(self):
+        """Return per-model RPS observed since last call, then reset the window.
+        Used by AllocationController.rps_provider."""
+        now = time.time()
+        elapsed = max(now - self._rps_window_start, 1e-6)
+        rps = {m: c / elapsed for m, c in self._rps_counters.items()}
+        self._rps_counters = {}
+        self._rps_window_start = now
+        return rps
 
     async def process_query(
         self,
@@ -149,8 +209,9 @@ class Orchestrator:
         if model_id not in self.model_usage_counts:
             self.model_usage_counts[model_id] = 0
         self.model_usage_counts[model_id] += 1
+        self._rps_counters[model_id] = self._rps_counters.get(model_id, 0) + 1
+        # Note: the queue client assigns the definitive task id in enqueue_task.
         task = {
-            "id": f"task_{int(time.time() * 1000)}",
             "query_text": query_text,
             "selected_model": model_id,
             "extraction_method": extraction_method,
@@ -173,7 +234,7 @@ class Orchestrator:
         if not wait_for_result:
             return response
         try:
-            timeout = 60
+            timeout = self.result_timeout_seconds
             start_time = time.time()
             result = None
 

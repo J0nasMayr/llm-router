@@ -1,7 +1,14 @@
+# config/mab.yaml
+# The API picks "linucb" when present (see run_api._build_services); other
+# entries are selectable by removing/reordering. Keys must match the bandit
+# constructor signatures in src/bandit/.
+linucb:
+  alpha: 1.0            # exploration strength
+  regularization: 1.0   # ridge lambda for the per-arm design matrix
+  seed: 40
+
 epsilon-greedy:
-  name: epsilon-greedy
-  epsilon: 0.1
-  num_actions: 2
-  random_seed: 40
-  type: epsilon-greedy
-  value: 0.0
+  initial_epsilon: 0.1
+  decay_factor: 0.995
+  min_epsilon: 0.01
+  seed: 40

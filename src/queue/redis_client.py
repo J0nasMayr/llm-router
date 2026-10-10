@@ -2,6 +2,7 @@
 import asyncio
 import json
 import time
+import uuid
 
 import redis
 
@@ -40,8 +41,10 @@ class RedisClient:
 
     def enqueue_task(self, task_data, queue_name=None):
         """Add task to queue and return task ID"""
+        # uuid suffix keeps IDs unique even for concurrent same-millisecond tasks
         task_id = (
-            f"task:{int(time.time() * 1000)}:{task_data.get('query_id', 'unknown')}"
+            f"task:{int(time.time() * 1000)}:{uuid.uuid4().hex[:8]}"
+            f":{task_data.get('query_id', 'unknown')}"
         )
         task_data["id"] = task_id
         task_json = json.dumps(task_data)
@@ -62,7 +65,11 @@ class RedisClient:
         return task_id
 
     def get_next_task(self, queue_name=None, timeout=1):
-        """Get next task from queue, waiting up to timeout seconds"""
+        """Get next task from queue, waiting up to timeout seconds.
+
+        queue_name may be a single queue or a list of queues; with a list,
+        BRPOP pops from the first non-empty queue (earlier entries win).
+        """
         target_queue = queue_name or self.default_queue
 
         if self._is_connected():

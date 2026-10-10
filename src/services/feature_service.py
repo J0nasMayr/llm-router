@@ -35,6 +35,11 @@ class FeatureService:
             f"{self.num_clusters} clusters, {self.num_complexity_bins} complexity bins"
         )
 
+    @property
+    def context_dimension(self):
+        """Length of the one-hot context vector built by `get_context_vector`."""
+        return len(self.task_types) + self.num_clusters + self.num_complexity_bins
+
     def extract_features(self, query_text, query_metadata=None):
         """Extract features from query text and metadata"""
         features = {}
