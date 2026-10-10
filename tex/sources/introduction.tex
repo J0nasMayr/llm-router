@@ -1,4 +1,37 @@
 \chapter{Introduction}
 \label{chapter:introduction}
 
-The introduction should explain the addressed problem, summarize existing systems (related works), and identify the need for the proposed solution. Identify the contributions of the proposed system. It is always good to defend your points and arguments with references to papers. 
+Every prompt submitted to a generative Large Language Model (LLM) triggers an inference job that consumes GPU-seconds, energy, and network bandwidth.
+Yet two prompts that look identical from the infrastructure's point of view can require vastly different capability: a keyword lookup is answered correctly by a one-billion-parameter model in well under a second, while a multi-step reasoning task may only be solved by a model more than an order of magnitude larger.
+A provider that serves every prompt with its largest model therefore pays -- in energy and hardware time -- for capability most requests never use, while one that serves every prompt with a small model silently fails its hardest requests.
+The scale of this inefficiency is no longer academic: within two years of ChatGPT's release, roughly 40\% of the U.S. working-age population had interacted with a generative AI system \cite{Bick2024Rapid}, and by 2025 nearly four-fifths of surveyed organisations reported using generative AI in at least one business function \cite{McKinsey2025State}, making the physical cost of serving inference one of the dominant operational concerns for both cloud providers and end-users.
+
+Two properties make this workload especially hard to serve efficiently.
+First, autoregressive decoding is bottlenecked not by raw compute but by the Key-Value Cache (KVC), a per-request GPU-memory state that grows with every generated token, making throughput highly sensitive to memory pressure \cite{bros, econoserve}.
+Second, deployable models are heterogeneous by design: a small model may answer a simple prompt in sub-second latency at negligible energy cost, while a multi-step reasoning prompt may exceed its capacity entirely and require a model orders of magnitude larger.
+No single model dominates across the full space of prompt complexities \cite{greenserv, frugalgpt, routellm}.
+
+A natural response is to \emph{route} each prompt to the cheapest model expected to satisfy it, which has motivated a substantial body of routing research \cite{cargo, tagrouter, noft, irtrouter, lookahead, greenserv}.
+In parallel, LLM \emph{serving} research has optimised the hardware layer through KVC management, scheduling, and energy-aware load balancing \cite{bros, econoserve, dynamollm, nexussched}, and a third line of work dynamically re-allocates GPU capacity between deployed models as demand shifts \cite{enova, hasgpu, sageserve, llm_serving_survey}.
+Each of these directions, however, solves only its own slice of the problem.
+Although serving systems maximise hardware utilisation and energy efficiency, they treat every prompt as an opaque computational block: they cannot answer an easy prompt with a cheaper model because they never ask what the prompt needs.
+Although semantic routers select the accuracy-optimal model for each prompt, they assume that model is always instantly available in an infinitely provisioned cloud; a decision can be semantically right yet physically infeasible, and under load it produces Service Level Agreement (SLA) violations.
+And although allocation systems adapt the deployment itself to the workload, they are prompt-blind: they decide where models live, never which model should answer.
+None of these blind spots is affordable once inference is expected to run across the \emph{edge-cloud continuum}, where edge nodes carry small GPU-memory budgets, are highly sensitive to queue depth, and are separated from the cloud by non-negligible network delay: a routing decision that ignores any of these signals will, in the worst case, dispatch a feasible request to an infeasible node.
+
+To address this gap, this thesis proposes a collaborative inference framework for the edge-cloud continuum that couples the three directions above.
+A lightweight telemetry-driven feasibility filter first prunes nodes and models that cannot meet the SLA deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.
+A contextual multi-armed bandit then selects a model from $M_t^*$ using a semantic context vector -- building on the Task Type, Semantic Cluster, and Text Complexity signals of GreenServ \cite{greenserv} -- and updates its policy online from an accuracy-energy scalarised reward.
+Complementing these per-query decisions, a background \emph{allocation controller} closes the loop at the deployment level: adopting the lightweight Kalman-filter trigger design of HAS-GPU \cite{hasgpu} and an ENOVA-style allocation program \cite{enova}, it consumes the same node telemetry and periodically recomputes which nodes each model may run on -- and in what proportion its traffic should be split across them -- so that the routing layer always operates on an up-to-date picture of the available capacity.
+
+The contributions of this thesis are fourfold.
+First, a formal problem model for edge-cloud LLM routing that treats latency feasibility as a first-class constraint rather than an implicit reward penalty, combined with a two-parameter scalarised reward weighing accuracy against energy.
+Second, an implementation of this architecture as a runtime pipeline of telemetry-driven feasibility filtering, semantic context extraction, and contextual bandit routing, deployed on an edge-cloud testbed with per-node task queues and inference workers that publish a uniform telemetry surface.
+Third, a trigger-driven per-model allocation controller that combines HAS-GPU's Kalman-plus-threshold trigger -- extended with latency-deviation and memory-pressure rules -- with an ENOVA-style linear program maintaining the per-model node eligibility map consulted at routing time.
+Fourth, an empirical evaluation on this testbed that quantifies the effect of the feasibility filter on SLA violations, the effect of semantic-aware routing on the accuracy-energy trade-off, and the contribution of the allocation controller (Chapter~\ref{chapter:evaluation}).
+
+The remainder of this thesis is organised as follows.
+Chapter~\ref{chapter:relatedWork} surveys the adjacent bodies of LLM serving, prompt-aware routing, and dynamic resource allocation, and identifies the specific gap this work targets.
+Chapter~\ref{chapter:model} formalises the routing problem and describes the architecture.
+Chapter~\ref{chapter:evaluation} presents the experimental methodology and results.
+Chapter~\ref{chapter:conclusion} summarises the contributions and outlines directions for future work.

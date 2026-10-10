@@ -1,14 +1,46 @@
 \chapter{Evaluation}
 \label{chapter:evaluation}
 
-The evaluation should start with a summary of the content of the section. It is always a good practice to give the reader some details about the system implemented and the important aspects that should be evaluated. Then, explain what the evaluation will look like. Explain the infrastructure used, metrics, competitors, or baselines. 
+% TODO: This chapter is a methodology skeleton. Fill in testbed specifics,
+% figures, and measured numbers once the experiments have been run.
 
-Then, use subsections to explain more in detail each particular experiment or scenario and present results in a clear way, discussing every significant detail.
+This chapter evaluates the three claims made in Chapter~\ref{chapter:introduction}: that telemetry-driven feasibility filtering reduces SLA violations, that semantic contextual-bandit routing improves the accuracy-energy trade-off over resource-agnostic baselines, and that the trigger-driven allocation controller improves latency behaviour under shifting load. Each claim maps to one ablation: the full system is compared against variants with the corresponding component disabled.
 
+\section{Experimental Setup}
 
-% \begin{lstlisting}[language=Bash]
-%     $ > netconvert -osm-files ibk_map.osm --output-file
-%         ibk.net.xml --geometry.remove --roundabouts.guess
-%         --ramps.guess --junctions.join --tls.guess-signals
-%         --tls.discard-simple --tls.join
-% \end{lstlisting}
+\textbf{Testbed.}
+% TODO: exact hardware. Placeholder description below.
+The system is deployed on an edge-cloud testbed consisting of resource-constrained edge nodes and a high-capacity cloud node, connected through the shared Redis queue described in Chapter~\ref{chapter:model}. Edge nodes host the smaller models of the pool (0.5B--7B parameters), the cloud node the larger ones (12B--27B). The scheduler runs as a gateway on the edge tier.
+
+\textbf{Workload.}
+Queries are drawn from the five datasets underlying the task-type feature (MMLU, GSM8K, HellaSwag, WinoGrande, CNN/DailyMail), interleaved to create a mixed stream; ground-truth references enable online reward computation. % TODO: sample sizes, arrival process (open vs. closed loop), number of runs and seeds.
+
+\textbf{Metrics.}
+(i) SLA violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU; (iv) the scalarised reward $r_t$; (v) for the allocation controller: trigger frequency, LP re-solve count, and time-to-recover after a load shift.
+
+\textbf{Baselines.}
+(a) \emph{Largest-model}: every query to the most capable cloud model; (b) \emph{smallest-model}: every query to the cheapest edge model; (c) \emph{random routing}; (d) \emph{GreenServ-style}: the contextual bandit without feasibility filtering or allocation control, i.e.\ the single-cloud assumption of prior routing work.
+
+\section{Effect of the Feasibility Filter}
+\label{sec:eval-filter}
+% Ablation: full system vs. bandit-only routing (no Stage-1 filtering).
+% Load is increased until edge nodes saturate; report SLA violation rate and
+% tail latency for both variants.
+% TODO: run and report.
+
+\section{Accuracy-Energy Trade-off of Semantic Routing}
+\label{sec:eval-routing}
+% Full system vs. baselines (a)-(d) on the mixed workload; report accuracy,
+% energy per query, and reward over time (learning curve).
+% Sensitivity: sweep the reward weights alpha/beta and plot the resulting
+% accuracy-energy Pareto front.
+% TODO: run and report.
+
+\section{Contribution of the Allocation Controller}
+\label{sec:eval-allocation}
+% Ablation: full system vs. system with a static model-to-node mapping.
+% Scenario: abrupt load shift (e.g. workload mix flips from easy to hard
+% prompts, moving demand from edge to cloud models); report latency over time,
+% trigger firings, and recovery behaviour. Verify the cooldown suppresses
+% oscillation.
+% TODO: run and report.
