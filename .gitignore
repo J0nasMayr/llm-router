@@ -24,3 +24,18 @@ experiments/*/results/*_summary_stats_*.csv
 experiments/*/results/*_metadata_*.yaml
 experiments/*/results/*_run_means_*.csv
 experiments/*/results/*_significance_tests_*.csv
+
+
+978-3-031-99854-6.pdf
+
+# LaTeX build output
+tex/**/*.aux
+tex/*.bbl
+tex/*.blg
+tex/*.fdb_latexmk
+tex/*.fls
+tex/*.log
+tex/*.out
+tex/*.synctex.gz
+tex/*.toc
+tex/main.pdf
