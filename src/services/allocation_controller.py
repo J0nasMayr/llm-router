@@ -55,18 +55,28 @@ def solve_replicas_weights(
 
     Variables: x[m,n] = fraction of model m's traffic routed to node n.
     Constraints:
-      sum_n x[m,n] = 1                              for each model m
+      sum_n x[m,n] = 1                              for each servable model m
       sum_m demand[m] * latency[m,n] * x[m,n] <= 1  for each node n  (no over-saturation)
       x[m,n] = 0                                    where not eligible
     Objective: minimize sum_{m,n} demand[m] * latency[m,n] * x[m,n]
                i.e. total node-busy time across the system.
 
-    Returns `model_id -> [(node_id, weight)]` (weights sum to 1 per model).
+    A model is servable if it has at least one eligible node. Unservable models
+    get an empty entry and are left out of the program.
+
+    Returns `model_id -> [(node_id, weight)]` (weights sum to 1 per servable model).
     On LP failure, falls back to equal weighting over each model's eligible nodes.
     """
+    # A model without any eligible node (e.g. no live node of its tier) can
+    # never satisfy sum_n x[m,n] = 1; keeping its row would make the whole
+    # program infeasible and push every model onto the equal-weight fallback.
+    out: Dict[str, List[Tuple[str, float]]] = {
+        m: [] for m in models if not any(eligible.get((m, n), False) for n in nodes)
+    }
+    models = [m for m in models if m not in out]
     M, N = len(models), len(nodes)
-    if M == 0 or N == 0:
-        return {m: [] for m in models}
+    if M == 0:
+        return out
 
     num_vars = M * N
     idx = lambda m, n: m * N + n  # noqa: E731
@@ -101,7 +111,6 @@ def solve_replicas_weights(
 
     res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method="highs")
 
-    out: Dict[str, List[Tuple[str, float]]] = {}
     if res.success:
         x = res.x.reshape(M, N)
         for m_i, m in enumerate(models):
@@ -114,11 +123,8 @@ def solve_replicas_weights(
     logger.warning(f"LP infeasible ({res.message}); falling back to equal weights")
     for m in models:
         elig = [n for n in nodes if eligible.get((m, n), False)]
-        if elig:
-            w = 1.0 / len(elig)
-            out[m] = [(n, w) for n in elig]
-        else:
-            out[m] = []
+        w = 1.0 / len(elig)
+        out[m] = [(n, w) for n in elig]
     return out
 
 

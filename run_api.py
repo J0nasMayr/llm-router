@@ -34,7 +34,6 @@ def _build_services():
     general = load_config("general") or {}
     models = load_config("models") or {}
     features = load_config("feature_extraction") or {}
-    metrics = load_config("metrics") or {}
     mab = load_config("mab") or {}
     infrastructure = load_config("infrastructure") or {}
 
@@ -48,7 +47,9 @@ def _build_services():
     )
 
     feature_service = FeatureService(features)
-    evaluation_service = EvaluationService(metrics)
+    # MetricNormalizer reads config/metrics.yaml itself; its constructor takes
+    # a path, not the already-loaded dict.
+    evaluation_service = EvaluationService()
 
     # Bandit choice: prefer linucb if configured, else fall back to epsilon-greedy.
     algo = "linucb" if "linucb" in mab else next(iter(mab.keys()), "epsilon_greedy")

@@ -253,9 +253,12 @@ class Orchestrator:
                     features.get("task_type", "default") if features else "default"
                 )
 
-                energy_consumption = result.get("energy_consumption", 0)
-                input_tokens = result.get("input_tokens", 0)
-                output_tokens = result.get("output_tokens", 0)
+                # The worker nests its measurements under "metrics"
+                # (see InferenceService.run_inference).
+                worker_metrics = result.get("metrics") or {}
+                energy_consumption = worker_metrics.get("energy_consumption", 0)
+                input_tokens = worker_metrics.get("input_tokens", 0)
+                output_tokens = worker_metrics.get("output_tokens", 0)
                 metrics = self.evaluation_service.evaluate_and_calculate_reward(
                     response=result["response"],
                     reference=reference,
