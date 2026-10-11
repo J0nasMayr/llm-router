@@ -36,6 +36,7 @@ def _build_services():
     features = load_config("feature_extraction") or {}
     mab = load_config("mab") or {}
     infrastructure = load_config("infrastructure") or {}
+    datasets = (load_config("datasets") or {}).get("datasets") or {}
 
     # Redis lives in infrastructure.yaml (port 6380 by default — must match
     # the workers' --redis-port); general.yaml is a legacy fallback.
@@ -76,6 +77,7 @@ def _build_services():
         queue_client=redis_client,
         model_configs=models,
         sla_max_latency_seconds=sla_seconds,
+        dataset_configs=datasets,
     )
 
     controller = AllocationController(

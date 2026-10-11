@@ -140,11 +140,11 @@ class AllocationController:
         queue_client,
         model_configs: Dict,
         rps_provider: Callable[[], Dict[str, float]],
-        alpha: float = 0.85,
-        beta: float = 0.5,
-        T_cooldown: float = 30.0,
+        theta_up: float = 0.85,
+        theta_down: float = 0.5,
+        T_cool: float = 30.0,
         R_min: float = 0.1,
-        k_sigma: float = 2.0,
+        kappa: float = 2.0,
         min_free_gpu_memory_gb: float = 0.5,
         tick_interval: float = 5.0,
         Q: float = 0.01,
@@ -153,11 +153,11 @@ class AllocationController:
         self.queue_client = queue_client
         self.model_configs = model_configs
         self.rps_provider = rps_provider
-        self.alpha = alpha
-        self.beta = beta
-        self.T_cooldown = T_cooldown
+        self.theta_up = theta_up
+        self.theta_down = theta_down
+        self.T_cool = T_cool
         self.R_min = R_min
-        self.k_sigma = k_sigma
+        self.kappa = kappa
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.tick_interval = tick_interval
         self._Q, self._D = Q, D
@@ -225,7 +225,7 @@ class AllocationController:
     def _update_latency_filters(self, telemetry_list) -> Optional[str]:
         """Feed per-(model, node) latency observations into their Kalman filters
         and residual-variance trackers. Returns a deviation reason when an
-        observation exceeds its prediction by more than k_sigma standard
+        observation exceeds its prediction by more than kappa standard
         deviations. Must run every tick so the filters stay current even when
         another rule fires first."""
         MIN_SAMPLES = 5
@@ -251,11 +251,11 @@ class AllocationController:
                 if (
                     reason is None
                     and n >= MIN_SAMPLES
-                    and residual > self.k_sigma * sigma
+                    and residual > self.kappa * sigma
                 ):
                     reason = (
                         f"latency_deviation({m}@{nid}: obs={obs:.2f}s > "
-                        f"pred={kf.R:.2f}s + {self.k_sigma}σ)"
+                        f"pred={kf.R:.2f}s + {self.kappa}σ)"
                     )
                 self._lat_resvar[key] = EW * var + (1 - EW) * residual**2
                 self._lat_samples[key] = n + 1
@@ -270,9 +270,9 @@ class AllocationController:
             return "first_run"
 
         # A single cooldown gates every rule (design: react at most once per
-        # T_cooldown, suppressing oscillation and LP re-run storms).
+        # T_cool, suppressing oscillation and LP re-run storms).
         now = time.time()
-        if now - self._last_rerun <= self.T_cooldown:
+        if now - self._last_rerun <= self.T_cool:
             return None
 
         # Memory-pressure (any node low)
@@ -284,8 +284,8 @@ class AllocationController:
         # Per-model scale-up
         for m, R in predicted_rps.items():
             cap = capacities.get(m, 0.0)
-            if cap > 0 and R > self.alpha * cap:
-                return f"scale_up({m}: R={R:.2f} > {self.alpha}·C={self.alpha * cap:.2f})"
+            if cap > 0 and R > self.theta_up * cap:
+                return f"scale_up({m}: R={R:.2f} > {self.theta_up}·C={self.theta_up * cap:.2f})"
 
         # Per-(model, node) latency deviation (computed in _update_latency_filters)
         if latency_reason:
@@ -293,9 +293,9 @@ class AllocationController:
 
         # Global scale-down
         nonzero = {m: R for m, R in predicted_rps.items() if capacities.get(m, 0.0) > 0}
-        if nonzero and all(R < self.beta * capacities[m] for m, R in nonzero.items()):
+        if nonzero and all(R < self.theta_down * capacities[m] for m, R in nonzero.items()):
             if any(R > self.R_min for R in predicted_rps.values()):
-                return "scale_down(all models below β·C)"
+                return "scale_down(all models below θ_down·C)"
 
         return None
 
@@ -336,8 +336,12 @@ class AllocationController:
         if not telemetry_list:
             return
         observed_rps = self.rps_provider() or {}
+        # Every model gets an observation each tick (0 when it received no
+        # traffic), so a model's prediction decays instead of freezing at its
+        # last non-zero value.
         predicted_rps = {
-            m: self._kalman_for(m).update(R) for m, R in observed_rps.items()
+            m: self._kalman_for(m).update(observed_rps.get(m, 0.0))
+            for m in self.model_configs
         }
         capacities = {m: self._model_capacity(m, telemetry_list) for m in self.model_configs}
         latency_reason = self._update_latency_filters(telemetry_list)

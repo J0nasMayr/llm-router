@@ -20,10 +20,13 @@ feature_extraction:
     
   complexity:
     measure: "flesch_reading_ease"
+    # Exclusive upper bound of each bin over the inverted Flesch score, which
+    # is clamped to [0, 100]: [0,33), [33,67), [67,100]. One one-hot slot per
+    # bin; the last bound must exceed 100 so every score falls into a slot.
     bins:
-      - 0
       - 33
       - 67
+      - 101
     use_binned: true
     
   context_vector:

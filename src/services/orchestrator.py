@@ -24,6 +24,7 @@ class Orchestrator:
         network_delay_by_tier=None,
         allocation_controller=None,
         result_timeout_seconds=None,
+        dataset_configs=None,
     ):
         self.feature_service = feature_service
         self.router_service = router_service
@@ -54,6 +55,26 @@ class Orchestrator:
         # consume_rps_window(); reset after each consumption.
         self._rps_counters = {}
         self._rps_window_start = time.time()
+        # Per-dataset scoring and generation settings (datasets.yaml), applied
+        # when a request names its dataset in metadata.
+        self.dataset_configs = dataset_configs or {}
+
+    def _dataset_settings(self, dataset):
+        """(extraction_method, evaluation_metric, generation_parameters) for a
+        known dataset, mirroring how data/process.py prepares queries offline.
+        All None for an unknown or missing dataset."""
+        cfg = self.dataset_configs.get(dataset)
+        if not cfg:
+            return None, None, None
+        extraction = cfg.get("extraction") or {}
+        extraction_method = extraction.get("method", "raw")
+        if extraction_method == "regex":
+            extraction_method = f"regex_{extraction.get('pattern', '')}"
+        return (
+            extraction_method,
+            cfg.get("evaluation_metric", "exact_match"),
+            dict(cfg.get("generation") or {}),
+        )
 
     def _network_delay(self, tier):
         return float(self.network_delay_by_tier.get(tier, 0.0))
@@ -210,6 +231,15 @@ class Orchestrator:
             self.model_usage_counts[model_id] = 0
         self.model_usage_counts[model_id] += 1
         self._rps_counters[model_id] = self._rps_counters.get(model_id, 0) + 1
+        # Explicit arguments win; otherwise use the dataset's own extraction,
+        # metric and generation settings so online rewards are computed the
+        # same way as in the offline GreenServ setup.
+        ds_extraction, ds_metric, ds_generation = self._dataset_settings(
+            (metadata or {}).get("dataset")
+        )
+        extraction_method = extraction_method or ds_extraction
+        evaluation_metric = evaluation_metric or ds_metric
+        generation_parameters = generation_parameters or ds_generation
         # Note: the queue client assigns the definitive task id in enqueue_task.
         task = {
             "query_text": query_text,
