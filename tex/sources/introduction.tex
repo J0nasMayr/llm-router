@@ -12,7 +12,7 @@ In practice, models run on a limited set of GPU nodes whose load changes from se
 % TODO: cite why inference moves to the edge (latency, privacy, bandwidth).
 In this setting, a routing decision can be right for the prompt and still wrong for the system.
 Consider a router that has learned that hard math prompts are best answered by a large cloud model.
-In GreenServ's own measurements, the slowest combinations of model and GSM8K query take up to about 38\,s; if three such queries are already waiting on the cloud node, the next one waits well over 100\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
+In GreenServ's own measurements, the slowest combinations of model and GSM8K query -- grade-school math word problems that require several reasoning steps \cite{gsm8k} -- take up to about 38\,s; if three such queries are already waiting on the cloud node, the next one waits well over 100\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
 A router that cannot see the node's queue keeps choosing the large model, and every such query misses any reasonable deadline.
 
 This thesis addresses the following problem: \emph{given a pool of LLMs of different sizes, spread over edge and cloud nodes whose load changes at runtime, decide for each query which model answers and which node runs it, such that the trade-off between accuracy and energy consumption is maximized while the answer still arrives within a latency deadline.}
@@ -35,13 +35,13 @@ The thesis answers three research questions:
 \end{description}
 
 The contributions of this thesis are fourfold.
-First, a formal problem model for edge-cloud LLM routing that treats latency feasibility as a first-class constraint rather than an implicit reward penalty: whereas GreenServ formulates a latency constraint but does not enforce it in its experiments, this work estimates feasibility per (model, node) pair from live telemetry and enforces it as a mask on the bandit's action set, while retaining GreenServ's accuracy-energy reward.
-Second, an implementation of this architecture as a runtime pipeline of telemetry-driven feasibility filtering, semantic context extraction, and contextual bandit routing, deployed on an edge-cloud testbed with per-node task queues and inference workers that publish a uniform telemetry surface.
+First, a formal problem model for edge-cloud LLM routing that treats latency feasibility as a constraint rather than an implicit reward penalty: whereas GreenServ formulates a latency constraint but does not enforce it in its experiments, this work estimates feasibility per (model, node) pair from live telemetry and enforces it as a mask on the bandit's action set, while retaining GreenServ's accuracy-energy reward.
+Second, an implementation of this architecture as a runtime pipeline of telemetry-driven feasibility filtering, semantic context extraction, and contextual bandit routing, deployed on an edge-cloud testbed with per-node task queues and inference workers that publish uniform telemetry metrics.
 Third, a trigger-driven per-model traffic allocation controller that combines HAS-GPU's Kalman-plus-threshold trigger -- extended with latency-deviation and memory-pressure rules -- with an ENOVA-style linear program maintaining the per-model node eligibility map consulted at routing time.
 Fourth, an empirical evaluation on this testbed that answers RQ1 (Section~\ref{sec:eval-filter}), RQ2 (Section~\ref{sec:eval-routing}), and RQ3 (Section~\ref{sec:eval-allocation}).
 
 The remainder of this thesis is organised as follows.
-Chapter~\ref{chapter:relatedWork} surveys the adjacent bodies of LLM serving, prompt-aware routing, and dynamic resource allocation, and identifies the specific gap this work targets.
+Chapter~\ref{chapter:relatedWork} surveys the adjacent topics LLM serving, prompt-aware routing, and dynamic resource allocation, and identifies the specific gap this work targets.
 Chapter~\ref{chapter:model} formalises the routing problem and describes the architecture.
 Chapter~\ref{chapter:evaluation} presents the experimental methodology and results.
 Chapter~\ref{chapter:conclusion} summarises the contributions and outlines directions for future work.
