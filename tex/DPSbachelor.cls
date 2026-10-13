@@ -88,7 +88,6 @@
 \renewcommand\appendix{%
  \backmatter
  \phantomsection{\addcontentsline{toc}{chapter}{\bibname}}
- \bibliographystyle{plain}
  \bibliography{\@bibfile}
  \@OLDappendix
 }
@@ -178,7 +177,7 @@
    }
 
    \vspace{\stretch{1}}
-   {\large \\ Innsbruck, Austria \\ \today{} \\ \ }
+   {\large Innsbruck, Austria \\ \today{} \\ \ }
   }
  \end{flushright}
  

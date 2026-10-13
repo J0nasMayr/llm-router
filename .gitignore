@@ -39,3 +39,6 @@ tex/*.out
 tex/*.synctex.gz
 tex/*.toc
 tex/main.pdf
+
+# Claude Code local settings
+.claude/
