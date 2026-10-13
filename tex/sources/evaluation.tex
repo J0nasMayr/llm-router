@@ -4,7 +4,7 @@
 % TODO: This chapter is a methodology skeleton. Fill in testbed specifics,
 % figures, and measured numbers once the experiments have been run.
 
-This chapter evaluates the three claims made in Chapter~\ref{chapter:introduction}: that telemetry-driven feasibility filtering reduces SLA violations, that semantic contextual-bandit routing improves the accuracy-energy trade-off over resource-agnostic baselines, and that the trigger-driven allocation controller improves latency behaviour under shifting load. Each claim maps to one ablation: the full system is compared against variants with the corresponding component disabled.
+This chapter answers the three research questions of Chapter~\ref{chapter:introduction}: whether telemetry-driven feasibility filtering reduces SLA violations (RQ1, Section~\ref{sec:eval-filter}), what restricting the choice to feasible models costs in accuracy and energy compared to GreenServ and simple baselines (RQ2, Section~\ref{sec:eval-routing}), and whether adapting each model's traffic split improves latency under shifting load (RQ3, Section~\ref{sec:eval-allocation}). Each question maps to one comparison: the full system is compared against variants with the corresponding component disabled.
 
 \section{Experimental Setup}
 

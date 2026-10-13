@@ -20,8 +20,9 @@ where $\alpha$ and $\beta$ are weighting parameters that specify the trade-off b
 
 
 \section{Proposed Method}
+\label{sec:method}
 
-To solve the routing problem defined above, this thesis proposes a four-stage scheduling pipeline, complemented by a background allocation control loop (Section~\ref{sec:allocation}) that adapts how each model's traffic is distributed across nodes. The architecture bridges real-time hardware telemetry with semantic prompt analysis to achieve resource-aware and prompt-aware inference.
+To solve the routing problem defined above, this thesis proposes a four-stage scheduling pipeline, complemented by a background allocation control loop (Section~\ref{sec:allocation}) that adapts how each model's traffic is distributed across nodes. Figure~\ref{fig:architecture} gives an overview. The architecture bridges real-time hardware telemetry with semantic prompt analysis to achieve resource-aware and prompt-aware inference.
 
 \noindent
 The proposed architecture operates through the following sequential stages:
@@ -70,8 +71,8 @@ with $x_{m,n} = 0$ fixed for ineligible pairs (tier mismatch or memory pressure)
 % Architectural Diagram
 \begin{figure}[htbp]
     \centering
-    \framebox{\parbox{0.9\textwidth}{\centering \vspace{2cm} \textit{Visualizing the flow from User Query $\rightarrow$ Telemetry Filter $\rightarrow$ Context Extractor $\rightarrow$ LinUCB Router $\rightarrow$ Node Dispatch $\rightarrow$ Edge/Cloud Nodes, with the Allocation Controller turning node telemetry into the eligibility map used by the filter and the dispatch step} \vspace{2cm}}}
-    \caption{Overview of the Proposed Edge-Cloud Collaborative Scheduling Architecture.}
+    \input{figures/architecture}
+    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the eligibility map produced by the allocation controller (Section~\ref{sec:allocation}). The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$; this arrow is omitted for readability.}
     \label{fig:architecture}
 \end{figure}
 

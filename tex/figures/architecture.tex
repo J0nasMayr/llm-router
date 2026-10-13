@@ -1,0 +1,84 @@
+% Architecture of the edge-cloud scheduler (Chapter 3).
+% Solid: request path; dashed: telemetry; dash-dotted: eligibility map.
+\setstretch{1}
+\begin{tikzpicture}[
+    font=\footnotesize,
+    >={Stealth[length=2mm]},
+    block/.style={draw, rounded corners=2pt, fill=gray!8, align=center,
+        text width=2.75cm, minimum height=1.1cm, inner sep=3pt},
+    store/.style={draw, fill=gray!20, align=center, minimum height=0.9cm, inner sep=3pt},
+    tier/.style={draw, thick, fill=white, align=center, text width=3.2cm,
+        minimum height=1.0cm, inner sep=3pt},
+    flow/.style={->, thick},
+    telem/.style={->, dashed},
+    elig/.style={->, dash dot, thick},
+    lbl/.style={font=\scriptsize, fill=white, inner sep=1pt},
+]
+
+% --- scheduler (edge gateway) -------------------------------------------
+\node[block] (filt)   at (4.55, 9.5) {\textbf{1}~Feasibility filter\\[1pt]
+    \scriptsize $G_n \ge G_{min}$, $\hat{T}(m, n) \le T_{max}$};
+\node[block] (ctx)    at (1.35, 7.3) {\textbf{2}~Context extraction\\[1pt]
+    \scriptsize task type, cluster, complexity};
+\node[block] (bandit) at (4.55, 7.3) {\textbf{3}~LinUCB bandit\\[1pt]
+    \scriptsize arms outside $M_t^*$ masked};
+\node[block] (disp)   at (7.75, 7.3) {\textbf{3}~Node dispatch\\[1pt]
+    \scriptsize min.\ $\hat{T}(m_t, n)$ or weights $w_{m,n}$};
+\node[block] (reward) at (1.35, 5.1) {\textbf{4}~Reward \& update\\[1pt]
+    \scriptsize $r_t = \alpha\,Acc + \beta\,(1 - E)$};
+
+\begin{scope}[on background layer]
+    \node[draw, dashed, rounded corners=4pt, fill=gray!3, inner sep=6pt,
+        fit=(ctx) (bandit) (disp) (filt) (reward)] (sched) {};
+\end{scope}
+\node[anchor=south east, font=\scriptsize\itshape, inner sep=2pt]
+    at (sched.north east) {Scheduler (gateway on the edge tier)};
+
+\node[draw, fill=white, align=center, text width=2.75cm, minimum height=0.7cm]
+    (client) at (1.35, 11.4) {Client};
+
+% --- queues and nodes -----------------------------------------------------
+\node[store, minimum width=8.8cm] (queues) at (4.55, 3.1)
+    {Redis: a task queue per node \textbar{} a fallback queue per tier \textbar{} results};
+
+\node[tier] (edge)  at (2.4, 1.2) {\textbf{Edge nodes}\\[1pt]
+    \scriptsize inference workers,\\ 13 models (0.5--8B)};
+\node[tier] (cloud) at (6.9, 1.2) {\textbf{Cloud nodes}\\[1pt]
+    \scriptsize inference workers,\\ 6 models (12--34B)};
+
+% --- telemetry and allocation controller --------------------------------
+\node[store, text width=2.3cm] (telem) at (11.45, 3.1)
+    {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$};
+\node[block, text width=2.3cm] (ctrl) at (11.45, 7.3)
+    {Allocation controller\\[1pt]
+    \scriptsize Kalman demand forecast, trigger rules, LP over $x_{m,n}$};
+
+% --- request path ---------------------------------------------------------
+\draw[flow] (client) -- node[lbl, right=2pt, align=left] {$q_t$,\\ dataset label} (ctx);
+\draw[flow] (ctx) -- node[lbl, above=2pt] {$x_t$} (bandit);
+\draw[flow] (filt) -- node[lbl, right=2pt] {$M_t^*$} (bandit);
+\draw[flow] (bandit) -- node[lbl, above=2pt] {$m_t$} (disp);
+\draw[flow] (disp.south) -- node[lbl, pos=0.3, right=2pt, align=left] {enqueue\\ to node $n$}
+    (disp.south |- queues.north);
+\draw[flow] (queues.south -| edge.north) -- (edge.north);
+\draw[flow] (queues.south -| cloud.north) -- (cloud.north);
+\draw[flow, gray] (reward.south |- queues.north)
+    -- node[lbl, right=2pt, text=black] {result} (reward.south);
+\draw[flow, gray] (reward.east) -| node[lbl, pos=0.25, below=1pt, text=black] {update}
+    ([xshift=-0.6cm]bandit.south);
+\draw[flow] (reward.west) -- ++(-0.45, 0) |- node[lbl, pos=0.75, above=1pt] {response}
+    (client.west);
+
+% --- telemetry ------------------------------------------------------------
+\draw[dashed] (edge.south) -- ++(0, -0.4) coordinate (bus);
+\draw[dashed] (cloud.south) -- (cloud.south |- bus);
+\draw[telem] (bus) -| node[lbl, pos=0.25, below=1pt] {published by every node every 5\,s}
+    (telem.south);
+\draw[telem] (telem.north) -- (ctrl.south);
+\draw[telem] (telem.east) -- ++(0.45, 0) |- ([yshift=0.3cm]filt.east);
+
+% --- eligibility map ----------------------------------------------------
+\draw[elig] (ctrl.west) -- (disp.east);
+\draw[elig] (ctrl.north) |- node[lbl, pos=0.75, below=2pt] {eligibility map}
+    ([yshift=-0.2cm]filt.east);
+\end{tikzpicture}
