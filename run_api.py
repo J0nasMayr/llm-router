@@ -67,9 +67,8 @@ def _build_services():
         context_dimension=feature_service.context_dimension,
     )
 
-    sla_seconds = float(
-        (features.get("feasibility") or {}).get("max_latency", 60.0)
-    )
+    feasibility = features.get("feasibility") or {}
+    sla_seconds = float(feasibility.get("max_latency", 60.0))
     orch = Orchestrator(
         feature_service=feature_service,
         router_service=router_service,
@@ -78,6 +77,9 @@ def _build_services():
         model_configs=models,
         sla_max_latency_seconds=sla_seconds,
         dataset_configs=datasets,
+        load_bandwidth_gb_per_s=float(
+            feasibility.get("load_bandwidth_gb_per_s", 2.0)
+        ),
     )
 
     controller = AllocationController(

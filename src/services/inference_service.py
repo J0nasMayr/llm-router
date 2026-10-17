@@ -85,42 +85,69 @@ class InferenceService:
         self._telemetry_window = telemetry_window
         self._latency_by_model = {}
         self._latency_lock = threading.Lock()
+        # Model loads block the worker and are not part of latency_by_model,
+        # so they are tracked separately for telemetry: the load in progress
+        # (model_id, start time) and the durations of recent loads per model.
+        self._loading = None
+        self._load_time_by_model = {}
+        self._load_window = 5
+        self._load_lock = threading.Lock()
         self._telemetry_stop = threading.Event()
         self._telemetry_thread = None
 
     def _load_model(self, model_id):
-        """Load model if not already loaded"""
+        """Load model if not already loaded. Returns (model, tokenizer,
+        load_seconds); load_seconds is 0.0 when the model was already loaded."""
         if self.loaded_model_id == model_id:
-            return self.loaded_model, self.tokenizer
-        if self.loaded_model is not None:
-            logger.info(f"Unloading model {self.loaded_model_id}")
-            self.loaded_model = None
-            self.tokenizer = None
-            torch.cuda.empty_cache()
+            return self.loaded_model, self.tokenizer, 0.0
 
-        logger.info(f"Loading model {model_id}")
-        model_config = self.model_configs[model_id]
-        model_name = model_config["name"]
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=self.general_configs.get("cache_dir"),
-            token=self.general_configs.get("hf_token"),
-        )
-        self.loaded_model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.bfloat16,
-            device_map=self.device,
-            cache_dir=self.general_configs.get("cache_dir"),
-            attn_implementation="eager",
-        )
-        self.loaded_model_id = model_id
-        self._warm_up_model(self.loaded_model, self.tokenizer)
+        start_time = time.time()
+        with self._load_lock:
+            self._loading = (model_id, start_time)
+        try:
+            if self.loaded_model is not None:
+                logger.info(f"Unloading model {self.loaded_model_id}")
+                self.loaded_model = None
+                self.tokenizer = None
+                self.loaded_model_id = None
+                torch.cuda.empty_cache()
 
-        return self.loaded_model, self.tokenizer
+            logger.info(f"Loading model {model_id}")
+            model_config = self.model_configs[model_id]
+            model_name = model_config["name"]
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name,
+                cache_dir=self.general_configs.get("cache_dir"),
+                token=self.general_configs.get("hf_token"),
+            )
+            self.loaded_model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.bfloat16,
+                device_map=self.device,
+                cache_dir=self.general_configs.get("cache_dir"),
+                attn_implementation="eager",
+            )
+            self.loaded_model_id = model_id
+            self._warm_up_model(self.loaded_model, self.tokenizer)
+        finally:
+            with self._load_lock:
+                self._loading = None
+
+        # Only successful loads are recorded; the duration includes unloading
+        # the previous model and the warm-up, as both delay the waiting task.
+        load_seconds = time.time() - start_time
+        with self._load_lock:
+            window = self._load_time_by_model.get(model_id)
+            if window is None:
+                window = deque(maxlen=self._load_window)
+                self._load_time_by_model[model_id] = window
+            window.append(load_seconds)
+
+        return self.loaded_model, self.tokenizer, load_seconds
 
     def run_inference(self, query_text, model_id, generation_parameters=None):
         """Run inference on a query"""
-        model, tokenizer = self._load_model(model_id)
+        model, tokenizer, load_seconds = self._load_model(model_id)
         inputs, input_tokens, gen_params = self._prepare_generation_params(
             query_text, tokenizer, generation_parameters
         )
@@ -153,6 +180,9 @@ class InferenceService:
                 "energy_consumption": energy,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
+                # Seconds spent loading the model before this task (0 when it
+                # was already in GPU memory); not included in `latency`.
+                "load_time": load_seconds,
             },
         }
 
@@ -221,6 +251,26 @@ class InferenceService:
             overall = 0.0
         return per_model, overall
 
+    def _model_state_snapshot(self):
+        """Models in GPU memory, the load in progress (with its elapsed time,
+        so readers need no synchronized clock) and the average duration of
+        recent loads per model."""
+        with self._load_lock:
+            resident = [self.loaded_model_id] if self.loaded_model_id else []
+            loading = None
+            if self._loading is not None:
+                loading_model, started_at = self._loading
+                loading = {
+                    "model_id": loading_model,
+                    "elapsed_s": round(time.time() - started_at, 3),
+                }
+            load_times = {
+                mid: (sum(window) / len(window))
+                for mid, window in self._load_time_by_model.items()
+                if window
+            }
+        return resident, loading, load_times
+
     def _hardware_state(self):
         """Best-effort hardware snapshot. Keeps cost low; fields optional."""
         state = {"device": self.device}
@@ -236,6 +286,7 @@ class InferenceService:
 
     def _publish_telemetry(self):
         latency_by_model, overall_avg = self._latency_by_model_snapshot()
+        resident_models, loading, load_time_by_model = self._model_state_snapshot()
         payload = {
             "node_id": self.node_id,
             "tier": self.tier,
@@ -243,6 +294,9 @@ class InferenceService:
             "queue_length": self.redis_client.get_queue_length(self.queue_name),
             "avg_task_latency": overall_avg,
             "latency_by_model": latency_by_model,
+            "resident_models": resident_models,
+            "loading": loading,
+            "load_time_by_model": load_time_by_model,
             "hardware_state": self._hardware_state(),
             "updated_at": time.time(),
         }

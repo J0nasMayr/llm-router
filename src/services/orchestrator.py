@@ -25,6 +25,7 @@ class Orchestrator:
         allocation_controller=None,
         result_timeout_seconds=None,
         dataset_configs=None,
+        load_bandwidth_gb_per_s=2.0,
     ):
         self.feature_service = feature_service
         self.router_service = router_service
@@ -47,6 +48,9 @@ class Orchestrator:
             "edge": 0.0,
             "cloud": 0.05,
         }
+        # Assumed disk-to-GPU speed for estimating the load time of a model a
+        # node has not loaded yet (bf16 weights: 2 GB per billion parameters).
+        self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
         # Optional allocation controller (HAS-GPU-style trigger + ENOVA LP).
         # When set, routing restricts to nodes the LP marked eligible for the
         # model, and uses LP-produced weights for weighted selection.
@@ -98,16 +102,53 @@ class Orchestrator:
             return float(per_model[model_id])
         return float(telemetry.get("avg_task_latency", 0.0) or 0.0)
 
+    def _load_time(self, telemetry, model_id):
+        """Seconds this node needs to load `model_id`: the node's measured
+        average, or before its first load of the model, an estimate from the
+        model's bf16 size."""
+        measured = (telemetry.get("load_time_by_model") or {}).get(model_id)
+        if measured is not None:
+            return float(measured)
+        params_billion = float(
+            self.model_configs.get(model_id, {}).get("parameter_count", 0) or 0
+        )
+        return 2.0 * params_billion / self.load_bandwidth_gb_per_s
+
+    def _pending_load_time(self, telemetry, model_id):
+        """Load time a new task for `model_id` waits for on this node: the rest
+        of a load already in progress, plus loading `model_id` itself unless
+        the node holds (or is loading) it. 0 for workers that do not report
+        which models they hold."""
+        resident = telemetry.get("resident_models")
+        if resident is None:
+            return 0.0
+        loading = telemetry.get("loading")
+        if loading:
+            loading_model = loading.get("model_id")
+            elapsed = float(loading.get("elapsed_s", 0.0) or 0.0)
+            remaining = max(0.0, self._load_time(telemetry, loading_model) - elapsed)
+            if loading_model == model_id:
+                return remaining
+            return remaining + self._load_time(telemetry, model_id)
+        if model_id in resident:
+            return 0.0
+        return self._load_time(telemetry, model_id)
+
     def _expected_latency(self, telemetry, model_id):
-        """expected_latency = network_delay(tier) + (queue_length + 1) * avg_task_latency.
+        """expected_latency = network_delay(tier) + pending_load_time + (queue_length + 1) * avg_task_latency.
 
         avg_task_latency of 0 means the node hasn't processed this model yet —
         treat as immediately available rather than infinitely fast: the (+1)
-        still accounts for the new task.
+        still accounts for the new task. Queued tasks are assumed to need no
+        further model change; with one model per worker this can be optimistic.
         """
         avg = self._avg_latency_for_model(telemetry, model_id)
         qlen = int(telemetry.get("queue_length", 0) or 0)
-        return self._network_delay(telemetry.get("tier")) + (qlen + 1) * avg
+        return (
+            self._network_delay(telemetry.get("tier"))
+            + self._pending_load_time(telemetry, model_id)
+            + (qlen + 1) * avg
+        )
 
     def _filter_nodes(self, telemetry_list):
         """Filter nodes by free GPU memory and return the survivors. Latency is

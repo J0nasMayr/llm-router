@@ -40,3 +40,8 @@ feature_extraction:
 # cold-start fallback path.
 feasibility:
   max_latency: 30
+  # Assumed disk-to-GPU speed (GB/s) for estimating how long a node needs to
+  # load a model it has not loaded before; after the first load, the node's
+  # measured load time is used instead. Pre-download all weights, otherwise
+  # the first measured load includes the download.
+  load_bandwidth_gb_per_s: 2.0
