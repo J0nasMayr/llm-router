@@ -17,7 +17,7 @@
 
 % --- scheduler (edge gateway) -------------------------------------------
 \node[block] (filt)   at (4.55, 9.5) {\textbf{1}~Feasibility filter\\[1pt]
-    \scriptsize $G_n \ge G_{min}$, $\hat{T}(m, n) \le T_{max}$};
+    \scriptsize $G_n \ge G_{min}$, $s_m \le S_n$,\\ $\hat{T}(m, n) \le T_{max}$};
 \node[block] (ctx)    at (1.35, 7.3) {\textbf{2}~Context extraction\\[1pt]
     \scriptsize task type, cluster, complexity};
 \node[block] (bandit) at (4.55, 7.3) {\textbf{3}~LinUCB bandit\\[1pt]
@@ -48,7 +48,7 @@
 
 % --- telemetry and allocation controller --------------------------------
 \node[store, text width=2.3cm] (telem) at (11.45, 3.1)
-    {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$,\\ loaded model, $\ell(m, n)$};
+    {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$,\\ loaded models, $\ell(m, n)$, $s_m$, $S_n$};
 \node[block, text width=2.3cm] (ctrl) at (11.45, 7.3)
     {Allocation controller\\[1pt]
     \scriptsize Kalman demand forecast, trigger rules, LP over $x_{m,n}$};

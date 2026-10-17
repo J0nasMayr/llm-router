@@ -1,9 +1,10 @@
 # src/worker.py
 import argparse
+import gc
 import logging
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 
 # os.environ['TORCH_USE_CUDA_DSA'] = '1'
 import torch
@@ -17,6 +18,7 @@ from transformers import (
 from config.manager import load_config
 from src.metrics.energy import EnergyMeasurement
 from src.queue.redis_client import RedisClient
+from src.services.model_memory import estimated_size_gb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("worker")
@@ -59,6 +61,9 @@ class InferenceService:
         node_id=None,
         telemetry_interval=5.0,
         telemetry_window=20,
+        memory_budget_gb=None,
+        memory_headroom_gb=4.0,
+        max_models=None,
     ):
         self.redis_client = redis_client
         self.general_configs = general_configs
@@ -68,9 +73,20 @@ class InferenceService:
         self.energy_measurement = EnergyMeasurement.create(
             method=energy_method, device_id=device_id
         )
-        self.loaded_model = None
-        self.loaded_model_id = None
-        self.tokenizer = None
+        # Models in GPU memory as model_id -> (model, tokenizer), least
+        # recently used first. The node keeps as many models as fit into its
+        # memory budget (and at most max_models, if set; 1 reproduces
+        # GreenServ's one-model worker) and unloads the least recently used
+        # model to make room for a new one.
+        self._resident = OrderedDict()
+        self._model_memory_gb = {}
+        self.max_models = max_models
+        if memory_budget_gb is None and torch.cuda.is_available():
+            # The headroom stays free for activations and the KV cache.
+            _, total = torch.cuda.mem_get_info(device_id)
+            memory_budget_gb = total / (1024**3) - memory_headroom_gb
+        # None means no limit (e.g. a CPU-only worker in tests).
+        self.memory_budget_gb = memory_budget_gb
         self.tier = tier
         self.node_id = node_id or f"{tier}-{device_id}"
         self.queue_name = dedicated_queue or f"llm_tasks_node_{self.node_id}"
@@ -95,55 +111,113 @@ class InferenceService:
         self._telemetry_stop = threading.Event()
         self._telemetry_thread = None
 
+    def _size_gb(self, model_id):
+        """Memory the model takes here: measured after its last load, else the
+        bf16 estimate. Callers that read _model_memory_gb concurrently hold
+        _load_lock."""
+        measured = self._model_memory_gb.get(model_id)
+        if measured is not None:
+            return measured
+        return estimated_size_gb(self.model_configs.get(model_id))
+
+    def _allocated_gb(self):
+        """GB held by tensors on this worker's GPU, or None without CUDA."""
+        if not torch.cuda.is_available():
+            return None
+        return torch.cuda.memory_allocated(self.device_id) / (1024**3)
+
+    def _release_gpu_memory(self):
+        """Return the memory of dropped models to the GPU."""
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    def _make_room_for(self, model_id):
+        """Unload least recently used models until `model_id` fits into the
+        memory budget and the model limit."""
+        needed = self._size_gb(model_id)
+        unloaded = False
+        while True:
+            with self._load_lock:
+                if not self._resident:
+                    break
+                too_many = (
+                    self.max_models is not None
+                    and len(self._resident) >= self.max_models
+                )
+                used = sum(self._size_gb(m) for m in self._resident)
+                too_big = (
+                    self.memory_budget_gb is not None
+                    and used + needed > self.memory_budget_gb
+                )
+                if not (too_many or too_big):
+                    break
+                # Delete the entry without keeping a reference to the model,
+                # so its memory can be released before the next load.
+                victim = next(iter(self._resident))
+                del self._resident[victim]
+            logger.info(f"Unloading model {victim}")
+            unloaded = True
+        if unloaded:
+            self._release_gpu_memory()
+        if self.memory_budget_gb is not None and needed > self.memory_budget_gb:
+            logger.warning(
+                f"Model {model_id} needs {needed:.1f} GB, more than the "
+                f"memory budget of {self.memory_budget_gb:.1f} GB"
+            )
+
     def _load_model(self, model_id):
-        """Load model if not already loaded. Returns (model, tokenizer,
-        load_seconds); load_seconds is 0.0 when the model was already loaded."""
-        if self.loaded_model_id == model_id:
-            return self.loaded_model, self.tokenizer, 0.0
+        """Return (model, tokenizer, load_seconds) for `model_id`, loading it
+        first if it is not in GPU memory; load_seconds is 0.0 if it was."""
+        with self._load_lock:
+            if model_id in self._resident:
+                self._resident.move_to_end(model_id)
+                model, tokenizer = self._resident[model_id]
+                return model, tokenizer, 0.0
 
         start_time = time.time()
         with self._load_lock:
             self._loading = (model_id, start_time)
         try:
-            if self.loaded_model is not None:
-                logger.info(f"Unloading model {self.loaded_model_id}")
-                self.loaded_model = None
-                self.tokenizer = None
-                self.loaded_model_id = None
-                torch.cuda.empty_cache()
-
+            self._make_room_for(model_id)
             logger.info(f"Loading model {model_id}")
-            model_config = self.model_configs[model_id]
-            model_name = model_config["name"]
-            self.tokenizer = AutoTokenizer.from_pretrained(
+            model_name = self.model_configs[model_id]["name"]
+            allocated_before = self._allocated_gb()
+            tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
                 cache_dir=self.general_configs.get("cache_dir"),
                 token=self.general_configs.get("hf_token"),
             )
-            self.loaded_model = AutoModelForCausalLM.from_pretrained(
+            model = AutoModelForCausalLM.from_pretrained(
                 model_name,
                 torch_dtype=torch.bfloat16,
                 device_map=self.device,
                 cache_dir=self.general_configs.get("cache_dir"),
                 attn_implementation="eager",
             )
-            self.loaded_model_id = model_id
-            self._warm_up_model(self.loaded_model, self.tokenizer)
+            allocated_after = self._allocated_gb()
+            self._warm_up_model(model_id, model, tokenizer)
+        except Exception:
+            model = tokenizer = None
+            self._release_gpu_memory()
+            raise
         finally:
             with self._load_lock:
                 self._loading = None
 
         # Only successful loads are recorded; the duration includes unloading
-        # the previous model and the warm-up, as both delay the waiting task.
+        # models to make room and the warm-up, as both delay the waiting task.
         load_seconds = time.time() - start_time
         with self._load_lock:
+            self._resident[model_id] = (model, tokenizer)
+            if allocated_before is not None:
+                self._model_memory_gb[model_id] = allocated_after - allocated_before
             window = self._load_time_by_model.get(model_id)
             if window is None:
                 window = deque(maxlen=self._load_window)
                 self._load_time_by_model[model_id] = window
             window.append(load_seconds)
 
-        return self.loaded_model, self.tokenizer, load_seconds
+        return model, tokenizer, load_seconds
 
     def run_inference(self, query_text, model_id, generation_parameters=None):
         """Run inference on a query"""
@@ -186,9 +260,9 @@ class InferenceService:
             },
         }
 
-    def _warm_up_model(self, model, tokenizer):
+    def _warm_up_model(self, model_id, model, tokenizer):
         """Run a warm-up inference to initialize model compilation and caches"""
-        logger.info(f"Warming up model {self.loaded_model_id}")
+        logger.info(f"Warming up model {model_id}")
         try:
             warm_up_text = "Hello, how are you today?"
             inputs = tokenizer(warm_up_text, return_tensors="pt").to(model.device)
@@ -252,11 +326,13 @@ class InferenceService:
         return per_model, overall
 
     def _model_state_snapshot(self):
-        """Models in GPU memory, the load in progress (with its elapsed time,
-        so readers need no synchronized clock) and the average duration of
-        recent loads per model."""
+        """Telemetry fields on the node's models: those in GPU memory (least
+        recently used first), the load in progress (with its elapsed time, so
+        readers need no synchronized clock), the average duration of recent
+        loads, the measured memory of each model loaded so far, and the
+        memory budget."""
         with self._load_lock:
-            resident = [self.loaded_model_id] if self.loaded_model_id else []
+            resident = list(self._resident)
             loading = None
             if self._loading is not None:
                 loading_model, started_at = self._loading
@@ -269,7 +345,16 @@ class InferenceService:
                 for mid, window in self._load_time_by_model.items()
                 if window
             }
-        return resident, loading, load_times
+            model_memory = {
+                mid: round(gb, 3) for mid, gb in self._model_memory_gb.items()
+            }
+        return {
+            "resident_models": resident,
+            "loading": loading,
+            "load_time_by_model": load_times,
+            "model_memory_gb": model_memory,
+            "memory_budget_gb": self.memory_budget_gb,
+        }
 
     def _hardware_state(self):
         """Best-effort hardware snapshot. Keeps cost low; fields optional."""
@@ -286,7 +371,6 @@ class InferenceService:
 
     def _publish_telemetry(self):
         latency_by_model, overall_avg = self._latency_by_model_snapshot()
-        resident_models, loading, load_time_by_model = self._model_state_snapshot()
         payload = {
             "node_id": self.node_id,
             "tier": self.tier,
@@ -294,9 +378,7 @@ class InferenceService:
             "queue_length": self.redis_client.get_queue_length(self.queue_name),
             "avg_task_latency": overall_avg,
             "latency_by_model": latency_by_model,
-            "resident_models": resident_models,
-            "loading": loading,
-            "load_time_by_model": load_time_by_model,
+            **self._model_state_snapshot(),
             "hardware_state": self._hardware_state(),
             "updated_at": time.time(),
         }
@@ -408,6 +490,27 @@ def main():
         default=5.0,
         help="Seconds between telemetry publishes to Redis.",
     )
+    parser.add_argument(
+        "--memory-budget-gb",
+        type=float,
+        default=None,
+        help="GPU memory the worker may fill with model weights. Defaults to "
+        "the GPU's total memory minus --memory-headroom-gb.",
+    )
+    parser.add_argument(
+        "--memory-headroom-gb",
+        type=float,
+        default=4.0,
+        help="GPU memory kept free for activations and the KV cache when the "
+        "budget is derived from the GPU size.",
+    )
+    parser.add_argument(
+        "--max-models",
+        type=int,
+        default=None,
+        help="Keep at most this many models in GPU memory "
+        "(1 = one model at a time, as in GreenServ).",
+    )
     args = parser.parse_args()
     redis_client = RedisClient(
         host=args.redis_host, port=args.redis_port, password=args.redis_password
@@ -425,6 +528,9 @@ def main():
         dedicated_queue=args.dedicated_queue,
         node_id=args.node_id,
         telemetry_interval=args.telemetry_interval,
+        memory_budget_gb=args.memory_budget_gb,
+        memory_headroom_gb=args.memory_headroom_gb,
+        max_models=args.max_models,
     )
     worker.run()
 

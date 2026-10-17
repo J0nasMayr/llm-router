@@ -4,6 +4,8 @@ import logging
 import random
 import time
 
+from src.services.model_memory import estimated_size_gb, fits_on_node
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,7 +51,7 @@ class Orchestrator:
             "cloud": 0.05,
         }
         # Assumed disk-to-GPU speed for estimating the load time of a model a
-        # node has not loaded yet (bf16 weights: 2 GB per billion parameters).
+        # node has not loaded yet.
         self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
         # Optional allocation controller (HAS-GPU-style trigger + ENOVA LP).
         # When set, routing restricts to nodes the LP marked eligible for the
@@ -109,10 +111,8 @@ class Orchestrator:
         measured = (telemetry.get("load_time_by_model") or {}).get(model_id)
         if measured is not None:
             return float(measured)
-        params_billion = float(
-            self.model_configs.get(model_id, {}).get("parameter_count", 0) or 0
-        )
-        return 2.0 * params_billion / self.load_bandwidth_gb_per_s
+        size_gb = estimated_size_gb(self.model_configs.get(model_id))
+        return size_gb / self.load_bandwidth_gb_per_s
 
     def _pending_load_time(self, telemetry, model_id):
         """Load time a new task for `model_id` waits for on this node: the rest
@@ -122,6 +122,9 @@ class Orchestrator:
         resident = telemetry.get("resident_models")
         if resident is None:
             return 0.0
+        own_load = (
+            0.0 if model_id in resident else self._load_time(telemetry, model_id)
+        )
         loading = telemetry.get("loading")
         if loading:
             loading_model = loading.get("model_id")
@@ -129,10 +132,8 @@ class Orchestrator:
             remaining = max(0.0, self._load_time(telemetry, loading_model) - elapsed)
             if loading_model == model_id:
                 return remaining
-            return remaining + self._load_time(telemetry, model_id)
-        if model_id in resident:
-            return 0.0
-        return self._load_time(telemetry, model_id)
+            return remaining + own_load
+        return own_load
 
     def _expected_latency(self, telemetry, model_id):
         """expected_latency = network_delay(tier) + pending_load_time + (queue_length + 1) * avg_task_latency.
@@ -140,7 +141,8 @@ class Orchestrator:
         avg_task_latency of 0 means the node hasn't processed this model yet —
         treat as immediately available rather than infinitely fast: the (+1)
         still accounts for the new task. Queued tasks are assumed to need no
-        further model change; with one model per worker this can be optimistic.
+        further model change; this can be optimistic when they need models the
+        node does not hold, as loading those may also unload `model_id`.
         """
         avg = self._avg_latency_for_model(telemetry, model_id)
         qlen = int(telemetry.get("queue_length", 0) or 0)
@@ -172,9 +174,10 @@ class Orchestrator:
         return dict(self.allocation_controller.eligibility_for(model_id))
 
     def _node_options_for_model(self, model_id, surviving_nodes):
-        """Return [(node, expected_latency)] of nodes whose tier matches `model_id`
-        and whose per-model expected latency satisfies the SLA. Sorted by latency.
-        When an LP eligibility map is present, restrict candidates to its keys."""
+        """Return [(node, expected_latency)] of nodes whose tier matches `model_id`,
+        whose memory budget can hold the model, and whose per-model expected
+        latency satisfies the SLA. Sorted by latency. When an LP eligibility map
+        is present, restrict candidates to its keys."""
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
             return []
@@ -182,6 +185,8 @@ class Orchestrator:
         options = []
         for n in surviving_nodes:
             if n.get("tier") != target_tier:
+                continue
+            if not fits_on_node(n, model_id, self.model_configs.get(model_id)):
                 continue
             if weights is not None and n.get("node_id") not in weights:
                 continue
@@ -318,15 +323,22 @@ class Orchestrator:
             if not result:
                 response["error"] = "Timeout waiting for response"
                 return response
+            if result.get("status") == "failed":
+                # Keep the worker's message (e.g. running out of GPU memory).
+                response["error"] = result.get("error") or "Inference failed"
+                return response
             response["response"] = result["response"]
+            # The worker nests its measurements under "metrics" (see
+            # InferenceService.run_inference): generation latency and energy,
+            # token counts and model load time. They are returned with every
+            # response so that clients, e.g. a load generator, can log them.
+            worker_metrics = result.get("metrics") or {}
+            response["metrics"] = dict(worker_metrics)
             if reference:
                 task_type = (
                     features.get("task_type", "default") if features else "default"
                 )
 
-                # The worker nests its measurements under "metrics"
-                # (see InferenceService.run_inference).
-                worker_metrics = result.get("metrics") or {}
                 energy_consumption = worker_metrics.get("energy_consumption", 0)
                 input_tokens = worker_metrics.get("input_tokens", 0)
                 output_tokens = worker_metrics.get("output_tokens", 0)
@@ -343,7 +355,7 @@ class Orchestrator:
                     beta=self.beta,
                 )
                 self.router_service.update(features, model_id, metrics["reward"])
-                response["metrics"] = metrics
+                response["metrics"].update(metrics)
 
         except Exception as e:
             logger.error(f"Error waiting for result: {e}")

@@ -10,20 +10,22 @@ This chapter answers the three research questions of Chapter~\ref{chapter:introd
 
 \textbf{Testbed.}
 % TODO: exact hardware. Placeholder description below.
-The system is deployed on an edge-cloud testbed consisting of resource-constrained edge nodes and a high-capacity cloud node, connected through the shared Redis queue described in Chapter~\ref{chapter:model}. Edge nodes serve the 13 smaller models of the pool (0.5B--8B parameters), the cloud node the six larger ones (12B--34B); every node loads the requested model on demand. The scheduler runs as a gateway on the edge tier. All system parameters are set as listed in Table~\ref{tab:parameters}.
+The system is deployed on an edge-cloud testbed consisting of resource-constrained edge nodes and a high-capacity cloud node, connected through the shared Redis queue described in Chapter~\ref{chapter:model}. Edge nodes serve the 13 smaller models of the pool (0.5B--8B parameters), the cloud node the six larger ones (12B--34B); every node loads requested models on demand and keeps as many as fit into its GPU memory. The scheduler runs as a gateway on the edge tier. All system parameters are set as listed in Table~\ref{tab:parameters}.
 
 \textbf{Workload.}
 Queries are drawn from the five datasets underlying the task-type feature -- MMLU \cite{mmlu} (multiple-choice knowledge questions), GSM8K \cite{gsm8k} (math word problems), HellaSwag \cite{hellaswag} (sentence completion), WinoGrande \cite{winogrande} (pronoun resolution) and CNN/DailyMail \cite{cnndm} (news summarization) --, interleaved to create a mixed stream. Each query is submitted with its dataset label and ground-truth reference, so the scheduler applies the dataset's answer extraction, quality metric and generation settings, and computes the reward online. % TODO: sample sizes, arrival process (open vs. closed loop), number of runs and seeds.
 
 \textbf{Metrics.}
-(i) SLA violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU (the reward itself uses energy per token, Section~\ref{sec:problem}); (iv) the scalarised reward $r_t$; (v) for the allocation controller: trigger frequency, LP re-solve count, and time-to-recover after a load shift; (vi) the number of model loads and the time spent on them, which the workers report with every result.
+(i) SLA violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU during generation, without the energy of model loads (the reward itself uses energy per token, Section~\ref{sec:problem}); (iv) the scalarised reward $r_t$; (v) for the allocation controller: trigger frequency, LP re-solve count, and time-to-recover after a load shift; (vi) the number of model loads and the time spent on them, which the workers report with every result.
 
 \textbf{Baselines.}
 (a) \emph{Largest-model}: every query to the most capable cloud model; (b) \emph{smallest-model}: every query to the cheapest edge model; (c) \emph{random routing}; (d) \emph{GreenServ-style}: the contextual bandit without feasibility filtering or allocation control, i.e.\ the single-cloud assumption of prior routing work.
+All variants run on the same inference workers, which keep several models in GPU memory, so that the comparisons isolate the routing decisions. GreenServ's own worker holds one model at a time; the implementation can reproduce this by limiting each node to one model, but this setting is not used for RQ1 and RQ2.
 % TODO: the implementation does not yet offer switches to disable the
-% feasibility filter, to use a static model-to-node mapping, or to set the
-% reward weights from config (only the controller can be disabled, by not
-% creating it). Add these before running (d) and the ablations below.
+% feasibility filter, to fix the traffic split, or to set the reward weights
+% from config (only the controller can be disabled, by not creating it, and
+% the workers can be limited to one model each with --max-models 1). Add
+% these before running (d) and the ablations below.
 % Note: experiments X0-X4 in the repository are GreenServ's offline replays
 % and do not exercise this system; they are not reused here.
 
@@ -44,7 +46,7 @@ Queries are drawn from the five datasets underlying the task-type feature -- MML
 
 \section{Contribution of the Allocation Controller}
 \label{sec:eval-allocation}
-% Ablation: full system vs. system with a static model-to-node mapping.
+% Ablation: full system vs. system with a fixed traffic split.
 % Scenario: abrupt load shift (e.g. workload mix flips from easy to hard
 % prompts, moving demand from edge to cloud models); report latency over time,
 % trigger firings, and recovery behaviour. Verify the cooldown suppresses

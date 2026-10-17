@@ -1,19 +1,12 @@
-"""Model load time in telemetry and in the feasibility estimate (step 3, P0).
+"""Model load time in telemetry and in the feasibility estimate.
 
 Run from the repository root: ./venv/bin/python -m unittest discover -s tests -v
 """
 
-import time
 import unittest
-from unittest import mock
 
-from src.services.inference_service import InferenceService
 from src.services.orchestrator import Orchestrator
-
-MODELS = {
-    "small": {"name": "org/small", "tier": "edge", "parameter_count": 1},
-    "big": {"name": "org/big", "tier": "edge", "parameter_count": 8},
-}
+from tests.worker_fixture import MODELS, FakeWorkerTestCase
 
 
 def make_orchestrator(sla=30.0):
@@ -42,7 +35,7 @@ def node(**fields):
 
 
 class ExpectedLatencyTest(unittest.TestCase):
-    # Size-based estimates with 2 GB/s: small = 2*1/2 = 1 s, big = 2*8/2 = 8 s.
+    # Size-based estimates with 2 GB/s: small = 2 GB / 2 = 1 s, big = 16 / 2 = 8 s.
 
     def test_loaded_model_adds_no_load_time(self):
         t = node(resident_models=["big"], queue_length=2)
@@ -64,6 +57,11 @@ class ExpectedLatencyTest(unittest.TestCase):
         # Other model: rest of the running load, then its own load.
         self.assertAlmostEqual(orch._expected_latency(t, "small"), 5.0 + 1.0 + 1.0)
 
+    def test_load_in_progress_while_model_is_held(self):
+        t = node(resident_models=["small"], loading={"model_id": "big", "elapsed_s": 3.0})
+        # The node already holds `small`: wait for the running load only.
+        self.assertAlmostEqual(make_orchestrator()._expected_latency(t, "small"), 5.0 + 1.0)
+
     def test_worker_without_model_state_is_unchanged(self):
         t = node(queue_length=1)
         self.assertAlmostEqual(make_orchestrator()._expected_latency(t, "big"), 2 * 2.0)
@@ -75,75 +73,54 @@ class ExpectedLatencyTest(unittest.TestCase):
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 
 
-class WorkerLoadTrackingTest(unittest.TestCase):
-    def setUp(self):
-        patches = [
-            mock.patch("src.services.inference_service.EnergyMeasurement"),
-            mock.patch("src.services.inference_service.AutoTokenizer"),
-            mock.patch("src.services.inference_service.AutoModelForCausalLM"),
-            mock.patch.object(InferenceService, "_warm_up_model"),
-        ]
-        mocks = [p.start() for p in patches]
-        for p in patches:
-            self.addCleanup(p.stop)
-        self.model_loader = mocks[2].from_pretrained
-        self.model_loader.side_effect = self._fake_load
-        self.redis = mock.MagicMock()
-        self.redis.get_queue_length.return_value = 0
-        self.worker = InferenceService(
-            self.redis, {}, MODELS, tier="edge", node_id="e1"
-        )
-        self.during_load = None
-        self.fail_next_load = False
-
-    def _fake_load(self, model_name, **kwargs):
-        self.during_load = self.worker._model_state_snapshot()
-        if self.fail_next_load:
-            raise RuntimeError("load failed")
-        time.sleep(0.02)
-        return mock.MagicMock(name=model_name)
-
+class WorkerLoadTimeTest(FakeWorkerTestCase):
     def test_load_is_timed_and_reported(self):
-        _, _, seconds = self.worker._load_model("small")
+        worker = self.make_worker()
+        _, _, seconds = worker._load_model("small")
         self.assertGreater(seconds, 0.0)
-        resident, loading, load_times = self.worker._model_state_snapshot()
-        self.assertEqual(resident, ["small"])
-        self.assertIsNone(loading)
-        self.assertAlmostEqual(load_times["small"], seconds)
+        state = worker._model_state_snapshot()
+        self.assertEqual(state["resident_models"], ["small"])
+        self.assertIsNone(state["loading"])
+        self.assertAlmostEqual(state["load_time_by_model"]["small"], seconds)
         # Already loaded: no new load.
-        _, _, seconds = self.worker._load_model("small")
+        _, _, seconds = worker._load_model("small")
         self.assertEqual(seconds, 0.0)
         self.assertEqual(self.model_loader.call_count, 1)
 
     def test_state_during_a_swap(self):
-        self.worker._load_model("small")
-        self.worker._load_model("big")
-        resident, loading, _ = self.during_load
-        self.assertEqual(resident, [])  # the old model is already unloaded
-        self.assertEqual(loading["model_id"], "big")
+        worker = self.make_worker(max_models=1)
+        worker._load_model("small")
+        worker._load_model("big")
+        # The old model is unloaded before the new one loads.
+        self.assertEqual(self.during_load["resident_models"], [])
+        self.assertEqual(self.during_load["loading"]["model_id"], "big")
 
-    def test_failed_load_leaves_no_stale_model(self):
-        self.worker._load_model("small")
+    def test_failed_load_is_not_recorded(self):
+        worker = self.make_worker(max_models=1)
+        worker._load_model("small")
         self.fail_next_load = True
         with self.assertRaises(RuntimeError):
-            self.worker._load_model("big")
-        resident, loading, load_times = self.worker._model_state_snapshot()
-        self.assertEqual(resident, [])
-        self.assertIsNone(loading)
-        self.assertNotIn("big", load_times)
-        # The unloaded model is loaded again instead of returning None.
+            worker._load_model("big")
+        state = worker._model_state_snapshot()
+        self.assertEqual(state["resident_models"], [])
+        self.assertIsNone(state["loading"])
+        self.assertNotIn("big", state["load_time_by_model"])
+        # The unloaded model is loaded again on its next use.
         self.fail_next_load = False
-        model, _, seconds = self.worker._load_model("small")
+        model, _, seconds = worker._load_model("small")
         self.assertIsNotNone(model)
         self.assertGreater(seconds, 0.0)
 
     def test_telemetry_contains_model_state(self):
-        self.worker._load_model("big")
-        self.worker._publish_telemetry()
+        worker = self.make_worker(memory_budget_gb=20.0)
+        worker._load_model("big")
+        worker._publish_telemetry()
         payload = self.redis.set_node_telemetry.call_args[0][1]
         self.assertEqual(payload["resident_models"], ["big"])
         self.assertIsNone(payload["loading"])
         self.assertIn("big", payload["load_time_by_model"])
+        self.assertEqual(payload["memory_budget_gb"], 20.0)
+        self.assertIn("model_memory_gb", payload)
 
 
 if __name__ == "__main__":

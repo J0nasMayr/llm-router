@@ -14,6 +14,7 @@ In this setting, a routing decision can be right for the prompt and still wrong 
 Consider a router that has learned that hard math prompts are best answered by a large cloud model.
 In GreenServ's own measurements, the slowest combinations of model and GSM8K query -- grade-school math word problems that require several reasoning steps \cite{gsm8k} -- take up to about 38\,s; if three such queries are already waiting on the cloud node, the next one waits well over 100\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
 A router that cannot see the node's queue keeps choosing the large model, and every such query misses any reasonable deadline.
+The queue is not the only hidden cost: a node holds only the models that fit into its GPU memory, and if the large model is not among them, its weights must be loaded first, which takes tens of seconds for the largest models.
 
 This thesis addresses the following problem: \emph{given a pool of LLMs of different sizes, spread over edge and cloud nodes whose load changes at runtime, decide for each query which model answers and which node runs it, such that the trade-off between accuracy and energy consumption is maximized while the answer still arrives within a latency deadline.}
 
@@ -24,6 +25,7 @@ Dynamic allocation systems \cite{enova, hasgpu, sageserve} adapt capacity to dem
 
 To address this problem, this thesis extends GreenServ to the edge-cloud continuum.
 A lightweight telemetry-driven feasibility filter first prunes nodes and models that are not expected to meet the latency deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.
+The filter takes into account each node's queue, the models it holds in GPU memory, and the time it would need to load a missing model.
 A contextual multi-armed bandit then selects a model from $M_t^*$ using GreenServ's semantic context -- Task Type, Semantic Cluster, and Text Complexity -- and updates its policy online from an accuracy-energy reward.
 Complementing these per-query decisions, a background \emph{allocation controller}, adopting the Kalman-filter trigger design of HAS-GPU \cite{hasgpu} and an ENOVA-style allocation program \cite{enova}, recomputes from the same node telemetry, whenever its trigger fires, which nodes each model may be routed to and in what proportion its traffic is split across them.
 
@@ -35,8 +37,8 @@ The thesis answers three research questions:
 \end{description}
 
 The contributions of this thesis are fourfold.
-First, a formal problem model for edge-cloud LLM routing that treats latency feasibility as a constraint rather than an implicit reward penalty: whereas GreenServ formulates a latency constraint but does not enforce it in its experiments, this work estimates feasibility per (model, node) pair from live telemetry and enforces it as a mask on the bandit's action set, while retaining GreenServ's accuracy-energy reward.
-Second, an implementation of this architecture as a runtime pipeline of telemetry-driven feasibility filtering, semantic context extraction, and contextual bandit routing, deployed on an edge-cloud testbed with per-node task queues and inference workers that publish uniform telemetry metrics.
+First, a formal problem model for edge-cloud LLM routing that treats latency feasibility as a constraint rather than an implicit reward penalty: whereas GreenServ formulates a latency constraint but does not enforce it in its experiments, this work estimates feasibility per (model, node) pair from live telemetry, including the time to load a model the node does not hold, and enforces it as a mask on the bandit's action set, while retaining GreenServ's accuracy-energy reward.
+Second, an implementation of this architecture as a runtime pipeline of telemetry-driven feasibility filtering, semantic context extraction, and contextual bandit routing, deployed on an edge-cloud testbed with per-node task queues and inference workers that keep several models in GPU memory and report their queue, latencies, model load times and memory use.
 Third, a trigger-driven per-model traffic allocation controller that combines HAS-GPU's Kalman-plus-threshold trigger -- extended with latency-deviation and memory-pressure rules -- with an ENOVA-style linear program maintaining the per-model node eligibility map consulted at routing time.
 Fourth, an empirical evaluation on this testbed that answers RQ1 (Section~\ref{sec:eval-filter}), RQ2 (Section~\ref{sec:eval-routing}), and RQ3 (Section~\ref{sec:eval-allocation}).
 

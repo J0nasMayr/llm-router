@@ -16,6 +16,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 from scipy.optimize import linprog
 
+from src.services.model_memory import fits_on_node
+
 logger = logging.getLogger(__name__)
 
 
@@ -194,6 +196,10 @@ class AllocationController:
 
     def _eligible_pair(self, model_id, telemetry) -> bool:
         if telemetry.get("tier") != self.model_configs.get(model_id, {}).get("tier"):
+            return False
+        # Same check as the routing filter: a model the node's memory budget
+        # cannot hold must get no traffic share there.
+        if not fits_on_node(telemetry, model_id, self.model_configs.get(model_id)):
             return False
         free_gb = self._node_free_memory_gb(telemetry)
         if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:

@@ -80,14 +80,14 @@ The LP becomes a small mixed-integer program. The solver stays the same: `scipy.
 - `S[n]`: memory budget of node n
 - `ρ`: target node load, e.g. 0.85 (= θ_up)
 - `y0`: current placement
-- `H`: planning horizon, e.g. 300 s
+- `T_plan`: planning horizon, e.g. 300 s (not `H`, which the thesis uses for the memory headroom)
 
 **Objective** (every term in node-seconds per second)
 
 ```
 min  Σ d[m]·τ̄[m,n]·x[m,n]                  inference time
    + Σ d[m]·L[m]·(1 − z[m])                   cold starts for models without a loaded replica
-   + Σ (L[m,n]/H)·y[m,n]·(1 − y0[m,n])        new loads, spread over the horizon H
+   + Σ (L[m,n]/T_plan)·y[m,n]·(1 − y0[m,n])   new loads, spread over the horizon T_plan
 ```
 
 **Constraints**
@@ -178,8 +178,8 @@ Deadline violations, p95 latency, cold starts per 100 requests, share of time sp
 | Phase | Content | Effort |
 |---|---|---|
 | P0 (do in any case) | Telemetry reports loaded models and load times; T̂ includes the load time; dispatch therefore prefers nodes that hold the model | 1 day |
-| P1 | Multi-model worker, memory budget, desired-state reconcile, LRU fallback, cold-start metrics | 2–3 days |
-| P2 | Shadow demand, MILP, trigger changes, policy switch (single / LRU / static / dynamic), unit tests on small MILP instances | 3 days |
+| P1 | Multi-model worker, memory budget, LRU fallback, cold-start metrics (done; the desired-state reconcile moved to P2) | 2–3 days |
+| P2 | Shadow demand, MILP, desired-state reconcile in the worker, trigger changes, policy switch (single / LRU / static / dynamic), unit tests on small MILP instances | 3–4 days |
 | P3 | Load generator with phases (needed for RQ1–RQ2 in any case) | 2 days |
 | P4 | Experiments | 3–5 days live, plus 4–6 days for a simulator |
 | P5 | Thesis text and figure | 4–6 days |
@@ -215,7 +215,7 @@ Decided:
 
 - **Hardware:** each node has its own GPU, so the worker needs a memory budget only, not a memory cap per process.
 - **Model pool:** GreenServ's 16 models. Not applied yet: `models.yaml` still lists 19, and the thesis says 13 edge and 6 cloud models (it becomes 11 and 5).
-- **Scope:** P0 only for now.
+- **Scope:** P0, then P1. P2 and later wait for the supervisor.
 
 Still open:
 
@@ -223,7 +223,7 @@ Still open:
 2. **Deadline:** how many weeks are left?
 3. **Optional:** allow edge models on cloud nodes, i.e. offloading from edge to cloud? It is one change in the MILP and strengthens the edge-cloud story, but adds evaluation work.
 
-## 11. P0 status (done, not committed)
+## 11. P0 status (done, commit c95a989)
 
 - **Worker** (`inference_service.py`):
   - times every model load (unload, load and warm-up);
@@ -240,3 +240,42 @@ Still open:
   - figure: telemetry box;
   - evaluation: metric (vi);
   - related work: the telemetry list.
+
+## 12. P1 status (done, not committed)
+
+- **Worker** (`inference_service.py`):
+  - keeps several models in GPU memory and unloads the least recently used one when a new model does not fit;
+  - its memory budget is `--memory-budget-gb`, by default the GPU's memory minus `--memory-headroom-gb` (4 GB, for activations and the KV cache);
+  - `--max-models 1` reproduces GreenServ's one-model worker (baseline B1);
+  - measures each model's memory after loading;
+  - reports `model_memory_gb` and `memory_budget_gb` in its telemetry.
+- **Shared helper** (`model_memory.py`): bf16 size estimate (2 GB per billion parameters), the size on a node (measured or estimated), and the fit check.
+- **Filter** (`orchestrator.py`): skips nodes whose budget cannot hold the model. The pending load time now counts no own load when the node holds the model while it is loading another one.
+- **Controller** (`allocation_controller.py`): applies the same fit check, so the LP gives a model no traffic share on a node that cannot hold it. Without it, the LP could put a model's whole share on such a node, and the filter would then mask the model completely.
+- **Tests:** 20 in total. `tests/test_model_residency.py` covers the budget, LRU order, the single-model mode, oversized models, the release of unloaded models before the next load, and the fit checks. `tests/worker_fixture.py` holds the shared fake worker.
+- **Unchanged:** the node-level rule "less than G_min free → drop the node" stays as a safety net. With the 4 GB headroom, a full node still has about 4 GB free.
+- **Thesis:** updated to match P1:
+  - §3.1: memory budget S_n and headroom H, LRU unloading, the load-term reason, the queue limitation, the fit condition s_m ≤ S_n in M_t*;
+  - §3.2: Stage 1 telemetry and fit check, Stage 4 unloading and memory measurement;
+  - §3.3: who loads and unloads, and the ineligible pairs;
+  - parameter table: H and the maximum number of models;
+  - figure: filter and telemetry boxes;
+  - evaluation: testbed sentence;
+  - related work: last sentence of §2.3.
+
+## 13. Coherence pass after P1 (not committed)
+
+- **Thesis:**
+  - unloading wording unified ("the models it has used least recently until the new one fits");
+  - telemetry list in §2.3;
+  - §2.2 and §2.4 now mention loading and memory;
+  - introduction: motivation sentence on load time, filter inputs, contributions 1 and 2;
+  - evaluation: metric (iii) without loading energy, all variants on the same multi-model workers, comments updated.
+- **Code:**
+  - `process_query` returns the worker's measurements (incl. `load_time`) with every response, plus the reward metrics when a reference is given;
+  - a failed task now returns the worker's error message instead of `'response'`;
+  - tests: `tests/test_orchestrator_response.py` (23 tests in total).
+- **Still open (fixed by P2 by design, or needs a small fix if P2 is dropped):**
+  - models whose estimated load time alone exceeds T_max (Yi-34B, Aya-32B) can only run on a node that already holds them;
+  - the controller's LP and the weighted dispatch ignore which models a node holds.
+
