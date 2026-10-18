@@ -12,8 +12,7 @@ GreenServ describes each prompt by its task type, its semantic cluster and its t
 From these features, a contextual multi-armed bandit learns which model gives the best trade-off between answer accuracy and energy use.
 
 Routing, however, is usually studied as if the chosen model were always available.
-In practice, models run on a limited set of GPU nodes whose load changes from second to second, and inference increasingly spans the \emph{edge-cloud continuum}: small models on edge nodes close to the user, with little GPU memory and short queues, and large models on cloud nodes that are more capable but further away.
-% TODO: cite why inference moves to the edge (latency, privacy, bandwidth).
+In practice, models run on a limited set of GPU nodes whose load changes from second to second, and inference increasingly spans the \emph{edge-cloud continuum}: small models on edge nodes close to the user, with little GPU memory and short queues, and large models on cloud nodes that are more capable but further away \cite{clone}.
 In this setting, a routing decision can be right for the prompt and still wrong for the system.
 Consider a router that has learned that hard math prompts are best answered by a large cloud model.
 Such prompts come, for example, from GSM8K \cite{gsm8k}, a benchmark of grade-school math word problems that need several reasoning steps.
