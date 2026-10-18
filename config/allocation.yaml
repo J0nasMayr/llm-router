@@ -1,0 +1,22 @@
+# Allocation controller (thesis Section 3.3): decides which models each node
+# keeps loaded and how each model's traffic is split across them.
+allocation:
+  # dynamic: first plan from the prior, then re-plan when a trigger fires.
+  # static:  the first plan only (a fixed placement).
+  # none:    no controller; nodes load models on demand and keep the most
+  #          recently used ones (with workers started with --max-models 1,
+  #          this is GreenServ's one-model worker).
+  policy: dynamic
+  # shadow:   the model the bandit would choose if every model were available.
+  # realized: the model each query is actually routed to.
+  demand: shadow
+  # Share of queries per model for the first plan, from GreenServ's offline
+  # data (config/placement_prior.yaml, made by scripts/placement_prior.py),
+  # and the total request rate it assumes.
+  prior: placement_prior
+  prior_total_rps: 1.0
+  # A new load must pay off within this horizon: a model is worth loading once
+  # about one request for it is expected within it.
+  planning_horizon_s: 300
+  # Cooldown between two plans.
+  cooldown_s: 30

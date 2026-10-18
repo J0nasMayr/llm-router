@@ -1,15 +1,5 @@
-phi2:
-  name: "microsoft/phi-2"
-  parameter_count: 2
-  type: "general"
-  tier: "edge"
-  
-phi3:
-  name: "microsoft/Phi-3-mini-4k-instruct"
-  parameter_count: 3
-  type: "general"
-  tier: "edge"
-
+# GreenServ's pool of 16 models, for which its offline profiling data exists
+# (db/llm_db_backup.sql.gz): 11 edge models and 5 cloud models.
 qwen2.5-7b:
   name: "Qwen/Qwen2.5-7B"
   parameter_count: 7
@@ -103,11 +93,5 @@ llama-3.2-1b:
 yi-34b:
   name: "01-ai/Yi-34B"
   parameter_count: 34
-  type: "general"
-  tier: "cloud"
-
-aya-expanse-32b:
-  name: "CohereForAI/aya-expanse-32b"
-  parameter_count: 32
   type: "general"
   tier: "cloud"

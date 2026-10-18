@@ -69,6 +69,7 @@ def _build_services():
 
     feasibility = features.get("feasibility") or {}
     sla_seconds = float(feasibility.get("max_latency", 60.0))
+    load_bandwidth = float(feasibility.get("load_bandwidth_gb_per_s", 2.0))
     orch = Orchestrator(
         feature_service=feature_service,
         router_service=router_service,
@@ -77,25 +78,52 @@ def _build_services():
         model_configs=models,
         sla_max_latency_seconds=sla_seconds,
         dataset_configs=datasets,
-        load_bandwidth_gb_per_s=float(
-            feasibility.get("load_bandwidth_gb_per_s", 2.0)
-        ),
+        load_bandwidth_gb_per_s=load_bandwidth,
     )
 
-    controller = AllocationController(
-        queue_client=redis_client,
-        model_configs=models,
-        rps_provider=orch.consume_rps_window,
-    )
+    controller = _build_controller(redis_client, models, orch, load_bandwidth)
     orch.allocation_controller = controller
     return orch, controller
+
+
+def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
+    """The allocation controller configured in allocation.yaml, or None for
+    policy "none" (nodes then load models on demand only)."""
+    cfg = (load_config("allocation") or {}).get("allocation") or {}
+    policy = cfg.get("policy", "dynamic")
+    if policy == "none":
+        logger.info("Allocation controller disabled (policy: none)")
+        return None
+    demand = cfg.get("demand", "shadow")
+    if demand not in ("shadow", "realized"):
+        raise ValueError(f"Unknown demand signal: {demand}")
+    # The first plan uses the prior shares of queries per model, scaled to an
+    # assumed total request rate.
+    prior_demand = None
+    if cfg.get("prior"):
+        shares = (load_config(cfg["prior"]) or {}).get("placement_prior") or {}
+        total_rps = float(cfg.get("prior_total_rps", 1.0))
+        prior_demand = {m: float(s) * total_rps for m, s in shares.items() if m in models}
+    return AllocationController(
+        queue_client=redis_client,
+        model_configs=models,
+        demand_provider=(
+            orch.consume_shadow_window if demand == "shadow" else orch.consume_rps_window
+        ),
+        policy=policy,
+        prior_demand=prior_demand,
+        load_bandwidth_gb_per_s=load_bandwidth_gb_per_s,
+        planning_horizon_s=float(cfg.get("planning_horizon_s", 300.0)),
+        T_cool=float(cfg.get("cooldown_s", 30.0)),
+    )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global orchestrator, allocation_controller
     orchestrator, allocation_controller = _build_services()
-    allocation_controller.start()
+    if allocation_controller:
+        allocation_controller.start()
     logger.info("API ready")
     try:
         yield

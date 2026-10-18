@@ -31,6 +31,7 @@ class RedisClient:
         self.default_queue = "llm_inference_tasks"
         self.result_prefix = "result:"
         self.telemetry_prefix = "telemetry:node:"
+        self.placement_prefix = "placement:node:"
 
     def _is_connected(self):
         """Check if Redis connection is active"""
@@ -157,6 +158,32 @@ class RedisClient:
         else:
             # Dummy store ignores TTL — fine for tests.
             self._dummy_store[key] = body
+
+    def set_node_placement(self, node_id, model_ids, ttl_seconds=None):
+        """Publish the models a node should keep loaded (its target placement,
+        most important first). The allocation controller renews it with a TTL,
+        so a plan expires once the controller stops renewing it."""
+        key = f"{self.placement_prefix}{node_id}"
+        body = json.dumps(list(model_ids))
+        if self._is_connected():
+            self.redis.set(key, body, ex=ttl_seconds)
+        else:
+            # Dummy store ignores TTL — fine for tests.
+            self._dummy_store[key] = body
+
+    def get_node_placement(self, node_id):
+        """The node's target placement, or None if no plan names the node."""
+        key = f"{self.placement_prefix}{node_id}"
+        if self._is_connected():
+            raw = self.redis.get(key)
+        else:
+            raw = self._dummy_store.get(key)
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
 
     def get_all_node_telemetry(self):
         """Return list of telemetry payloads for every active node (TTL'd entries auto-expire)."""

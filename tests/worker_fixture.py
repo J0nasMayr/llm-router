@@ -42,9 +42,9 @@ class FakeWorkerTestCase(unittest.TestCase):
         self.during_load = None
         self.fail_next_load = False
 
-    def make_worker(self, **kwargs):
+    def make_worker(self, redis_client=None, node_id="e1", **kwargs):
         self.worker = InferenceService(
-            self.redis, {}, MODELS, tier="edge", node_id="e1", **kwargs
+            redis_client or self.redis, {}, MODELS, tier="edge", node_id=node_id, **kwargs
         )
         return self.worker
 

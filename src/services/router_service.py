@@ -59,6 +59,11 @@ class RouterService:
         except TypeError:
             return self.bandit.select_model(context)
 
+    def preferred_model(self):
+        """The model the bandit would have chosen in its last selection if every
+        model had been available, or None if the bandit does not report it."""
+        return getattr(self.bandit, "last_preferred_model", None)
+
     def update(self, features, model_id, reward):
         """Update the bandit algorithm with the observed reward.
 

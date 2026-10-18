@@ -20,6 +20,15 @@ def size_on_node_gb(telemetry, model_id, model_config):
     return estimated_size_gb(model_config)
 
 
+def load_time_on_node(telemetry, model_id, model_config, load_bandwidth_gb_per_s):
+    """Seconds a node needs to load the model: its measured average, or before
+    its first load of the model, the bf16 size over the assumed load speed."""
+    measured = (telemetry.get("load_time_by_model") or {}).get(model_id)
+    if measured is not None:
+        return float(measured)
+    return estimated_size_gb(model_config) / load_bandwidth_gb_per_s
+
+
 def fits_on_node(telemetry, model_id, model_config):
     """True if the model fits into the node's memory budget once the node has
     unloaded other models. Nodes that report no budget are not restricted."""

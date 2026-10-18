@@ -82,7 +82,7 @@ class FitCheckTest(unittest.TestCase):
     def test_controller_gives_no_share_where_the_model_does_not_fit(self):
         async def build():
             return AllocationController(
-                queue_client=None, model_configs=MODELS, rps_provider=dict
+                queue_client=None, model_configs=MODELS, demand_provider=dict
             )
 
         controller = asyncio.run(build())

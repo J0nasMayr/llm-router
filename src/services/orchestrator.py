@@ -4,7 +4,7 @@ import logging
 import random
 import time
 
-from src.services.model_memory import estimated_size_gb, fits_on_node
+from src.services.model_memory import fits_on_node, load_time_on_node
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +53,15 @@ class Orchestrator:
         # Assumed disk-to-GPU speed for estimating the load time of a model a
         # node has not loaded yet.
         self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
-        # Optional allocation controller (HAS-GPU-style trigger + ENOVA LP).
-        # When set, routing restricts to nodes the LP marked eligible for the
-        # model, and uses LP-produced weights for weighted selection.
+        # Optional allocation controller. Once it has a placement, a model
+        # with replicas is routed to the nodes that hold it, in proportion to
+        # its traffic weights; see _node_options_for_model.
         self.allocation_controller = allocation_controller
-        # Per-model arrival counters consumed by the controller via
-        # consume_rps_window(); reset after each consumption.
-        self._rps_counters = {}
-        self._rps_window_start = time.time()
+        # Per-model arrival counters, read and reset by the controller:
+        # "realized" counts the model each query was routed to, "shadow" the
+        # model the bandit would have chosen if every model were available.
+        now = time.time()
+        self._windows = {"realized": ({}, now), "shadow": ({}, now)}
         # Per-dataset scoring and generation settings (datasets.yaml), applied
         # when a request names its dataset in metadata.
         self.dataset_configs = dataset_configs or {}
@@ -108,11 +109,12 @@ class Orchestrator:
         """Seconds this node needs to load `model_id`: the node's measured
         average, or before its first load of the model, an estimate from the
         model's bf16 size."""
-        measured = (telemetry.get("load_time_by_model") or {}).get(model_id)
-        if measured is not None:
-            return float(measured)
-        size_gb = estimated_size_gb(self.model_configs.get(model_id))
-        return size_gb / self.load_bandwidth_gb_per_s
+        return load_time_on_node(
+            telemetry,
+            model_id,
+            self.model_configs.get(model_id),
+            self.load_bandwidth_gb_per_s,
+        )
 
     def _pending_load_time(self, telemetry, model_id):
         """Load time a new task for `model_id` waits for on this node: the rest
@@ -165,34 +167,43 @@ class Orchestrator:
         return surviving
 
     def _allocation_weights(self, model_id):
-        """LP-produced {node_id: weight} for the model, or None if no controller
-        or no entry yet. Empty dict means the LP has run but no node is eligible."""
+        """{node_id: weight} over the nodes the controller's placement assigns
+        to the model, or None if there is no controller, no placement yet, or
+        no replica of the model in it. A model without replicas is not
+        restricted: it runs wherever the filter allows, loaded on demand."""
         if self.allocation_controller is None:
             return None
         if not self.allocation_controller.has_eligibility():
             return None
-        return dict(self.allocation_controller.eligibility_for(model_id))
+        weights = dict(self.allocation_controller.eligibility_for(model_id))
+        return weights or None
 
     def _node_options_for_model(self, model_id, surviving_nodes):
         """Return [(node, expected_latency)] of nodes whose tier matches `model_id`,
         whose memory budget can hold the model, and whose per-model expected
-        latency satisfies the SLA. Sorted by latency. When an LP eligibility map
-        is present, restrict candidates to its keys."""
+        latency satisfies the SLA. Sorted by latency. When the placement has
+        replicas of the model, only their nodes are returned, unless none of
+        them meets the SLA; then the other nodes serve as overflow and load the
+        model on demand."""
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
             return []
         weights = self._allocation_weights(model_id)
-        options = []
+        options, overflow = [], []
         for n in surviving_nodes:
             if n.get("tier") != target_tier:
                 continue
             if not fits_on_node(n, model_id, self.model_configs.get(model_id)):
                 continue
-            if weights is not None and n.get("node_id") not in weights:
-                continue
             elat = self._expected_latency(n, model_id)
-            if elat <= self.sla_max_latency_seconds:
+            if elat > self.sla_max_latency_seconds:
+                continue
+            if weights is None or n.get("node_id") in weights:
                 options.append((n, elat))
+            else:
+                overflow.append((n, elat))
+        if not options:
+            options = overflow
         options.sort(key=lambda x: x[1])
         return options
 
@@ -211,7 +222,7 @@ class Orchestrator:
         weights = self._allocation_weights(model_id)
         if weights:
             # Weighted random selection over SLA-passing options; falls back
-            # to lowest-latency when no LP weight is available for the survivors.
+            # to lowest-latency when none of them has a weight (overflow).
             pool = [(n, weights.get(n.get("node_id"), 0.0)) for n, _ in options]
             total = sum(w for _, w in pool)
             if total > 0:
@@ -230,15 +241,30 @@ class Orchestrator:
             best_node = options[0][0]
         return best_node.get("queue_name") or f"llm_tasks_node_{best_node.get('node_id')}"
 
-    def consume_rps_window(self):
-        """Return per-model RPS observed since last call, then reset the window.
-        Used by AllocationController.rps_provider."""
+    def _count(self, window, model_id):
+        counters, _ = self._windows[window]
+        counters[model_id] = counters.get(model_id, 0) + 1
+
+    def _consume_window(self, window):
+        """Per-model arrival rate (req/s) counted in `window` since its last
+        consumption; the window is then reset."""
+        counters, started = self._windows[window]
         now = time.time()
-        elapsed = max(now - self._rps_window_start, 1e-6)
-        rps = {m: c / elapsed for m, c in self._rps_counters.items()}
-        self._rps_counters = {}
-        self._rps_window_start = now
-        return rps
+        self._windows[window] = ({}, now)
+        elapsed = max(now - started, 1e-6)
+        return {m: c / elapsed for m, c in counters.items()}
+
+    def consume_rps_window(self):
+        """Realized demand: queries routed to each model. One of the demand
+        providers of the allocation controller."""
+        return self._consume_window("realized")
+
+    def consume_shadow_window(self):
+        """Shadow demand: queries for which the bandit would have chosen each
+        model if every model were available. The default demand provider of
+        the allocation controller: unlike realized demand, it also counts
+        models the filter currently masks, e.g. because no node holds them."""
+        return self._consume_window("shadow")
 
     async def process_query(
         self,
@@ -265,18 +291,21 @@ class Orchestrator:
         available_models = self._available_models(surviving_nodes)
 
         features = self.feature_service.extract_features(query_text, metadata)
+        preferred_model = model_id
         if model_id is None:
-            # Stage 2: 
+            # Stage 2:
             # - Bandit chooses among physically viable arms (mask)
             # - Empty available_models (no telemetry yet) => bandit sees all arms
             model_id = self.router_service.select_model(
                 features,
                 available_models=available_models or None,
             )
+            preferred_model = self.router_service.preferred_model() or model_id
         if model_id not in self.model_usage_counts:
             self.model_usage_counts[model_id] = 0
         self.model_usage_counts[model_id] += 1
-        self._rps_counters[model_id] = self._rps_counters.get(model_id, 0) + 1
+        self._count("realized", model_id)
+        self._count("shadow", preferred_model)
         # Explicit arguments win; otherwise use the dataset's own extraction,
         # metric and generation settings so online rewards are computed the
         # same way as in the offline GreenServ setup.

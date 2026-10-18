@@ -81,6 +81,12 @@ class InferenceService:
         self._resident = OrderedDict()
         self._model_memory_gb = {}
         self.max_models = max_models
+        # The allocation controller's target placement for this node (models
+        # to keep loaded, most important first), or None without a plan. It is
+        # read from Redis at most every reconcile_interval seconds.
+        self._target = None
+        self.reconcile_interval = 1.0
+        self._last_reconcile = 0.0
         if memory_budget_gb is None and torch.cuda.is_available():
             # The headroom stays free for activations and the KV cache.
             _, total = torch.cuda.mem_get_info(device_id)
@@ -131,32 +137,42 @@ class InferenceService:
         gc.collect()
         torch.cuda.empty_cache()
 
-    def _make_room_for(self, model_id):
-        """Unload least recently used models until `model_id` fits into the
-        memory budget and the model limit."""
+    def _fits(self, needed_gb, models):
+        """Whether a model of needed_gb fits next to `models` within the
+        memory budget and the model limit. Callers hold _load_lock."""
+        if self.max_models is not None and len(models) + 1 > self.max_models:
+            return False
+        if self.memory_budget_gb is None:
+            return True
+        used = sum(self._size_gb(m) for m in models)
+        return used + needed_gb <= self.memory_budget_gb
+
+    def _make_room_for(self, model_id, for_target=False):
+        """Unload models until `model_id` fits into the memory budget and the
+        model limit: first models outside the target placement, then target
+        models, least recently used first within each group. A load that
+        follows the target placement (for_target) never unloads other target
+        models; it returns False, without unloading anything, if the model
+        would not fit next to them. A load for a waiting task unloads target
+        models as a last resort and goes ahead even if the model exceeds the
+        budget."""
         needed = self._size_gb(model_id)
-        unloaded = False
-        while True:
-            with self._load_lock:
-                if not self._resident:
-                    break
-                too_many = (
-                    self.max_models is not None
-                    and len(self._resident) >= self.max_models
-                )
-                used = sum(self._size_gb(m) for m in self._resident)
-                too_big = (
-                    self.memory_budget_gb is not None
-                    and used + needed > self.memory_budget_gb
-                )
-                if not (too_many or too_big):
+        unloaded = []
+        with self._load_lock:
+            target = set(self._target or ())
+            others = [m for m in self._resident if m not in target]
+            targets = [m for m in self._resident if m in target]
+            if for_target and not self._fits(needed, targets):
+                return False
+            for victim in others if for_target else others + targets:
+                if self._fits(needed, list(self._resident)):
                     break
                 # Delete the entry without keeping a reference to the model,
                 # so its memory can be released before the next load.
-                victim = next(iter(self._resident))
                 del self._resident[victim]
+                unloaded.append(victim)
+        for victim in unloaded:
             logger.info(f"Unloading model {victim}")
-            unloaded = True
         if unloaded:
             self._release_gpu_memory()
         if self.memory_budget_gb is not None and needed > self.memory_budget_gb:
@@ -164,10 +180,13 @@ class InferenceService:
                 f"Model {model_id} needs {needed:.1f} GB, more than the "
                 f"memory budget of {self.memory_budget_gb:.1f} GB"
             )
+        return True
 
-    def _load_model(self, model_id):
+    def _load_model(self, model_id, for_target=False):
         """Return (model, tokenizer, load_seconds) for `model_id`, loading it
-        first if it is not in GPU memory; load_seconds is 0.0 if it was."""
+        first if it is not in GPU memory; load_seconds is 0.0 if it was. A
+        load for the target placement (for_target) returns None instead if
+        the model does not fit next to the other target models."""
         with self._load_lock:
             if model_id in self._resident:
                 self._resident.move_to_end(model_id)
@@ -178,7 +197,8 @@ class InferenceService:
         with self._load_lock:
             self._loading = (model_id, start_time)
         try:
-            self._make_room_for(model_id)
+            if not self._make_room_for(model_id, for_target):
+                return None
             logger.info(f"Loading model {model_id}")
             model_name = self.model_configs[model_id]["name"]
             allocated_before = self._allocated_gb()
@@ -218,6 +238,50 @@ class InferenceService:
             window.append(load_seconds)
 
         return model, tokenizer, load_seconds
+
+    def _reconcile_placement(self):
+        """Follow the allocation controller's target placement. The target is
+        read at most every reconcile_interval seconds. A missing target model
+        is loaded only while the node's queue is empty, one per call, so that
+        loading for the plan never delays a waiting task; a target model that a
+        task's on-demand load had to unload thus returns once the node is
+        idle. Models outside the target stay loaded until their memory is
+        needed. Without a target, or once it has expired, the node only loads
+        on demand."""
+        now = time.time()
+        if now - self._last_reconcile < self.reconcile_interval:
+            return
+        self._last_reconcile = now
+        try:
+            target = self.redis_client.get_node_placement(self.node_id)
+        except Exception as e:
+            logger.warning(f"Reading the target placement failed: {e}")
+            return
+        if target is None:
+            # No plan, or it expired because the controller stopped renewing
+            # it: load on demand and keep the most recently used models.
+            with self._load_lock:
+                self._target = None
+            return
+        target = [m for m in target if m in self.model_configs]
+        with self._load_lock:
+            changed = target != self._target
+            self._target = target
+            missing = [m for m in target if m not in self._resident]
+        if not missing or self.redis_client.get_queue_length(self.queue_name) > 0:
+            return
+        for model_id in missing:
+            try:
+                if self._load_model(model_id, for_target=True) is not None:
+                    return
+            except Exception as e:
+                logger.error(f"Loading target model {model_id} failed: {e}")
+                return
+            if changed:
+                logger.warning(
+                    f"Target model {model_id} does not fit next to the other "
+                    f"target models; skipped"
+                )
 
     def run_inference(self, query_text, model_id, generation_parameters=None):
         """Run inference on a query"""
@@ -327,10 +391,10 @@ class InferenceService:
 
     def _model_state_snapshot(self):
         """Telemetry fields on the node's models: those in GPU memory (least
-        recently used first), the load in progress (with its elapsed time, so
-        readers need no synchronized clock), the average duration of recent
-        loads, the measured memory of each model loaded so far, and the
-        memory budget."""
+        recently used first), the target placement it follows, the load in
+        progress (with its elapsed time, so readers need no synchronized
+        clock), the average duration of recent loads, the measured memory of
+        each model loaded so far, and the memory budget."""
         with self._load_lock:
             resident = list(self._resident)
             loading = None
@@ -348,8 +412,10 @@ class InferenceService:
             model_memory = {
                 mid: round(gb, 3) for mid, gb in self._model_memory_gb.items()
             }
+            target = list(self._target) if self._target is not None else None
         return {
             "resident_models": resident,
+            "target_models": target,
             "loading": loading,
             "load_time_by_model": load_times,
             "model_memory_gb": model_memory,
@@ -420,6 +486,7 @@ class InferenceService:
         self.start_telemetry()
 
         while True:
+            self._reconcile_placement()
             task = self.redis_client.get_next_task(queue_name=self.listen_queues, timeout=1)
             if not task:
                 time.sleep(0.1)

@@ -279,3 +279,97 @@ Still open:
   - models whose estimated load time alone exceeds T_max (Yi-34B, Aya-32B) can only run on a node that already holds them;
   - the controller's LP and the weighted dispatch ignore which models a node holds.
 
+
+## 14. P2 status (done, not committed)
+
+- **Model pool:** `config/models.yaml` holds GreenServ's 16 models: 11 edge, 5 cloud. The thesis numbers follow in the thesis pass.
+- **Shadow demand:**
+  - LinUCB records the model it would choose without the mask (`last_preferred_model`, random tie-breaking);
+  - the orchestrator counts it next to the realized demand (`consume_shadow_window`, `consume_rps_window`).
+- **Placement program** (`solve_placement`, `scipy.optimize.milp`):
+  - variables y[m,n] (n keeps m loaded) and x[m,n] (share of m's requests n serves);
+  - a model may be served partly: the rest finds no replica and costs a load plus the inference. This replaces the planned z[m], keeps very popular models placed when they overload their nodes, and keeps the program always feasible;
+  - load costs are spread over T_plan (300 s), so a model is worth loading once about one request for it is expected within T_plan;
+  - the current placement is the last plan; a tiny bonus for it avoids churn between equally good plans.
+- **Controller:**
+  - policies `dynamic` (first plan from the prior, then re-plan on triggers) and `static` (first plan only);
+  - new trigger rule "place": a model without replica whose demand exceeds R_min;
+  - publishes each node's target to Redis (`placement:node:<id>`, highest demand first).
+- **Routing:**
+  - a model with replicas goes to its replicas, by weight;
+  - if no replica meets the deadline, other nodes serve as overflow and load it on demand;
+  - models without replica are not restricted.
+- **Worker:**
+  - follows its target placement, one missing target model per step, and only while its queue is empty, so loading for the plan never delays a waiting query;
+  - for a task, it unloads models outside the target first and target models only as a last resort; for the plan, it never unloads other target models;
+  - reports `target_models`.
+- **Prior:** `scripts/placement_prior.py` replays GreenServ's 2,500 profiled queries, computes each model's reward like the live system (α = β = 0.5), and writes the share of queries each model wins to `config/placement_prior.yaml`. Llama-3.2-1B wins 34%; the 5 cloud models win 3% together.
+- **Configuration** (`config/allocation.yaml`):
+
+  | Variant | Setting |
+  |---|---|
+  | B1, one model per node | `policy: none` and workers with `--max-models 1` |
+  | B2, LRU cache | `policy: none` |
+  | B3, fixed placement | `policy: static` |
+  | P, proposed | `policy: dynamic` |
+  | Ablation | `demand: realized` |
+
+- **Tests:**
+  - 47 in total;
+  - `tests/test_placement.py` covers the program, the controller, the worker's target following, routing, shadow demand and the prior;
+  - an end-to-end test runs the real worker, controller and orchestrator against a shared in-memory store.
+- **Example first plan** (2 edge nodes with 20 GB budget, 1 cloud node with 76 GB, prior at 1 req/s):
+
+  | Node | Models | Memory |
+  |---|---|---|
+  | edge-2 | Llama-3.2-1B, Qwen-0.5B, Qwen-1.5B, Llama-3.2-3B, Phi-4-mini | 20 GB |
+  | edge-1 | Mistral-7B, Qwen-3B | 20 GB |
+  | cloud-1 | Gemma-12B, Phi-4 | 54 GB |
+
+  Yi-34B and Gemma-27B are not placed (less than one expected request per 300 s).
+- **Known limits:**
+  - an on-demand load of a model without replica can unload a target model on a full node; the node restores it when its queue is empty;
+  - the static policy gives no target to nodes that join after its plan;
+  - load times are estimates until a node has loaded the model once.
+- **Thesis (done, not committed):**
+  - §3.3 rewritten as "Demand-Driven Model Placement": shadow demand and trigger with the new placement rule, the placement program, following the plan;
+  - §3.1 and §3.2 updated for target placements, shadow choices and traffic shares;
+  - parameter table: T_plan, prior rate and target read interval added, d_min removed;
+  - figure: controller writes target placements to Redis; 11 + 5 models;
+  - introduction: problem statement, approach, RQ3 reworded, contributions 2 and 3;
+  - related work: §2.3, §2.4 and the summary table;
+  - evaluation: RQ3 variants (e) on-demand loading, (f) LRU cache, (g) fixed placement, plus the ablation.
+- **Next:** P3 (load generator).
+
+## 15. Fixes after the P2 coherence review (not committed)
+
+- **Placement rule:**
+  - fires for a model without replica once its demand exceeds 1/T_plan, the placement program's break-even (about 0.003 req/s), instead of R_min (0.1 req/s);
+  - before, the dynamic policy could stop re-planning at low load and act like the fixed placement;
+  - R_min remains only the keep-alive floor of the scale-down rule.
+- **Plan expiry:**
+  - target placements are written with a 16 s expiry, and the controller renews them every tick (also under the static policy);
+  - when a target expires, the node drops its protection and falls back to the LRU cache;
+  - a plan therefore never outlives its controller, and baseline runs (`policy: none`) cannot follow an old plan.
+- **Tests:** 50 in total.
+- **Thesis:**
+  - placement rule and its threshold explained;
+  - expiry added to "Following the plan";
+  - parameter table: R_min description, plus the 16 s expiry.
+
+## 16. Goals aligned with the official topic (not committed)
+
+- **Topic:** "Dynamic LLM Scheduling in the Edge–Cloud Continuum: Prompt-Aware & Resource-Aware" names three goals: higher accuracy, lower latency and resource utilization. The thesis now states these three goals:
+  - in the introduction's problem statement;
+  - in the opening of Chapter 3;
+  - in §3.1.
+- **Split of the goals:**
+  - the router trades accuracy against energy per query, within a latency deadline;
+  - the placement controller serves the router's demand with as little node time as possible, for lower latency and better use of GPU memory and time (new paragraph in §3.3);
+  - the evaluation's opening maps RQ1–RQ3 to the goals.
+- **Not covered from the topic page** (to name as future work):
+  - prompt length and sensitivity as inputs;
+  - CPU load and measured bandwidth;
+  - precision levels (quantized variants);
+  - edge–cloud collaboration;
+  - execution location as a decision of its own (offloading).

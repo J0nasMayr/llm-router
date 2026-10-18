@@ -1,11 +1,14 @@
 """Per-model allocation controller.
 
-Adopts HAS-GPU's Kalman + threshold + cooldown trigger and an ENOVA-style
-per-model replicas+weights LP. Produces a `model_id -> [(node_id, weight)]`
-eligibility map that the orchestrator consults at routing time.
+Decides which models each node keeps loaded (the placement) and how each
+model's traffic is split across the nodes that hold it. Adopts HAS-GPU's
+Kalman + threshold + cooldown trigger; the placement is a small mixed-integer
+program in the spirit of ENOVA's replica program and SageServe's placement
+ILP. Nodes read their target placement from Redis and load or unload models
+to follow it; the orchestrator reads the traffic shares via eligibility_for().
 
-The controller is optional: orchestrator works without it (cold-start path),
-and falls back gracefully when the LP has not yet produced a map.
+The controller is optional: without it, nodes load models on demand and keep
+the most recently used ones.
 """
 
 import asyncio
@@ -14,9 +17,13 @@ import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
-from scipy.optimize import linprog
+from scipy.optimize import Bounds, LinearConstraint, milp
 
-from src.services.model_memory import fits_on_node
+from src.services.model_memory import (
+    fits_on_node,
+    load_time_on_node,
+    size_on_node_gb,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,102 +53,155 @@ class ScalarKalman:
         return self.R
 
 
-def solve_replicas_weights(
+Pair = Tuple[str, str]
+
+
+def solve_placement(
     models: List[str],
     nodes: List[str],
     demand: Dict[str, float],
-    latency: Dict[Tuple[str, str], float],
-    eligible: Dict[Tuple[str, str], bool],
-) -> Dict[str, List[Tuple[str, float]]]:
-    """ENOVA-style allocation LP.
+    latency: Dict[Pair, float],
+    load_time: Dict[Pair, float],
+    size_gb: Dict[Pair, float],
+    budget_gb: Dict[str, Optional[float]],
+    eligible: Dict[Pair, bool],
+    current: Dict[Pair, bool],
+    target_utilization: float = 0.85,
+    planning_horizon_s: float = 300.0,
+) -> Tuple[Dict[str, List[str]], Dict[str, List[Tuple[str, float]]]]:
+    """Placement program: which models each node keeps loaded, and how each
+    model's traffic is split across the nodes that hold it.
 
-    Variables: x[m,n] = fraction of model m's traffic routed to node n.
-    Constraints:
-      sum_n x[m,n] = 1                              for each servable model m
-      sum_m demand[m] * latency[m,n] * x[m,n] <= 1  for each node n  (no over-saturation)
-      x[m,n] = 0                                    where not eligible
-    Objective: minimize sum_{m,n} demand[m] * latency[m,n] * x[m,n]
-               i.e. total node-busy time across the system.
+    Variables, per eligible (model m, node n) pair: y[m,n] in {0, 1}, node n
+    keeps m loaded, and x[m,n] in [0, 1], the share of m's requests that n
+    serves. The rest of m's requests, 1 - sum_n x[m,n], find no loaded
+    replica.
 
-    A model is servable if it has at least one eligible node. Unservable models
-    get an empty entry and are left out of the program.
+    Objective, in node-seconds per second:
+        sum d[m] * tau[m,n] * x[m,n]                     served requests
+      + sum d[m] * (tau_avg[m] + load_avg[m]) * rest[m]   requests without a
+                                                          replica: a load, then
+                                                          the inference
+      + sum load[m,n] / T_plan * y[m,n] * (1 - y0[m,n])   new loads, spread over
+                                                          the planning horizon
+    so a model is worth loading once about one request for it is expected
+    within the horizon. Constraints:
+        sum_n x[m,n] <= 1                    for each model
+        x[m,n] <= y[m,n]                     traffic only to nodes that hold m
+        sum_m size[m,n] * y[m,n] <= S[n]     memory budget of each node
+        sum_m d[m] * tau[m,n] * x[m,n] <= rho   load of each node
+    Loading nothing is always feasible. A tiny bonus for the current placement
+    (y0) keeps plans that are equally good from replacing it.
 
-    Returns `model_id -> [(node_id, weight)]` (weights sum to 1 per servable model).
-    On LP failure, falls back to equal weighting over each model's eligible nodes.
+    Returns (placement, weights): for every node, the models to keep loaded
+    (highest demand first), and for every model with traffic on a replica,
+    its shares [(node, share)] summing to 1. If the solver fails, the current
+    placement is kept and each model's traffic is split equally over the
+    nodes that hold it.
     """
-    # A model without any eligible node (e.g. no live node of its tier) can
-    # never satisfy sum_n x[m,n] = 1; keeping its row would make the whole
-    # program infeasible and push every model onto the equal-weight fallback.
-    out: Dict[str, List[Tuple[str, float]]] = {
-        m: [] for m in models if not any(eligible.get((m, n), False) for n in nodes)
-    }
-    models = [m for m in models if m not in out]
-    M, N = len(models), len(nodes)
-    if M == 0:
-        return out
+    pairs = [(m, n) for m in models for n in nodes if eligible.get((m, n))]
+    placement: Dict[str, List[str]] = {n: [] for n in nodes}
+    if not pairs:
+        return placement, {}
 
-    num_vars = M * N
-    idx = lambda m, n: m * N + n  # noqa: E731
+    by_demand = {m: -demand.get(m, 0.0) for m in models}
+    P = len(pairs)
+    num_vars = 2 * P  # y for every pair, then x for every pair
+    keep_bonus = 1e-6
 
-    # Objective coefficients: demand[m] * latency[m,n]
     c = np.zeros(num_vars)
-    for m_i, m in enumerate(models):
-        for n_i, n in enumerate(nodes):
-            if eligible.get((m, n), False):
-                c[idx(m_i, n_i)] = demand.get(m, 0.0) * max(latency.get((m, n), 0.0), 1e-9)
+    for p, (m, n) in enumerate(pairs):
+        d = demand.get(m, 0.0)
+        own = [q for q, (mm, _) in enumerate(pairs) if mm == m]
+        tau_avg = sum(latency[pairs[q]] for q in own) / len(own)
+        load_avg = sum(load_time[pairs[q]] for q in own) / len(own)
+        # Serving a request here instead of leaving it without replica.
+        c[P + p] = d * (latency[(m, n)] - tau_avg - load_avg)
+        if current.get((m, n)):
+            c[p] = -keep_bonus
+        else:
+            c[p] = load_time[(m, n)] / planning_horizon_s
 
-    # sum_n x[m,n] = 1 (per model)
-    A_eq = np.zeros((M, num_vars))
-    for m_i in range(M):
-        for n_i in range(N):
-            A_eq[m_i, idx(m_i, n_i)] = 1.0
-    b_eq = np.ones(M)
+    rows, lower, upper = [], [], []
 
-    # sum_m demand[m] * latency[m,n] * x[m,n] <= 1 (per node)
-    A_ub = np.zeros((N, num_vars))
-    for n_i, n in enumerate(nodes):
-        for m_i, m in enumerate(models):
-            if eligible.get((m, n), False):
-                A_ub[n_i, idx(m_i, n_i)] = demand.get(m, 0.0) * max(latency.get((m, n), 0.0), 1e-9)
-    b_ub = np.ones(N)
+    def add_row(coefficients, low, up):
+        row = np.zeros(num_vars)
+        for index, value in coefficients:
+            row[index] = value
+        rows.append(row)
+        lower.append(low)
+        upper.append(up)
 
-    bounds = [
-        (0.0, 1.0) if eligible.get((m, n), False) else (0.0, 0.0)
-        for m in models
-        for n in nodes
-    ]
-
-    res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method="highs")
-
-    if res.success:
-        x = res.x.reshape(M, N)
-        for m_i, m in enumerate(models):
-            weights = [
-                (nodes[n_i], float(x[m_i, n_i])) for n_i in range(N) if x[m_i, n_i] > 1e-6
-            ]
-            out[m] = weights
-        return out
-
-    logger.warning(f"LP infeasible ({res.message}); falling back to equal weights")
     for m in models:
-        elig = [n for n in nodes if eligible.get((m, n), False)]
-        w = 1.0 / len(elig)
-        out[m] = [(n, w) for n in elig]
-    return out
+        own = [q for q, (mm, _) in enumerate(pairs) if mm == m]
+        if own:
+            add_row([(P + q, 1.0) for q in own], -np.inf, 1.0)
+    for p in range(P):
+        add_row([(P + p, 1.0), (p, -1.0)], -np.inf, 0.0)
+    for n in nodes:
+        own = [q for q, (_, nn) in enumerate(pairs) if nn == n]
+        if not own:
+            continue
+        if budget_gb.get(n) is not None:
+            add_row([(q, size_gb[pairs[q]]) for q in own], -np.inf, float(budget_gb[n]))
+        add_row(
+            [(P + q, demand.get(pairs[q][0], 0.0) * latency[pairs[q]]) for q in own],
+            -np.inf,
+            target_utilization,
+        )
+
+    integrality = np.zeros(num_vars)
+    integrality[:P] = 1
+    res = milp(
+        c,
+        constraints=LinearConstraint(np.array(rows), lower, upper),
+        integrality=integrality,
+        bounds=Bounds(0.0, 1.0),
+        options={"time_limit": 10.0},
+    )
+
+    shares: Dict[str, List[Tuple[str, float]]] = {}
+    if res.success and res.x is not None:
+        y, x = res.x[:P], res.x[P:]
+        for p, (m, n) in enumerate(pairs):
+            if y[p] > 0.5:
+                placement[n].append(m)
+            if x[p] > 1e-6:
+                shares.setdefault(m, []).append((n, float(x[p])))
+    else:
+        logger.warning(f"Placement program failed ({res.message}); keeping the current placement")
+        for m, n in pairs:
+            if current.get((m, n)):
+                placement[n].append(m)
+                shares.setdefault(m, []).append((n, 1.0))
+
+    weights = {}
+    for m, node_shares in shares.items():
+        total = sum(s for _, s in node_shares)
+        weights[m] = [(n, s / total) for n, s in node_shares]
+    for n in placement:
+        placement[n].sort(key=lambda m: by_demand[m])
+    return placement, weights
 
 
 class AllocationController:
-    """Periodic loop: read telemetry, evaluate trigger, optionally re-solve LP.
+    """Periodic loop: read telemetry, evaluate the trigger, and re-plan which
+    models each node keeps loaded and how each model's traffic is split.
 
-    Holds the current eligibility map; orchestrator consults it via
-    `eligibility_for(model_id)`.
+    Policy "dynamic" makes a first plan from the prior demand (if given) and
+    re-plans whenever a trigger rule fires; "static" makes that first plan
+    only and keeps it.
     """
 
     def __init__(
         self,
         queue_client,
         model_configs: Dict,
-        rps_provider: Callable[[], Dict[str, float]],
+        demand_provider: Callable[[], Dict[str, float]],
+        policy: str = "dynamic",
+        prior_demand: Optional[Dict[str, float]] = None,
+        load_bandwidth_gb_per_s: float = 2.0,
+        planning_horizon_s: float = 300.0,
         theta_up: float = 0.85,
         theta_down: float = 0.5,
         T_cool: float = 30.0,
@@ -151,10 +211,17 @@ class AllocationController:
         tick_interval: float = 5.0,
         Q: float = 0.01,
         D: float = 1.0,
+        nominal_latency_s: float = 1.0,
     ):
+        if policy not in ("dynamic", "static"):
+            raise ValueError(f"Unknown allocation policy: {policy}")
         self.queue_client = queue_client
         self.model_configs = model_configs
-        self.rps_provider = rps_provider
+        self.demand_provider = demand_provider
+        self.policy = policy
+        self.prior_demand = prior_demand
+        self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
+        self.planning_horizon_s = planning_horizon_s
         self.theta_up = theta_up
         self.theta_down = theta_down
         self.T_cool = T_cool
@@ -162,16 +229,23 @@ class AllocationController:
         self.kappa = kappa
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.tick_interval = tick_interval
+        # Target placements expire unless renewed; like node telemetry, they
+        # survive two missed ticks.
+        self.placement_ttl_s = int(tick_interval * 3) + 1
+        self.nominal_latency_s = nominal_latency_s
         self._Q, self._D = Q, D
         self._kalman: Dict[str, ScalarKalman] = {}
         # Per-(model, node) latency tracking for the deviation trigger:
         # a Kalman prediction of the pair's latency plus an exponentially
         # weighted variance of its residuals.
-        self._lat_kalman: Dict[Tuple[str, str], ScalarKalman] = {}
-        self._lat_resvar: Dict[Tuple[str, str], float] = {}
-        self._lat_samples: Dict[Tuple[str, str], int] = {}
+        self._lat_kalman: Dict[Pair, ScalarKalman] = {}
+        self._lat_resvar: Dict[Pair, float] = {}
+        self._lat_samples: Dict[Pair, int] = {}
         self._last_rerun: float = 0.0
-        self._eligibility: Dict[str, List[Tuple[str, float]]] = {}
+        self._planned = False
+        # Last plan: models each node should keep loaded, and traffic shares.
+        self._targets: Dict[str, List[str]] = {}
+        self._weights: Dict[str, List[Tuple[str, float]]] = {}
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
 
@@ -198,7 +272,7 @@ class AllocationController:
         if telemetry.get("tier") != self.model_configs.get(model_id, {}).get("tier"):
             return False
         # Same check as the routing filter: a model the node's memory budget
-        # cannot hold must get no traffic share there.
+        # cannot hold is never placed there.
         if not fits_on_node(telemetry, model_id, self.model_configs.get(model_id)):
             return False
         free_gb = self._node_free_memory_gb(telemetry)
@@ -207,8 +281,8 @@ class AllocationController:
         return True
 
     def _model_capacity(self, model_id, telemetry_list) -> float:
-        """Capacity ≡ sum over current-eligible nodes of (weight × 1/latency)."""
-        weights = dict(self._eligibility.get(model_id, []))
+        """Capacity ≡ sum over the model's replicas of (share × 1/latency)."""
+        weights = dict(self._weights.get(model_id, []))
         if not weights:
             return 0.0
         total = 0.0
@@ -271,12 +345,8 @@ class AllocationController:
     def _trigger_reason(
         self, predicted_rps, capacities, telemetry_list, latency_reason=None
     ) -> Optional[str]:
-        # No eligibility yet — first tick, never gated
-        if not self._eligibility:
-            return "first_run"
-
         # A single cooldown gates every rule (design: react at most once per
-        # T_cool, suppressing oscillation and LP re-run storms).
+        # T_cool, suppressing oscillation and re-planning storms).
         now = time.time()
         if now - self._last_rerun <= self.T_cool:
             return None
@@ -287,11 +357,17 @@ class AllocationController:
             if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
                 return f"memory_pressure(node={t.get('node_id')}, free={free_gb:.2f}GB)"
 
-        # Per-model scale-up
+        # Per-model scale-up: demand approaches the capacity of the model's
+        # replicas, or a model without replica reaches the placement program's
+        # break-even of about one request per planning horizon, from which on
+        # loading it can pay off.
+        break_even = 1.0 / self.planning_horizon_s
         for m, R in predicted_rps.items():
             cap = capacities.get(m, 0.0)
             if cap > 0 and R > self.theta_up * cap:
                 return f"scale_up({m}: R={R:.2f} > {self.theta_up}·C={self.theta_up * cap:.2f})"
+            if cap == 0 and R > break_even:
+                return f"place({m}: R={R:.4f} > 1/T_plan={break_even:.4f})"
 
         # Per-(model, node) latency deviation (computed in _update_latency_filters)
         if latency_reason:
@@ -305,35 +381,72 @@ class AllocationController:
 
         return None
 
-    # ---------- LP actuator ----------
+    # ---------- placement ----------
 
-    def _rerun_lp(self, telemetry_list, predicted_rps):
-        models = list(self.model_configs.keys())
-        nodes = [t.get("node_id") for t in telemetry_list if t.get("node_id")]
+    def _replan(self, telemetry_list, demand, reason):
+        tel_by_node = {t.get("node_id"): t for t in telemetry_list if t.get("node_id")}
+        nodes = list(tel_by_node)
         if not nodes:
             return
+        models = list(self.model_configs.keys())
+        eligible: Dict[Pair, bool] = {}
+        latency: Dict[Pair, float] = {}
+        load_time: Dict[Pair, float] = {}
+        size_gb: Dict[Pair, float] = {}
+        current: Dict[Pair, bool] = {}
+        budget_gb: Dict[str, Optional[float]] = {}
+        for n, t in tel_by_node.items():
+            budget_gb[n] = t.get("memory_budget_gb")
+            # The current placement is the last plan for the node; before
+            # the first plan, the models the node holds.
+            held = set(self._targets.get(n, t.get("resident_models") or []))
+            for m in models:
+                if not self._eligible_pair(m, t):
+                    continue
+                cfg = self.model_configs.get(m)
+                eligible[(m, n)] = True
+                lat = self._latency_for_pair(t, m)
+                # Nominal latency for pairs without any history.
+                latency[(m, n)] = lat if lat > 0 else self.nominal_latency_s
+                load_time[(m, n)] = load_time_on_node(
+                    t, m, cfg, self.load_bandwidth_gb_per_s
+                )
+                size_gb[(m, n)] = size_on_node_gb(t, m, cfg)
+                current[(m, n)] = m in held
 
-        tel_by_node = {t.get("node_id"): t for t in telemetry_list}
-        eligible: Dict[Tuple[str, str], bool] = {}
-        latency: Dict[Tuple[str, str], float] = {}
-        for m in models:
-            for n in nodes:
-                t = tel_by_node[n]
-                if self._eligible_pair(m, t):
-                    eligible[(m, n)] = True
-                    lat = self._latency_for_pair(t, m)
-                    # Cold-start: assume nominal 1s if a node hasn't run this model yet
-                    latency[(m, n)] = lat if lat > 0 else 1.0
-                else:
-                    eligible[(m, n)] = False
-
-        # Demand: predicted RPS, with a tiny floor so models the bandit hasn't
-        # tried yet still get capacity reserved.
-        demand = {m: max(predicted_rps.get(m, 0.0), 1e-3) for m in models}
-        self._eligibility = solve_replicas_weights(models, nodes, demand, latency, eligible)
+        placement, weights = solve_placement(
+            models,
+            nodes,
+            demand,
+            latency,
+            load_time,
+            size_gb,
+            budget_gb,
+            eligible,
+            current,
+            target_utilization=self.theta_up,
+            planning_horizon_s=self.planning_horizon_s,
+        )
+        self._targets = {n: list(placement.get(n, [])) for n in nodes}
+        self._weights = weights
+        self._planned = True
         self._last_rerun = time.time()
-        nonempty = sum(1 for v in self._eligibility.values() if v)
-        logger.info(f"Allocation LP solved: {nonempty}/{len(models)} models have eligible nodes")
+        self._publish_targets()
+        loaded = sum(len(v) for v in self._targets.values())
+        logger.info(
+            f"Placement planned ({reason}): {loaded} replicas of "
+            f"{len(weights)} models on {len(nodes)} nodes"
+        )
+
+    def _publish_targets(self):
+        """Write each node's target placement with an expiry. The controller
+        renews it every tick, so a plan never outlives the controller: if it
+        stops, the targets expire and the nodes fall back to loading models on
+        demand and keeping the most recently used ones."""
+        for n, models in self._targets.items():
+            self.queue_client.set_node_placement(
+                n, models, ttl_seconds=self.placement_ttl_s
+            )
 
     # ---------- async loop ----------
 
@@ -341,7 +454,7 @@ class AllocationController:
         telemetry_list = self.queue_client.get_all_node_telemetry() or []
         if not telemetry_list:
             return
-        observed_rps = self.rps_provider() or {}
+        observed_rps = self.demand_provider() or {}
         # Every model gets an observation each tick (0 when it received no
         # traffic), so a model's prediction decays instead of freezing at its
         # last non-zero value.
@@ -349,14 +462,23 @@ class AllocationController:
             m: self._kalman_for(m).update(observed_rps.get(m, 0.0))
             for m in self.model_configs
         }
-        capacities = {m: self._model_capacity(m, telemetry_list) for m in self.model_configs}
         latency_reason = self._update_latency_filters(telemetry_list)
+        if not self._planned:
+            reason = "static_plan" if self.policy == "static" else "first_plan"
+            self._replan(telemetry_list, self.prior_demand or predicted_rps, reason)
+            return
+        if self.policy == "static":
+            self._publish_targets()
+            return
+        capacities = {m: self._model_capacity(m, telemetry_list) for m in self.model_configs}
         reason = self._trigger_reason(
             predicted_rps, capacities, telemetry_list, latency_reason
         )
         if reason:
             logger.info(f"Allocation trigger fired: {reason}")
-            self._rerun_lp(telemetry_list, predicted_rps)
+            self._replan(telemetry_list, predicted_rps, reason)
+        else:
+            self._publish_targets()
 
     async def _loop(self):
         while not self._stop.is_set():
@@ -386,13 +508,14 @@ class AllocationController:
     # ---------- public read API ----------
 
     def eligibility_for(self, model_id) -> List[Tuple[str, float]]:
-        """Return [(node_id, weight)] for the model. Empty when no entry yet."""
-        return self._eligibility.get(model_id, [])
+        """[(node_id, share)] over the nodes that hold the model in the current
+        plan. Empty for a model without replicas, which is not restricted."""
+        return self._weights.get(model_id, [])
 
     def has_eligibility(self) -> bool:
-        """True once the LP has produced at least one non-empty entry."""
-        return any(self._eligibility.values())
+        """True once the controller has made its first plan."""
+        return self._planned
 
     def available_models(self) -> List[str]:
-        """Models that have at least one eligible node in the current map."""
-        return [m for m, v in self._eligibility.items() if v]
+        """Models with at least one replica in the current plan."""
+        return [m for m, v in self._weights.items() if v]
