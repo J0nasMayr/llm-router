@@ -75,7 +75,7 @@ it demonstrates that classical state-space estimation paired with simple thresho
 
 SageServe \cite{sageserve} attacks the same problem at hyperscaler scale.
 Operating on production traces from Microsoft Office 365 (over ten million LLM requests per day), it co-optimizes short-term request routing with long-term GPU placement:
-an ARIMA traffic forecast predicts per-region demand and an integer linear program reallocates GPU VMs and model placements every few hours, subject to SLA constraints.
+an ARIMA traffic forecast predicts per-region demand and an integer linear program reallocates GPU VMs and model placements every hour, subject to SLA constraints.
 The authors report up to 25\% GPU-hour savings against the production baseline and explicitly demonstrate that routing and placement decisions cannot be made in isolation without problems.
 
 A complementary line of work keeps the deployment fixed and instead reshapes the model itself to fit the device.
