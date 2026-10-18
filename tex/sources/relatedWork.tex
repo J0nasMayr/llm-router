@@ -37,7 +37,7 @@ These results are then used to train a routing regression model used for deploym
 The most logical and the most studied approach is to make this choice by inspecting/analyzing the input prompt and route based on its features.
 TagRouter \cite{tagrouter} uses custom semantic Tags to classify prompts and lets the historically best model for these tags do the inference.
 Marinelli et al. \cite{noft} suggest the new metric "Number of Thoughts" to describe the prompt's complexity. This single value is then predicted through a random forest and used for routing.
-The IRT-Router \cite{irtrouter} scores responses across 25 predefined abilities and uses Item Response Theory to make the router improve over time.
+The IRT-Router \cite{irtrouter} uses Item Response Theory. It learns the abilities of each LLM and the difficulty of each query over 25 dimensions, predicts how well each LLM will answer, and weighs this against the LLM's cost. The router is trained offline; for a new query, it only refines the query's embedding with similar known queries.
 
 Although using the input prompt as the anchor for this choice might already seem like the best approach, there are still clear limitations to be noted \cite{lookahead}.
 Lookahead \cite{lookahead} introduces an additional lookahead routing framework that predicts potential model outputs without full inference.
@@ -101,16 +101,16 @@ A telemetry-driven feasibility filter restricts the bandit to models that a node
 The filter is evaluated for its effect on SLA violations (RQ1) and for what the restriction costs in accuracy and energy (RQ2).
 A trigger-driven controller, combining HAS-GPU's trigger design with a placement program, decides which models each node keeps loaded, following the demand of the router;
 it is evaluated against on-demand loading, an LRU cache and a fixed placement (RQ3).
-Table~\ref{tab:related_work_summary} summarizes the surveyed work and positions this thesis against it.
+Table~\ref{tab:related_work_summary} lists the surveyed work and positions this thesis against it.
 
 
 \begin{sidewaystable}[htbp]
 \centering
-\footnotesize
-\caption{Detailed Summary of Related Work in LLM Serving and Routing}
+\scriptsize
+\caption{Detailed Summary of Related Work in LLM Serving, Routing and Resource Allocation}
 \label{tab:related_work_summary}
-\renewcommand{\arraystretch}{1.2}
-\begin{tabularx}{\textheight}{p{2cm} p{1.8cm} p{1.8cm} X X} 
+\renewcommand{\arraystretch}{1.1}
+\begin{tabularx}{\textheight}{p{1.9cm} p{1.6cm} p{1.4cm} X X} 
 \toprule
 \textbf{Paper} & \textbf{Focus Area} & \textbf{Goals \newline (Acc, Lat, Res)} & \textbf{Detailed Methodology} & \textbf{Prompt Analysis Method} \\
 \midrule
@@ -128,11 +128,19 @@ TagRouter \cite{tagrouter} & Routing & Yes, No, Yes & Maps incoming queries to s
 
 Marinelli et al. \cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Analyzes prompt metadata to estimate the required ``Number of Thoughts'' (reasoning complexity). \\
 
-IRT-Router \cite{irtrouter} & Routing & Yes, No, Yes & Applies Item Response Theory (IRT) to mathematically model both the latent abilities of 20+ LLMs and the difficulty of incoming prompts. & Estimates the latent difficulty of the prompt across 25 predefined cognitive abilities. \\
+IRT-Router \cite{irtrouter} & Routing & Yes, No, Yes & Applies Item Response Theory (IRT) to mathematically model both the latent abilities of 20 LLMs and the difficulty of incoming prompts. & Embeds the prompt and estimates its difficulty and the abilities it needs (25 dimensions). \\
 
 Lookahead \cite{lookahead} & Routing & Yes, No, No & Prevents blind routing by predicting potential model outputs (fast drafting) without full inference to gauge which model is best suited. & Employs fast-drafting/partial inference to preview the generation trajectory of the prompt. \\
 
-GreenServ \cite{greenserv} & Routing & Yes, Yes, Yes & Utilizes a Contextual Multi-Armed Bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. & Extracts Task Type, Semantic Cluster (via embeddings), and Text Complexity (Flesch Reading Ease). \\
+GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a Contextual Multi-Armed Bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. Formulates a latency constraint, but does not enforce it. & Extracts Task Type, Semantic Cluster (via embeddings), and Text Complexity (Flesch Reading Ease). \\
+
+ENOVA \cite{enova} & Allocation & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
+
+HAS-GPU \cite{hasgpu} & Allocation & No, Yes, Yes & Scales serverless GPU functions vertically (SM partitions, time quotas) and horizontally. A Kalman filter predicts the request rate, and threshold rules trigger scaling. & None (only the request rate counts); built for deep-learning inference in general, not for LLMs. \\
+
+SageServe \cite{sageserve} & Allocation & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
+
+CLONE \cite{clone} & Allocation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and recovers its accuracy with LoRA (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
 
 \textbf{This work} & \textbf{Routing, Serving \& Allocation} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts Task Type, Semantic Cluster, and Text Complexity (as in GreenServ).} \\
 \bottomrule
