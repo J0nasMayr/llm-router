@@ -1,5 +1,5 @@
 % Architecture of the edge-cloud scheduler (Chapter 3).
-% Solid: request path; dashed: telemetry; dash-dotted: eligibility map.
+% Solid: request path; dashed: telemetry; dash-dotted: the controller's plan.
 \setstretch{1}
 \begin{tikzpicture}[
     font=\footnotesize,
@@ -23,7 +23,7 @@
 \node[block] (bandit) at (4.55, 7.3) {\textbf{3}~LinUCB bandit\\[1pt]
     \scriptsize arms outside $M_t^*$ masked};
 \node[block] (disp)   at (7.75, 7.3) {\textbf{3}~Node dispatch\\[1pt]
-    \scriptsize min.\ $\hat{T}(m_t, n)$ or weights $w_{m,n}$};
+    \scriptsize min.\ $\hat{T}(m_t, n)$ or shares $w_{m,n}$};
 \node[block] (reward) at (1.35, 5.1) {\textbf{4}~Reward \& update\\[1pt]
     \scriptsize $r_t = \alpha\,Acc + \beta\,(1 - E)$};
 
@@ -39,19 +39,20 @@
 
 % --- queues and nodes -----------------------------------------------------
 \node[store, minimum width=8.8cm] (queues) at (4.55, 3.1)
-    {Redis: a task queue per node \textbar{} a fallback queue per tier \textbar{} results};
+    {Redis: a task queue per node \textbar{} a fallback queue per tier\\
+     results \textbar{} target placement per node};
 
 \node[tier] (edge)  at (2.4, 1.2) {\textbf{Edge nodes}\\[1pt]
-    \scriptsize inference workers,\\ 13 models (0.5--8B)};
+    \scriptsize inference workers,\\ 11 models (0.5--8B)};
 \node[tier] (cloud) at (6.9, 1.2) {\textbf{Cloud nodes}\\[1pt]
-    \scriptsize inference workers,\\ 6 models (12--34B)};
+    \scriptsize inference workers,\\ 5 models (12--34B)};
 
 % --- telemetry and allocation controller --------------------------------
 \node[store, text width=2.3cm] (telem) at (11.45, 3.1)
     {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$,\\ loaded models, $\ell(m, n)$, $s_m$, $S_n$};
 \node[block, text width=2.3cm] (ctrl) at (11.45, 7.3)
     {Allocation controller\\[1pt]
-    \scriptsize Kalman demand forecast, trigger rules, LP over $x_{m,n}$};
+    \scriptsize Kalman forecast of shadow demand, trigger rules, placement program};
 
 % --- request path ---------------------------------------------------------
 \draw[flow] (client) -- node[lbl, right=2pt, align=left] {$q_t$,\\ dataset label} (ctx);
@@ -77,8 +78,10 @@
 \draw[telem] (telem.north) -- (ctrl.south);
 \draw[telem] (telem.east) -- ++(0.45, 0) |- ([yshift=0.3cm]filt.east);
 
-% --- eligibility map ----------------------------------------------------
+% --- plan of the allocation controller ----------------------------------
 \draw[elig] (ctrl.west) -- (disp.east);
-\draw[elig] (ctrl.north) |- node[lbl, pos=0.75, below=2pt] {eligibility map}
+\draw[elig] (ctrl.north) |- node[lbl, pos=0.75, below=2pt] {traffic shares}
     ([yshift=-0.2cm]filt.east);
+\draw[elig] ([yshift=-0.45cm]ctrl.west) -| node[lbl, pos=0.75, right=2pt, align=left]
+    {target\\ placement} ($(queues.east) + (0.8, 0)$) -- (queues.east);
 \end{tikzpicture}
