@@ -36,7 +36,8 @@ class ScalarKalman:
         P = (1-K)·(P_prev + Q),  K = (P_prev + Q) / (P_prev + Q + D)
 
     Q (process noise) and D (observation noise) are the only knobs; K
-    self-adjusts. Defaults match HAS-GPU's reported settings.
+    self-adjusts. HAS-GPU uses this filter but does not report its Q and D;
+    the defaults are this work's own choice.
     """
 
     def __init__(self, Q: float = 0.01, D: float = 1.0, R0: float = 0.0, P0: float = 1.0):
@@ -280,20 +281,31 @@ class AllocationController:
             return False
         return True
 
-    def _model_capacity(self, model_id, telemetry_list) -> float:
-        """Capacity ≡ sum over the model's replicas of (share × 1/latency)."""
-        weights = dict(self._weights.get(model_id, []))
-        if not weights:
-            return 0.0
-        total = 0.0
-        for t in telemetry_list:
-            nid = t.get("node_id")
-            if nid not in weights:
-                continue
-            lat = self._latency_for_pair(t, model_id)
-            if lat > 0:
-                total += weights[nid] * (1.0 / lat)
-        return total
+    def _node_loads(self, predicted_rps, telemetry_list):
+        """Predicted load of every node that holds a replica in the current
+        plan: the fraction of its time the node needs for its shares of the
+        predicted demand, sum_m R[m] * w[m,n] * tau[m,n]. The placement
+        program keeps this below theta_up. Unlike HAS-GPU's pods, which have
+        their own share of the GPU, the models on a node share its time, so
+        the trigger compares per node rather than per model.
+
+        Returns (loads, replicated): {node_id: load}, and the models with at
+        least one replica on a node that still reports telemetry."""
+        tel_by_node = {t.get("node_id"): t for t in telemetry_list}
+        loads: Dict[str, float] = {}
+        replicated = set()
+        for m, shares in self._weights.items():
+            R = predicted_rps.get(m, 0.0)
+            for n, w in shares:
+                t = tel_by_node.get(n)
+                if t is None:
+                    continue
+                replicated.add(m)
+                lat = self._latency_for_pair(t, m)
+                if lat <= 0:
+                    lat = self.nominal_latency_s
+                loads[n] = loads.get(n, 0.0) + R * w * lat
+        return loads, replicated
 
     # ---------- trigger ----------
 
@@ -343,7 +355,7 @@ class AllocationController:
         return reason
 
     def _trigger_reason(
-        self, predicted_rps, capacities, telemetry_list, latency_reason=None
+        self, predicted_rps, node_loads, replicated, telemetry_list, latency_reason=None
     ) -> Optional[str]:
         # A single cooldown gates every rule (design: react at most once per
         # T_cool, suppressing oscillation and re-planning storms).
@@ -357,27 +369,28 @@ class AllocationController:
             if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
                 return f"memory_pressure(node={t.get('node_id')}, free={free_gb:.2f}GB)"
 
-        # Per-model scale-up: demand approaches the capacity of the model's
-        # replicas, or a model without replica reaches the placement program's
+        # Scale-up: a node's predicted load exceeds theta_up, the limit the
+        # placement program keeps it under, so the plan no longer fits.
+        for n, load in node_loads.items():
+            if load > self.theta_up:
+                return f"scale_up(node={n}: load={load:.2f} > {self.theta_up})"
+
+        # Placement: a model without replica reaches the placement program's
         # break-even of about one request per planning horizon, from which on
         # loading it can pay off.
         break_even = 1.0 / self.planning_horizon_s
         for m, R in predicted_rps.items():
-            cap = capacities.get(m, 0.0)
-            if cap > 0 and R > self.theta_up * cap:
-                return f"scale_up({m}: R={R:.2f} > {self.theta_up}·C={self.theta_up * cap:.2f})"
-            if cap == 0 and R > break_even:
+            if m not in replicated and R > break_even:
                 return f"place({m}: R={R:.4f} > 1/T_plan={break_even:.4f})"
 
         # Per-(model, node) latency deviation (computed in _update_latency_filters)
         if latency_reason:
             return latency_reason
 
-        # Global scale-down
-        nonzero = {m: R for m, R in predicted_rps.items() if capacities.get(m, 0.0) > 0}
-        if nonzero and all(R < self.theta_down * capacities[m] for m, R in nonzero.items()):
+        # Scale-down: every node with a replica is below theta_down.
+        if node_loads and all(load < self.theta_down for load in node_loads.values()):
             if any(R > self.R_min for R in predicted_rps.values()):
-                return "scale_down(all models below θ_down·C)"
+                return f"scale_down(all node loads < {self.theta_down})"
 
         return None
 
@@ -470,9 +483,9 @@ class AllocationController:
         if self.policy == "static":
             self._publish_targets()
             return
-        capacities = {m: self._model_capacity(m, telemetry_list) for m in self.model_configs}
+        node_loads, replicated = self._node_loads(predicted_rps, telemetry_list)
         reason = self._trigger_reason(
-            predicted_rps, capacities, telemetry_list, latency_reason
+            predicted_rps, node_loads, replicated, telemetry_list, latency_reason
         )
         if reason:
             logger.info(f"Allocation trigger fired: {reason}")

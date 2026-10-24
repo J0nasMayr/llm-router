@@ -164,6 +164,58 @@ class ControllerTest(unittest.TestCase):
         queue.set_node_placement.assert_called_once_with("e1", [], ttl_seconds=16)
 
 
+class TriggerTest(unittest.TestCase):
+    """Scale-up and scale-down compare the predicted load of each node with
+    theta_up (0.85) and theta_down (0.5)."""
+
+    def reason(self, weights, demand, telemetry):
+        async def scenario():
+            controller = AllocationController(
+                queue_client=mock.MagicMock(),
+                model_configs=MODELS,
+                demand_provider=dict,
+                T_cool=0.0,
+            )
+            controller._weights = weights
+            loads, replicated = controller._node_loads(demand, telemetry)
+            return controller._trigger_reason(demand, loads, replicated, telemetry)
+
+        return asyncio.run(scenario())
+
+    def two_replicas(self, rate):
+        # small takes 2 s on e1 and e2, which split its traffic equally.
+        telemetry = [
+            edge_node(node_id, latency_by_model={"small": 2.0}) for node_id in ("e1", "e2")
+        ]
+        weights = {"small": [("e1", 0.5), ("e2", 0.5)]}
+        return self.reason(weights, {"small": rate}, telemetry)
+
+    def test_replicas_add_up(self):
+        # 0.5 req/s keeps each node 50 % busy: no new plan. Averaging the
+        # replicas' throughput would have fired at 0.43 req/s.
+        self.assertIsNone(self.two_replicas(0.5))
+        self.assertTrue(self.two_replicas(0.9).startswith("scale_up"))
+
+    def test_models_on_one_node_share_its_time(self):
+        # Each model alone needs 60 % of e1, together 120 %.
+        telemetry = [edge_node(latency_by_model={"small": 1.0, "mid": 1.0})]
+        weights = {"small": [("e1", 1.0)], "mid": [("e1", 1.0)]}
+        reason = self.reason(weights, {"small": 0.6, "mid": 0.6}, telemetry)
+        self.assertTrue(reason.startswith("scale_up(node=e1"))
+
+    def test_scale_down_when_every_node_is_below_theta_down(self):
+        telemetry = [edge_node(latency_by_model={"small": 1.0})]
+        reason = self.reason({"small": [("e1", 1.0)]}, {"small": 0.2}, telemetry)
+        self.assertTrue(reason.startswith("scale_down"))
+
+    def test_replica_on_a_silent_node_does_not_count(self):
+        # mid's only replica is on e2, which no longer reports telemetry.
+        telemetry = [edge_node(latency_by_model={"small": 1.0})]
+        weights = {"small": [("e1", 1.0)], "mid": [("e2", 1.0)]}
+        reason = self.reason(weights, {"small": 0.6, "mid": 0.05}, telemetry)
+        self.assertTrue(reason.startswith("place(mid"))
+
+
 class WorkerTargetTest(FakeWorkerTestCase):
     def reconcile(self, target):
         self.redis.get_node_placement.return_value = target
