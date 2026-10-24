@@ -21,7 +21,7 @@ Instead of relying on naive metrics like queue length, NexusSched uses forward-l
 The motivating insight is that pending request count can be misleading on engines under KVC pressure, where a short queue still produces long latencies.
 NexusSched therefore replaces reactive load balancing with predictive scheduling that anticipates bottlenecks before they appear.
 
-However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they treat every prompt as an ambiguous job: lacking any semantic awareness, they never answer an easy prompt with a smaller, cheaper model.
+However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they treat every prompt as an opaque job: lacking any semantic awareness, they never answer an easy prompt with a smaller, cheaper model.
 Disregarding this optimization possibility means ignoring one of the largest efficiency levers available.
 
 
@@ -31,10 +31,9 @@ While LLM serving asks the question "How?", LLM routing tries to optimize the an
 Here, the choice between models of different sizes and specializations is made.
 This choice is a major factor in the trade-off between resource consumption and inference accuracy \cite{greenserv, frugalgpt, routellm}.
 
-A brute-force approach to make this choice is presented by CARGO \cite{cargo}, which sends each prompt to multiple LLMs and grades the answers using separate "judge" LLMs.
-These results are then used to train a routing regression model used for deployment.
-
 The most logical and the most studied approach is to make this choice by inspecting/analyzing the input prompt and route based on its features.
+CARGO \cite{cargo} embeds the prompt and uses a single regression model to predict how well each LLM will answer it; if the two best LLMs are close, a small classifier decides between them.
+Judge LLMs are only needed to label its training data: they compare the answers of several LLMs to the same prompts.
 TagRouter \cite{tagrouter} uses custom semantic Tags to classify prompts and lets the historically best model for these tags do the inference.
 Marinelli et al. \cite{noft} suggest the new metric "Number of Thoughts" to describe the prompt's complexity. This single value is then predicted through a random forest and used for routing.
 The IRT-Router \cite{irtrouter} uses Item Response Theory. It learns the abilities of each LLM and the difficulty of each query over 25 dimensions, predicts how well each LLM will answer, and weighs this against the LLM's cost. The router is trained offline; for a new query, it only refines the query's embedding with similar known queries.
@@ -59,7 +58,7 @@ The same assumption also hides the option of serving a prompt from a nearby edge
 
 \section{Dynamic Resource Allocation for LLM Serving}
 
-The systems discussed so far assume a fixed deployment: a static pool of models occupies a static pool of GPUs, and the scheduler only decides which already-deployed model serves each request.
+The systems discussed so far take the set of deployed models as fixed: the routers assume that every model is available, and the serving systems change at most how many instances of a given model run, as DynamoLLM does.
 A separate research area asks the orthogonal question of how the deployment itself should change over time, i.e., which models to replicate, on which devices, at what scale, in response to workload and hardware state.
 Recent surveys of LLM serving scheduling \cite{llm_serving_survey} highlight that this axis is increasingly inseparable from routing.
 
@@ -67,9 +66,9 @@ ENOVA \cite{enova} addresses this for serverless multi-GPU clusters.
 It deconstructs the inference pipeline into measurable sub-stages and fits a recommendation module that maps each (LLM, GPU type) pair to an expected throughput configuration.
 Furthermore, it feeds live telemetry - request rate, pending count, GPU utilization, response time - into an autoscaling controller that adjusts how many replicas of each model are kept.
 
-HAS-GPU \cite{hasgpu} is much like ENOVA but at a finer allocation granularity.
+HAS-GPU \cite{hasgpu} is much like ENOVA but at a finer allocation granularity, and it targets deep-learning inference in general rather than LLMs.
 It introduces vertical scaling for serverless GPU functions - adjusting Streaming Multiprocessor partitions and time quotas at runtime - alongside horizontal scaling, and drives both with an online Kalman filter that predicts the next request load from the current measurement.
-Scaling decisions then reduce to two threshold tests against this prediction, gated by a cooldown interval to suppress oscillation.
+Scaling decisions then reduce to two threshold tests against this prediction, and a minimum interval between scale-down operations suppresses oscillation.
 While its vertical-scaling actuator is tied to NVIDIA's MPS-based SM partitioning and does not translate to higher-level inference stacks, its control-loop design is directly relevant here:
 it demonstrates that classical state-space estimation paired with simple threshold rules suffices to trigger fine-grained reallocation.
 
@@ -78,14 +77,15 @@ Operating on production traces from Microsoft Office 365 (over ten million LLM r
 an ARIMA traffic forecast predicts per-region demand and an integer linear program reallocates GPU VMs and model placements every hour, subject to SLA constraints.
 The authors report up to 25\% GPU-hour savings against the production baseline and explicitly demonstrate that routing and placement decisions cannot be made in isolation without problems.
 
-A complementary line of work keeps the deployment fixed and instead reshapes the model itself to fit the device.
-CLONE \cite{clone} customizes a single LLM for a single edge endpoint by combining structured pruning, LoRA-based accuracy recovery, and layer-level dynamic voltage and frequency scaling to meet a latency target under a power budget.
+A complementary line of work keeps the placement fixed and adapts the resources of a single device at runtime.
+CLONE \cite{clone} prunes a single LLM for a single edge device and recovers its accuracy with LoRA, offline.
+At runtime, a learned controller sets the voltage and frequency of the device per layer, so that the model meets a latency target with little energy, and a router mixes LoRA adapters for each prompt.
 While not a cross-model allocation system, it is the natural counterpart on the edge tier:
 where ENOVA and SageServe ask which model lives on which GPU, CLONE asks how much capacity a fixed (model, GPU) pair can be made to yield.
 
 However, although these systems adapt capacity to demand from live telemetry, they assume the traffic per model is given rather than chosen by a router that decides \emph{which model should answer} each query, and their scaling decisions are driven mainly by aggregate demand -- HAS-GPU's trigger, for instance, looks at the request rate alone -- which misses LLM requests whose cost varies by orders of magnitude.
 The common control-loop pattern they share -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
-This thesis therefore integrates an allocation controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- extended with per-(model, node) latency-deviation and free-memory rules, since an RPS-only trigger is insufficient when per-request cost, model selection, and memory pressure decouple from the arrival rate -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
+This thesis therefore integrates an allocation controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- extended with a placement rule for models without a replica and with per-(model, node) latency-deviation and memory-pressure rules, since a trigger based on request rates alone is insufficient when per-request cost, model selection, and memory pressure decouple from the arrival rate -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
 Unlike the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if every model were loaded.
 
 \section{Research Gap and Thesis Contribution}
@@ -94,7 +94,8 @@ The three research areas leave complementary gaps:
 serving systems use the hardware efficiently but never choose the model;
 prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
 and allocation systems adapt capacity but take the traffic per model as given.
-None of the surveyed systems both chooses a model per prompt and accounts for the live state of the nodes that would serve it, across edge and cloud.
+None of the surveyed systems both chooses among separate models per prompt and accounts for the live state of the nodes that would serve it, across edge and cloud.
+CLONE comes closest, since it mixes LoRA adapters per prompt and meets a latency target, but it does so for one model on one device.
 
 This thesis closes this gap by extending GreenServ's semantic bandit routing in two steps, each tied to the research questions of Chapter~\ref{chapter:introduction}.
 A telemetry-driven feasibility filter restricts the bandit to models that a node can hold and is expected to serve within the latency deadline, counting the time to load a model the node does not hold.

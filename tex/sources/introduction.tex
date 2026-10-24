@@ -16,8 +16,8 @@ In practice, models run on a limited set of GPU nodes whose load changes from se
 In this setting, a routing decision can be right for the prompt and still wrong for the system.
 Consider a router that has learned that hard math prompts are best answered by a large cloud model.
 Such prompts come, for example, from GSM8K \cite{gsm8k}, a benchmark of grade-school math word problems that need several reasoning steps.
-In GreenServ's measurements, the slowest pairs of model and GSM8K problem take up to about 38\,s.
-If three such queries are already waiting on the cloud node, the next one waits well over 100\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
+In GreenServ's measurements, a large cloud model such as Gemma 3 27B needs about 19\,s on average for such a problem.
+If three such queries are already waiting on the cloud node, the next one is answered only after about 75\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
 A router that cannot see the node's queue keeps choosing the large model, and every such query misses any reasonable deadline.
 The queue is not the only hidden cost: a node holds only the models that fit into its GPU memory, and if a model is not among them, its weights must be loaded first.
 This loading takes tens of seconds for the largest models.
@@ -55,6 +55,6 @@ Fourth, an empirical evaluation on this testbed that answers RQ1 (Section~\ref{s
 
 The remainder of this thesis is organised as follows.
 Chapter~\ref{chapter:relatedWork} surveys the adjacent topics LLM serving, prompt-aware routing, and dynamic resource allocation, and identifies the specific gap this work targets.
-Chapter~\ref{chapter:model} formalises the routing problem and describes the architecture.
+Chapter~\ref{chapter:model} formalises the routing problem, describes the architecture, and presents the demand-driven model placement.
 Chapter~\ref{chapter:evaluation} presents the experimental methodology and results.
 Chapter~\ref{chapter:conclusion} summarises the contributions and outlines directions for future work.
