@@ -131,7 +131,7 @@ For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman
 $$ \hat{R}_t^{(m)} = \hat{R}_{t-1}^{(m)} + K_t \big( R_t^{(m)} - \hat{R}_{t-1}^{(m)} \big), \qquad K_t = \frac{P_{t-1} + Q}{P_{t-1} + Q + D}, $$
 where the process noise $Q$ and observation noise $D$ are the only hyperparameters.
 After each update, the uncertainty of the prediction becomes $P_t = (1 - K_t)(P_{t-1} + Q)$, starting from $P_0$.
-The gain $K_t$ thus self-adjusts between $Q$ and $D$: it is large while the prediction is uncertain and settles at a constant value, which reduces the filter to a self-tuning exponential smoother.
+The gain $K_t$ thus adjusts itself: it is large while the prediction is uncertain and then settles at a constant value that depends only on the ratio of $Q$ and $D$. With the values of Table~\ref{tab:parameters}, it falls from about 0.5 to about 0.1. From then on, the filter works like an exponential smoother.
 The controller runs the same filter on the average latency that each node reports for each model.
 These per-(model, node) filters feed the latency-deviation rule below; they start at the first reported latency instead of zero.
 The predictions are compared against the current plan through the predicted load of each node
@@ -180,7 +180,9 @@ The second covers the requests that find no replica: each of them costs a load a
 The third counts new loads, each spread over a planning horizon $T_{plan}$.
 Loading a model therefore pays off roughly once one request for it is expected within $T_{plan}$.
 The constraints let a node serve a model only if it holds it, keep each node within its memory budget, and keep its load below $\theta_{up}$.
-When a model's demand exceeds what its nodes can serve, the program serves it partly, and the rest overflows to other nodes (Stage~1).
+When a model's demand exceeds what its nodes can serve, the program plans to serve only part of it.
+The dispatch step still sends all of the model's queries to its replicas, because the traffic shares are normalized (see below).
+Only when none of the replicas meets $T_{max}$ does another node of the tier take the query and load the model on demand (Stage~1).
 Loading nothing is always a valid solution, so the program is always feasible.
 A tiny bonus for keeping the current placement prevents changes between equally good plans.
 The program is solved with the HiGHS solver \cite{highs} in SciPy \cite{scipy}; for the testbed, it has a few dozen variables and takes well under a second.
