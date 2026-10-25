@@ -1,7 +1,7 @@
 \chapter{System Model}
 \label{chapter:model}
 
-The objective of this work is to dynamically orchestrate Large Language Model (LLM) inference tasks across an Edge-Cloud continuum.
+The objective of this work is to dynamically orchestrate Large Language Model (LLM) inference tasks across an edge-cloud continuum.
 The system pursues three goals: high accuracy, low latency, and an efficient use of the nodes' resources -- GPU time, memory and energy.
 Two decisions share these goals.
 For each query, a router selects the model and the node: it trades accuracy against energy, and it only considers models that are expected to meet a latency deadline under the current state of the hardware (Sections~\ref{sec:problem} and~\ref{sec:method}).
@@ -29,7 +29,7 @@ To ensure Quality of Service (QoS), the system should satisfy a latency deadline
 The latency of executing a query with model $m$ on node $n$ is estimated as
 $$ \hat{T}(m, n) = \delta_{\mathrm{tier}(n)} + L(m, n) + (W_n + 1) \cdot \bar{\tau}(m, n), $$
 the sum of a tier-dependent network delay $\delta$, the time $L(m, n)$ the query waits for a model load, and a queue-aware processing estimate:
-$W_n$ is the number of tasks waiting in node $n$'s queue and $\bar{\tau}(m, n)$ is the node's recent average inference latency for $m$, so a node that is currently overloaded - or that has historically been slow for $m$ - yields a correspondingly larger estimate.
+$W_n$ is the number of tasks waiting in node $n$'s queue and $\bar{\tau}(m, n)$ is the node's recent average inference latency for $m$, so a node that is currently overloaded -- or that has historically been slow for $m$ -- yields a correspondingly larger estimate.
 The load term is needed because a node holds only the models that fit into its memory budget: a task for any other model must wait until that model's weights are loaded into GPU memory.
 Let $\ell(m, n)$ be the time node $n$ needs to load $m$. It is the average of the node's last five loads of $m$. Before the first load, it is estimated as the size of $m$'s weights (2\,GB per billion parameters in bf16) divided by an assumed load speed $B$.
 With $B = 2$\,GB/s, this ranges from about 0.5\,s for the smallest to about 34\,s for the largest model of the pool, so a single load can exceed the deadline on its own.
@@ -64,11 +64,11 @@ The architecture bridges real-time hardware telemetry with semantic prompt analy
 \noindent
 The proposed architecture operates through the following sequential stages:
 
-\textbf{1. Telemetry and Feasibility Filtering:}
+\textbf{1. Telemetry and Feasibility Filtering.}
 Every edge and cloud node runs an inference worker that, in a background thread, publishes its current state to a shared store every few seconds: the length of its task queue $W_n$, its free GPU memory $G_n$, and its rolling average inference latency $\bar{\tau}(m, n)$ for every model it has executed.
 It also reports the models it holds in GPU memory, a model load in progress with the time it has been running, the average load time $\ell(m, n)$ and the memory $s_m$ of every model it has loaded, and its memory budget $S_n$.
 Each entry expires shortly after its last update, so nodes that stop reporting drop out automatically.
-To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the Edge tier. This allows it to be the initial point of contact and intercept incoming queries.
+To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the edge tier. This allows it to be the initial point of contact and intercept incoming queries.
 When query $q_t$ arrives, the scheduler reads the latest state of all nodes, prunes any node whose free GPU memory falls below $G_{min}$, and evaluates $\hat{T}(m, n)$ for every model on the surviving nodes of its tier that can hold it.
 Any model for which no such node meets $T_{max}$ is excluded, yielding the feasible set $M_t^*$.
 Once the allocation controller (Section~\ref{sec:allocation}) has made a plan, a model that has replicas in it is considered only on the nodes that hold it.
@@ -77,25 +77,25 @@ Models without replica are not restricted. If node $n$ has not yet executed $m$,
 This way, new nodes and untried models can still receive traffic. The filter is a best-effort mechanism built on estimates, not a hard guarantee: when no telemetry is available (e.g.\ at start-up) or no model is feasible, the scheduler does not reject the query.
 The bandit then chooses among all models, and the query is placed on a shared fallback queue of the chosen model's tier, which every node of that tier consumes after its own queue.
 
-\textbf{2. Semantic Context Extraction:}
+\textbf{2. Semantic Context Extraction.}
 Next, the incoming query $q_t$ is passed through a lightweight context generator.
 This module extracts key semantic features from the prompt to evaluate its complexity without performing full inference.
-Following the methodology established by GreenServ, the module extracts three specific features: Task Type, Semantic Cluster (via online $k$-means with $k = 3$ over sentence embeddings \cite{sbert}), and Text Complexity (via the Flesch Reading Ease formula \cite{flesch}, inverted so that higher values denote harder text and binned into the intervals $[0, 33)$, $[33, 67)$ and $[67, 100]$).
+Following the methodology established by GreenServ, the module extracts three specific features: task type, semantic cluster (via online $k$-means with $k = 3$ over sentence embeddings \cite{sbert}), and text complexity (via the Flesch Reading Ease formula \cite{flesch}, inverted so that higher values denote harder text and binned into the intervals $[0, 33)$, $[33, 67)$ and $[67, 100]$).
 As in GreenServ's own experiments, the task type is the label of the benchmark dataset a query is drawn from, which the client submits together with the query; a query without such a label receives an all-zero task-type component.
 GreenServ additionally describes a lightweight classifier for unlabeled queries, which is not used in this work.
 Each feature is one-hot encoded, and the three encodings are concatenated into the context vector $x_t \in \{0, 1\}^d$ with $d = 5 + 3 + 3 = 11$ (five task types, three clusters, three complexity bins).
 
-\textbf{3. Contextual Bandit Routing:}
-With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a Contextual Multi-Armed Bandit (MAB) algorithm to make the final routing decision.
+\textbf{3. Contextual Bandit Routing.}
+With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a contextual multi-armed bandit (MAB) algorithm to make the final routing decision.
 Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm \cite{linucb} is utilized. The algorithm assumes a linear relationship between the context $x_t$ and the expected reward of each model arm.
 LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models; models outside $M_t^*$ are masked by forcing their score to $-\infty$, so the bandit can only choose physically viable arms.
 The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if every model were loaded. The allocation controller plans with these choices (Section~\ref{sec:allocation}).
 The bandit decides \emph{which model} answers; a final dispatch step decides \emph{which node} executes it.
 Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler selects the node with the lowest estimate $\hat{T}(m_t, n)$ -- or, when the controller's plan has replicas of $m_t$, draws one of the replicas at random in proportion to its traffic shares $w_{m_t,n}$.
-Since $\hat{T}$ includes the load time, a node that would first have to load $m_t$ can fail the deadline check, and the lowest estimate favours nodes that already hold $m_t$.
+Since $\hat{T}$ includes the load time, a node that would first have to load $m_t$ can fail the deadline check, and the lowest estimate favors nodes that already hold $m_t$.
 The query is then enqueued to that node's dedicated task queue.
 
-\textbf{4. Execution and Policy Update (Feedback Loop):}
+\textbf{4. Execution and Policy Update (Feedback Loop).}
 The selected node executes the inference task: its worker loads $m_t$ if it is not already in GPU memory, after unloading its least recently used models if $m_t$ does not fit next to them -- first those outside the node's target placement (Section~\ref{sec:allocation}).
 The worker then generates the response with the generation settings of the query's task (e.g.\ a single output token for multiple-choice tasks), and measures the GPU energy of the generation step.
 Loading a model is not part of these measurements.
