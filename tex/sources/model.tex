@@ -13,7 +13,7 @@ In the background, a placement controller decides which models the nodes keep lo
 Consider a distributed computing environment consisting of a set of nodes $N$, comprising both resource-constrained edge nodes and high-capacity cloud nodes;
 $\mathrm{tier}(n)$ denotes whether node $n \in N$ belongs to the edge or the cloud tier.
 Let $M = \{m_1, m_2, \dots, m_K\}$ denote the heterogeneous pool of LLMs.
-Each model is assigned to one tier: a subset of smaller models $M_{edge} \subset M$ is only executed on edge nodes, while larger, high-precision models $M_{cloud} \subset M$ are only executed on cloud nodes.
+Each model is assigned to one tier, written $\mathrm{tier}(m)$: the smaller models $M_{edge} \subset M$ are only executed on edge nodes, and the larger, high-precision models $M_{cloud} = M \setminus M_{edge}$ only on cloud nodes.
 Nodes do not host a fixed set of models.
 A node keeps as many models in GPU memory as fit into its memory budget $S_n$, which is its GPU memory minus a headroom $H$ for activations and the KV cache.
 It loads the models that a placement controller assigns to it (Section~\ref{sec:allocation}), and any other model a task requests on demand.
