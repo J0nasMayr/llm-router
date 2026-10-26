@@ -12,7 +12,7 @@ In the background, a placement controller decides which models the nodes keep lo
 
 Consider a distributed computing environment consisting of a set of nodes $N$, comprising both resource-constrained edge nodes and high-capacity cloud nodes;
 $\mathrm{tier}(n)$ denotes whether node $n \in N$ belongs to the edge or the cloud tier.
-Let $M = \{m_1, m_2, \dots, m_K\}$ denote the heterogeneous pool of LLMs.
+Let $M$ denote the heterogeneous pool of $|M|$ LLMs.
 Each model is assigned to one tier, written $\mathrm{tier}(m)$: the smaller models $M_{edge} \subset M$ are only executed on edge nodes, and the larger, high-precision models $M_{cloud} = M \setminus M_{edge}$ only on cloud nodes.
 Nodes do not host a fixed set of models.
 A node keeps as many models in GPU memory as fit into its memory budget $S_n$, which is its GPU memory minus a headroom $H$ for activations and the KV cache.
@@ -23,7 +23,7 @@ The system processes a stream of user queries over time.
 At each discrete time step $t$, a user submits a query $q_t$.
 Upon arrival, the system must select exactly one model $m_t \in M$ to execute the inference, and one node of the model's tier to run it.
 In the background, the system also decides which models each node keeps loaded.
-That decision serves the latency and resource goals and is formulated in Section~\ref{sec:allocation}.
+That decision serves the latency goal and the efficient use of GPU time and memory, and is formulated in Section~\ref{sec:allocation}.
 
 To ensure Quality of Service (QoS), the system should satisfy a latency deadline $T_{max}$.
 The latency of executing a query with model $m$ on node $n$ is estimated as
@@ -42,6 +42,7 @@ This threshold is a coarse safety net against nodes close to running out of memo
 Here $s_m$ is the memory model $m$ took when the node last loaded it; before the first load, it is estimated as 2\,GB per billion parameters.
 A model is feasible if at least one surviving node of its tier can hold it and is expected to meet the deadline, which establishes a dynamic set of feasible models:
 $$ M_t^* = \{m \in M \mid \exists\, n \in N_t : \mathrm{tier}(n) = \mathrm{tier}(m) \,\wedge\, s_m \le S_n \,\wedge\, \hat{T}(m, n) \le T_{max}\} $$
+This extends the feasible set of GreenServ \cite{greenserv}, which bounds only the processing time of each model, with the node that runs the query, its queue and the time to load the model.
 For the selected model $m_t \in M_t^*$, the system observes an inference accuracy $Acc(m_t, q_t)$ and an energy cost $E(m_t, q_t)$.
 The routing problem is formulated as a multi-objective optimization task maximizing the scalarized reward $r_t$:
 $$ r_t = \alpha \cdot Acc(m_t, q_t) - \beta \cdot E(m_t, q_t) $$
@@ -136,11 +137,11 @@ A model that no node holds is often masked, so the bandit cannot choose it, its 
 Many masked models become feasible once the controller loads them or spreads their traffic over more replicas.
 The shadow demand also contains the exploration of the bandit, so a model the bandit wants to try can be loaded if the placement program finds it worthwhile.
 
-For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman} over its shadow request rate $R_t^{(m)}$ -- the number of queries whose shadow choice was $m$ since the previous evaluation, divided by the elapsed time, which is zero if there were none -- yielding the prediction
-$$ \hat{R}_t^{(m)} = \hat{R}_{t-1}^{(m)} + K_t \big( R_t^{(m)} - \hat{R}_{t-1}^{(m)} \big), \qquad K_t = \frac{P_{t-1} + Q}{P_{t-1} + Q + D}, $$
+For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman} over its shadow request rate $R_j^{(m)}$ at evaluation $j$ -- the number of queries whose shadow choice was $m$ since the previous evaluation, divided by the elapsed time, which is zero if there were none -- yielding the prediction
+$$ \hat{R}_j^{(m)} = \hat{R}_{j-1}^{(m)} + K_j \big( R_j^{(m)} - \hat{R}_{j-1}^{(m)} \big), \qquad K_j = \frac{P_{j-1} + Q}{P_{j-1} + Q + D}, $$
 where the process noise $Q$ and observation noise $D$ are the only hyperparameters.
-After each update, the uncertainty of the prediction becomes $P_t = (1 - K_t)(P_{t-1} + Q)$, starting from $P_0$.
-The gain $K_t$ thus adjusts itself: it is large while the prediction is uncertain and then settles at a constant value that depends only on the ratio of $Q$ and $D$. With the values of Table~\ref{tab:parameters}, it falls from about 0.5 to about 0.1. From then on, the filter works like an exponential smoother.
+After each update, the uncertainty of the prediction becomes $P_j = (1 - K_j)(P_{j-1} + Q)$, starting from $P_0$.
+The gain $K_j$ thus adjusts itself: it is large while the prediction is uncertain and then settles at a constant value that depends only on the ratio of $Q$ and $D$. With the values of Table~\ref{tab:parameters}, it falls from about 0.5 to about 0.1. From then on, the filter works like an exponential smoother.
 The controller runs the same filter on the average latency that each node reports for each model.
 These per-(model, node) filters feed the latency-deviation rule below; they start at the first reported latency instead of zero.
 The predictions are compared against the current plan through the predicted load of each node
@@ -186,7 +187,8 @@ and $y^0$ is the current placement, i.e.\ the last plan.
 
 All three terms of the objective are node time per second.
 The first is the inference time of the requests that replicas serve.
-The second covers the requests that find no replica: each of them costs a load and an inference.
+The second covers the requests that find no replica: each of them is counted as a load plus an inference.
+This is pessimistic, because the node that serves the first such request keeps the model loaded for later ones.
 The third counts new loads, each spread over a planning horizon $T_{plan}$.
 Loading a model therefore pays off roughly once one request for it is expected within $T_{plan}$.
 The constraints let a node serve a model only if it holds it, keep each node within its memory budget, and keep its load below $\theta_{up}$.
@@ -201,7 +203,7 @@ The program does not weigh accuracy against energy itself.
 Its demand is the shadow demand of the router, which already reflects how the router trades accuracy against energy.
 The program serves this demand with as little node time as possible, i.e.\ inference plus loading.
 Less node time means that queries wait less, and that GPU time and memory are spent on the models in demand.
-The program thus pursues the latency and resource goals, while the router pursues accuracy and energy (Section~\ref{sec:problem}).
+The program thus serves the latency goal and the efficient use of GPU time and memory, while the router weighs accuracy against energy (Section~\ref{sec:problem}).
 
 The solution gives the target placement of each node, its models sorted by demand, and the traffic shares $w_{m,n} = f_{m,n} / \sum_{n'} f_{m,n'}$ of each model over its replicas, which the dispatch step of Stage~3 uses.
 If the solver fails, the controller keeps the current placement and splits each model's traffic equally over the nodes that hold it.

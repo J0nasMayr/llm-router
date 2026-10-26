@@ -19,7 +19,7 @@ As a result, it also reduces carbon emissions.
 The framework decomposes its decisions into a hierarchy of controllers operating on different timescales, separating slow choices such as instance count from fast ones such as GPU frequency scaling.
 
 Finally, systems like NexusSched \cite{nexussched} look at the layer above and try to bridge the ``information gap'' between the central cluster router and the individual inference engines.
-Instead of relying on naive metrics like queue length, NexusSched uses forward-looking telemetry -- such as predicted latency and available KVC -- to make proactive routing decisions across the cluster.
+Instead of relying on naive metrics like queue length and average latency, NexusSched uses forward-looking telemetry -- such as predicted latency and available KVC -- to make proactive routing decisions across the cluster.
 The motivating insight is that these metrics lag behind the real load.
 A rolling average latency describes the last few seconds, not the current state.
 Also, the same queue length means very different delays on different GPU types.
