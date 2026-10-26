@@ -1,5 +1,7 @@
 # Step 3 revisited: from traffic shaping to model placement
 
+> **Note (2026-10-26):** sections 1–4 and 9–16 are historical. Names, numbers and the MILP have changed since; the thesis in `/tex` is authoritative. Sections 5–8 still hold open plans for the evaluation.
+
 ## 1. Verdict
 
 Yes, this makes sense for the thesis, under three conditions:
