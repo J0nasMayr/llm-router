@@ -5,7 +5,8 @@ Every prompt submitted to a generative Large Language Model (LLM) triggers an in
 It is important to realize that two prompts that look identical from the infrastructure's point of view may require vastly different capability:
 a simple factual question, such as naming a country's capital, is answered correctly by a small model in well under a second, while a multi-step reasoning task may only be solved by a model more than an order of magnitude larger.
 A provider that serves every prompt with its largest model therefore pays -- in energy and hardware time -- for capability most requests never use, while one that serves every prompt with a small model silently fails harder requests.
-No single model dominates across the full space of prompt complexities \cite{greenserv, frugalgpt, routellm}, which has motivated a growing body of work on \emph{routing} each prompt to the cheapest model expected to answer it well \cite{cargo, tagrouter, noft, irtrouter, lookahead, greenserv}.
+No single model dominates across the full space of prompt complexities \cite{greenserv, frugalgpt, routellm}, which has motivated a growing research area: \emph{routing} each prompt to the model that suits it best \cite{cargo, tagrouter, noft, irtrouter, lookahead, greenserv}.
+Several of these routers also prefer a cheaper model when it is expected to answer well enough \cite{tagrouter, noft, irtrouter, greenserv}.
 With generative AI already used by roughly 40\% of the U.S. working-age population \cite{Bick2024Rapid} and by nearly four-fifths of surveyed organizations \cite{McKinsey2025State}, the cost of these decisions accumulates over a very large number of requests.
 One such router is GreenServ \cite{greenserv}, the system this thesis builds on.
 GreenServ describes each prompt by its task type, its semantic cluster and its text complexity.
@@ -19,7 +20,7 @@ Such prompts come, for example, from GSM8K \cite{gsm8k}, a benchmark of grade-sc
 In GreenServ's measurements, a large cloud model such as Gemma 3 27B needs about 19\,s on average for such a problem.
 If three such queries are already waiting on the cloud node, the next one is answered only after about 75\,s, while an idle edge model could have answered much sooner at a somewhat lower expected accuracy.
 A router that cannot see the node's queue keeps choosing the large model, and every such query misses any reasonable deadline.
-The queue is not the only hidden cost: a node holds only the models that fit into its GPU memory, and if a model is not among them, its weights must be loaded first.
+The queue is not the only hidden cost: a node holds only the models that fit into its GPU memory, and if a model is not among them, its weights must be loaded first \cite{llm_serving_survey}.
 This loading takes tens of seconds for the largest models.
 
 This thesis addresses the following problem: \emph{given a pool of LLMs of different sizes, spread over edge and cloud nodes whose load changes at runtime, decide for each query which model answers and which node runs it, and decide which models each node keeps in GPU memory, such that the answers are accurate, arrive within a deadline, and use the GPU time, memory and energy of the nodes efficiently.}
@@ -30,7 +31,7 @@ In the background, a controller decides which models stay loaded, so that the mo
 Existing work covers parts of this problem, but not all of it (Chapter~\ref{chapter:relatedWork}).
 LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardware efficiently, but treat every prompt as an opaque job and never choose a cheaper model for an easy one.
 Prompt-aware routers choose a model per prompt but assume it is always available; GreenServ formulates a latency constraint but never enforces it.
-Dynamic allocation systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router, and react mainly to aggregate demand.
+Dynamic allocation systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router.
 
 To address this problem, this thesis extends GreenServ to the edge-cloud continuum.
 A lightweight telemetry-driven feasibility filter first prunes nodes and models that are not expected to meet the latency deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.

@@ -119,6 +119,7 @@ It writes the \emph{target placement} of each node, the list of models the node 
 The design adopts the lightweight trigger of HAS-GPU \cite{hasgpu} -- classical state-space estimation paired with simple threshold rules -- and a placement program in the spirit of the replica program of ENOVA \cite{enova} and the placement program of SageServe \cite{sageserve}.
 Unlike these systems, the controller plans with the demand of the router.
 The controller is optional: without it, each node keeps the models it has used most recently, i.e.\ it works as a least-recently-used (LRU) cache of models.
+LRU is a common eviction policy, but it is not always a good choice when models differ strongly in popularity or size \cite{llm_serving_survey}.
 
 \subsection{Shadow Demand and Trigger}
 
