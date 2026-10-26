@@ -31,7 +31,7 @@
 
 @misc{econoserve,
   author        = {Haiying Shen and Tanmoy Sen},
-  title         = {EconoServe: Maximizing Multi-Resource Utilization with {SLO} Guarantees in {LLM} Serving},
+  title         = {{EconoServe}: Maximizing Multi-Resource Utilization with {SLO} Guarantees in {LLM} Serving},
   year          = {2025},
   eprint        = {2411.06364},
   archiveprefix = {arXiv},
@@ -41,7 +41,7 @@
 
 @misc{dynamollm,
   author        = {Jovan Stojkovic and Chaojie Zhang and Inigo Goiri and Josep Torrellas and Esha Choukse},
-  title         = {DynamoLLM: Designing {LLM} Inference Clusters for Performance and Energy Efficiency},
+  title         = {{DynamoLLM}: Designing {LLM} Inference Clusters for Performance and Energy Efficiency},
   year          = {2024},
   eprint        = {2408.00741},
   archiveprefix = {arXiv},
@@ -60,8 +60,8 @@
 }
 
 @misc{greenserv,
-  author        = {Thomas Ziller and Shashikant Ilager and Ezio Bartocci and Leonardo Mariani and Alessandro Tundo and Ivona Brandic},
-  title         = {GreenServ: Energy-Efficient Context-Aware Dynamic Routing for Multi-Model {LLM} Inference},
+  author        = {Thomas Ziller and Shashikant Ilager and Alessandro Tundo and Ezio Bartocci and Leonardo Mariani and Ivona Brandic},
+  title         = {{GreenServ}: Energy-Efficient Context-Aware Dynamic Routing for Multi-Model {LLM} Inference},
   year          = {2026},
   eprint        = {2601.17551},
   archiveprefix = {arXiv},
@@ -69,9 +69,17 @@
   url           = {https://arxiv.org/abs/2601.17551}
 }
 
+@misc{greenserv_code,
+  author       = {Thomas Ziller and Shashikant Ilager and Alessandro Tundo and Ezio Bartocci and Leonardo Mariani and Ivona Brandic},
+  title        = {{llm-inference-router}: Source Code and Data of {GreenServ}},
+  year         = {2025},
+  howpublished = {GitHub repository, commit 8e055dd},
+  url          = {https://github.com/TZData1/llm-inference-router}
+}
+
 @misc{frugalgpt,
   author        = {Lingjiao Chen and Matei Zaharia and James Zou},
-  title         = {FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance},
+  title         = {{FrugalGPT}: How to Use Large Language Models While Reducing Cost and Improving Performance},
   year          = {2023},
   eprint        = {2305.05176},
   archiveprefix = {arXiv},
@@ -79,19 +87,21 @@
   url           = {https://arxiv.org/abs/2305.05176}
 }
 
-@misc{routellm,
+@inproceedings{routellm,
   author        = {Isaac Ong and Amjad Almahairi and Vincent Wu and Wei-Lin Chiang and Tianhao Wu and Joseph E. Gonzalez and M. Waleed Kadous and Ion Stoica},
-  title         = {RouteLLM: Learning to Route {LLM}s with Preference Data},
-  year          = {2024},
+  title         = {{RouteLLM}: Learning to Route {LLM}s with Preference Data},
+  booktitle     = {International Conference on Learning Representations (ICLR)},
+  year          = {2025},
   eprint        = {2406.18665},
   archiveprefix = {arXiv},
   primaryclass  = {cs.LG},
   url           = {https://arxiv.org/abs/2406.18665}
 }
 
-@misc{cargo,
+@inproceedings{cargo,
   author        = {Amine Barrak and Yosr Fourati and Michael Olchawa and Emna Ksontini and Khalil Zoghlami},
   title         = {{CARGO}: A Framework for Confidence-Aware Routing of Large Language Models},
+  booktitle     = {35th IEEE International Conference on Collaborative Advances in Software and Computing (CASCON)},
   year          = {2025},
   eprint        = {2509.14899},
   archiveprefix = {arXiv},
@@ -101,7 +111,7 @@
 
 @inproceedings{tagrouter,
   author    = {Zhou Chen and Zhiqiang Wei and Yuqi Bai and Xue Xiong and Jianmin Wu},
-  title     = {TagRouter: Learning Route to {LLM}s through Tags for Open-Domain Text Generation Tasks},
+  title     = {{TagRouter}: Learning Route to {LLM}s through Tags for Open-Domain Text Generation Tasks},
   booktitle = {Findings of the Association for Computational Linguistics: ACL 2025},
   year      = {2025},
   pages     = {21539--21564},
@@ -123,13 +133,15 @@
   title     = {{IRT}-Router: Effective and Interpretable Multi-{LLM} Routing via Item Response Theory},
   booktitle = {Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
   year      = {2025},
-  pages     = {15628--15644},
+  pages     = {15629--15644},
+  doi       = {10.18653/v1/2025.acl-long.761},
   url       = {https://aclanthology.org/2025.acl-long.761}
 }
 
-@misc{lookahead,
+@inproceedings{lookahead,
   author        = {Canbin Huang and Tianyuan Shi and Yuhua Zhu and Ruijun Chen and Xiaojun Quan},
   title         = {Lookahead Routing for Large Language Models},
+  booktitle     = {Advances in Neural Information Processing Systems (NeurIPS)},
   year          = {2025},
   eprint        = {2510.19506},
   archiveprefix = {arXiv},
@@ -171,20 +183,21 @@
 @inproceedings{hasgpu,
   author    = {Gu, Jianfeng
                and Wang, Puxuan
-               and David N{\'u}{\~{n}}ez Araya, Isaac
+               and N{\'u}{\~{n}}ez Araya, Isaac David
                and Huang, Kai
                and Gerndt, Michael},
   editor    = {Nagel, Wolfgang E.
                and Goehringer, Diana
                and Diniz, Pedro C.},
-  title     = {HAS-GPU: Efficient Hybrid Auto-scaling with Fine-Grained GPU Allocation for SLO-Aware Serverless Inferences},
+  title     = {{HAS-GPU}: Efficient Hybrid Auto-scaling with Fine-Grained {GPU} Allocation for {SLO}-Aware Serverless Inferences},
   booktitle = {Euro-Par 2025: Parallel Processing},
   year      = {2026},
   publisher = {Springer Nature Switzerland},
   address   = {Cham},
   pages     = {159--174},
   abstract  = {Serverless Computing (FaaS) has become a popular paradigm for deep learning inference due to the ease of deployment and pay-per-use benefits. However, current serverless inference platforms encounter the coarse-grained and static GPU resource allocation problems during scaling, which leads to high costs and Service Level Objective (SLO) violations in fluctuating workloads. Meanwhile, current platforms only support horizontal scaling for GPU inferences, thus the cold start problem further exacerbates the problems. In this paper, we propose HAS-GPU, an efficient Hybrid Auto-scaling Serverless architecture with fine-grained GPU allocation for deep learning inferences. HAS-GPU proposes an agile scheduler capable of allocating GPU Streaming Multiprocessor (SM) partitions and time quotas with arbitrary granularity and enables significant vertical quota scalability at runtime. To resolve performance uncertainty introduced by massive fine-grained resource configuration spaces, we propose the Resource-aware Performance Predictor (RaPP). Furthermore, we present an adaptive hybrid auto-scaling algorithm with both horizontal and vertical scaling to ensure inference SLOs and minimize GPU costs. The experiments demonstrated that compared to the mainstream serverless inference platform, HAS-GPU reduces function costs by an average of 10.8x with better SLO guarantees. Compared to state-of-the-art spatio-temporal GPU sharing serverless framework, HAS-GPU reduces function SLO violation by 4.8x and cost by 1.72x on average.},
-  isbn      = {978-3-031-99854-6}
+  isbn      = {978-3-031-99854-6},
+  doi       = {10.1007/978-3-031-99854-6_11}
 }
 
 @techreport{llm_serving_survey,
@@ -240,6 +253,18 @@
   volume    = {28},
   pages     = {1693--1701},
   year      = {2015}
+}
+
+@inproceedings{see2017,
+  author    = {Abigail See and Peter J. Liu and Christopher D. Manning},
+  title     = {Get To The Point: Summarization with Pointer-Generator Networks},
+  booktitle = {Proceedings of the 55th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages     = {1073--1083},
+  publisher = {Association for Computational Linguistics},
+  address   = {Vancouver, Canada},
+  year      = {2017},
+  doi       = {10.18653/v1/P17-1099},
+  url       = {https://aclanthology.org/P17-1099}
 }
 
 @inproceedings{rouge,

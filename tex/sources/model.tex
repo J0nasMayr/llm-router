@@ -30,6 +30,8 @@ The latency of executing a query with model $m$ on node $n$ is estimated as
 $$ \hat{T}(m, n) = \delta_{\mathrm{tier}(n)} + L(m, n) + (W_n + 1) \cdot \bar{\tau}(m, n), $$
 the sum of a tier-dependent network delay $\delta$, the time $L(m, n)$ the query waits for a model load, and a queue-aware processing estimate:
 $W_n$ is the number of tasks waiting in node $n$'s queue and $\bar{\tau}(m, n)$ is the node's recent average inference latency for $m$, so a node that is currently overloaded -- or that has historically been slow for $m$ -- yields a correspondingly larger estimate.
+Since $\bar{\tau}(m, n)$ is measured per node, the estimate also accounts for nodes with different GPUs.
+Like the metrics NexusSched \cite{nexussched} criticizes, however, $\bar{\tau}(m, n)$ lags behind the real load; the filter accepts this, since it is a best-effort mechanism (Section~\ref{sec:method}).
 The load term is needed because a node holds only the models that fit into its memory budget: a task for any other model must wait until that model's weights are loaded into GPU memory.
 Let $\ell(m, n)$ be the time node $n$ needs to load $m$. It is the average of the node's last five loads of $m$. Before the first load, it is estimated as the size of $m$'s weights (2\,GB per billion parameters in bf16) divided by an assumed load speed $B$.
 With $B = 2$\,GB/s, this ranges from about 0.5\,s for the smallest to about 34\,s for the largest model of the pool, so a single load can exceed the deadline on its own.
@@ -46,10 +48,12 @@ $$ r_t = \alpha \cdot Acc(m_t, q_t) - \beta \cdot E(m_t, q_t) $$
 where $\alpha$ and $\beta$ are weighting parameters that specify the trade-off between output quality and energy efficiency.
 $Acc$ is the quality metric of the query's task.
 For the multiple-choice tasks and GSM8K, it is exact match after extracting the answer letter or the final numeric answer; for summarization, it is a simplified ROUGE-1 recall \cite{rouge}, the fraction of distinct words of the reference summary that also appear in the generated one.
-Following GreenServ, $E$ is the GPU energy consumed per processed (input and output) token. Both terms are normalized to $[0, 1]$ per task type before being combined, so the bandit always compares arms on the same scale regardless of the units of accuracy and energy.
-The normalization uses fixed minimum and maximum values obtained from GreenServ's offline profiling of the same model pool; values outside these bounds are clamped, and a query without a known task type receives the neutral value $0.5$ for both terms.
+As in GreenServ's released code \cite{greenserv_code}, $E$ is the GPU energy consumed per processed (input and output) token. The GreenServ paper itself defines the energy per query. Both terms are normalized to $[0, 1]$ per task type before being combined, so the bandit always compares arms on the same scale regardless of the units of accuracy and energy.
+The normalization uses fixed minimum and maximum values obtained from GreenServ's offline profiling of the same model pool \cite{greenserv_code}; values outside these bounds are clamped, and a query without a known task type receives the neutral value $0.5$ for both terms.
 The implementation computes the energy term in its efficiency form, $r_t = \alpha \cdot Acc + \beta \cdot (1 - E)$, which differs from the formulation above only by the additive constant $\beta$ and therefore induces the same preference ordering over models.
-With $\alpha = 1 - \lambda$ and $\beta = \lambda$, this is exactly GreenServ's single-parameter reward with trade-off weight $\lambda$; this work uses $\alpha = \beta = 0.5$, i.e.\ GreenServ's default $\lambda = 0.5$.
+With $\alpha = 1 - \lambda$ and $\beta = \lambda$, this is exactly GreenServ's single-parameter reward with trade-off weight $\lambda$.
+This work uses $\alpha = \beta = 0.5$, i.e.\ $\lambda = 0.5$, the default in GreenServ's released code \cite{greenserv_code}.
+The main experiments of the GreenServ paper use $\lambda = 0.4$.
 Computing $Acc$ requires a reference answer, which the benchmark workloads used in this thesis provide; queries without a reference are routed normally but do not update the routing policy.
 Because the true accuracy and energy consumption are only observed for the selected model after execution, the system must continuously learn the optimal routing policy online.
 
@@ -81,8 +85,10 @@ The bandit then chooses among all models, and the query is placed on a shared fa
 Next, the incoming query $q_t$ is passed through a lightweight context generator.
 This module extracts key semantic features from the prompt to evaluate its complexity without performing full inference.
 Following the methodology established by GreenServ, the module extracts three specific features: task type, semantic cluster (via online $k$-means with $k = 3$ over sentence embeddings \cite{sbert}), and text complexity (via the Flesch Reading Ease formula \cite{flesch}, inverted so that higher values denote harder text and binned into the intervals $[0, 33)$, $[33, 67)$ and $[67, 100]$).
-As in GreenServ's own experiments, the task type is the label of the benchmark dataset a query is drawn from, which the client submits together with the query; a query without such a label receives an all-zero task-type component.
-GreenServ additionally describes a lightweight classifier for unlabeled queries, which is not used in this work.
+The GreenServ paper obtains the task type with a logistic-regression classifier on embeddings of the prompt's instruction.
+Its released experiment code, however, uses the label of the benchmark dataset a query is drawn from \cite{greenserv_code}.
+This work does the same: the client submits the dataset label together with the query, and a query without such a label receives an all-zero task-type component.
+The classifier is not used.
 Each feature is one-hot encoded, and the three encodings are concatenated into the context vector $x_t \in \{0, 1\}^d$ with $d = 5 + 3 + 3 = 11$ (five task types, three clusters, three complexity bins).
 
 \textbf{3. Contextual Bandit Routing.}
@@ -147,7 +153,7 @@ A new plan is triggered when any of the following rules fires, all gated by a si
     \item \textbf{Latency deviation:} the average latency of a (model, node) pair most recently reported by the node -- a rolling mean over its last executions of the model -- exceeds the pair's own Kalman prediction by more than $\kappa$ standard deviations of its recent residuals -- the pair is misbehaving relative to its history. The rule becomes active after a few observations, and the standard deviation is floored at a fraction of the prediction so that a perfectly stable history does not make the threshold unreachable.
     \item \textbf{Memory pressure:} a node's free GPU memory $G_n$ falls below $G_{min}$ -- the node can no longer safely host additional work.
 \end{itemize}
-The scale-up and scale-down rules follow HAS-GPU, whose request-rate-only trigger suffices for homogeneous serverless functions.
+The scale-up and scale-down rules follow HAS-GPU, whose trigger looks only at the request rate and was built for serverless deep-learning functions.
 HAS-GPU compares the predicted rate of each function with the summed capacity of its pods, because each pod has its own share of the GPU.
 Here, the models on a node share its time, so the rules compare the load of each node instead.
 A check per model would miss a node that two models overload together, because each model on its own stays below the limit.
@@ -161,7 +167,7 @@ The thresholds $\theta_{up}$ and $\theta_{down}$ are deliberately far apart ($\t
 Since one cooldown gates every rule, the controller reacts to rising and falling load at the same pace, at most once per $T_{cool}$.
 
 The first plan is made as soon as telemetry is available.
-Its demand is a prior: the share of GreenServ's 2,500 profiled queries for which each model gives the highest reward at $\lambda = 0.5$, scaled to an assumed total request rate.
+Its demand is a prior: the share of GreenServ's 2,500 profiled queries \cite{greenserv_code} for which each model gives the highest reward at $\lambda = 0.5$, scaled to an assumed total request rate.
 A fixed placement, used as a baseline in Chapter~\ref{chapter:evaluation}, keeps this first plan.
 
 \subsection{Placement Program}
@@ -240,7 +246,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
         -- & Telemetry publish interval / expiry & 5\,s / 16\,s \\
         \midrule
         \multicolumn{3}{l}{\emph{Reward and bandit}} \\
-        $\alpha$, $\beta$ & Reward weights (equivalent to GreenServ's $\lambda = 0.5$) & 0.5, 0.5 \\
+        $\alpha$, $\beta$ & Reward weights (equivalent to $\lambda = 0.5$ in GreenServ's reward) & 0.5, 0.5 \\
         $\alpha_{UCB}$ & LinUCB exploration weight & 1.0 \\
         -- & LinUCB ridge regularization & 1.0 \\
         \midrule

@@ -9,11 +9,13 @@ BROS \cite{bros} distinguishes between latency-critical (RT) requests and throug
 EconoServe \cite{econoserve} instead splits every request into its two phases: a prompt processing task (PT) and a token generation task (GT).
 An important aspect of optimization in these systems is advanced Key-Value Cache (KVC) handling.
 BROS designs a bidirectional KVC management mechanism to best fit hybrid RT and BE requests, while EconoServe maintains separate queues for PTs and GTs and designs its own KVC pipelining method.
-Because LLM inference is dominated by decoding, the KVC -- not raw compute -- is what most often caps throughput, which explains why both systems invest so heavily in cache-level optimization.
+Both papers name the KVC as a main bottleneck of LLM serving \cite{bros, econoserve}.
+This explains why both systems invest so heavily in cache-level optimization.
 
 Beyond memory, energy consumption has emerged as a critical serving constraint.
 DynamoLLM \cite{dynamollm} introduces a broad energy-management framework that dynamically reconfigures the number of active instances, model parallelism, and GPU frequencies in response to fluctuating workloads.
-This allows the system to minimize power consumption and carbon emissions while strictly satisfying latency constraints.
+This allows the system to minimize energy use and cost while meeting its latency targets.
+As a result, it also reduces carbon emissions.
 The framework decomposes its decisions into a hierarchy of controllers operating on different timescales, separating slow choices such as instance count from fast ones such as GPU frequency scaling.
 
 Finally, systems like NexusSched \cite{nexussched} look at the layer above and try to bridge the ``information gap'' between the central cluster router and the individual inference engines.
@@ -24,7 +26,9 @@ Also, the same queue length means very different delays on different GPU types.
 NexusSched therefore replaces reactive load balancing with predictive scheduling that anticipates bottlenecks before they appear.
 
 However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they treat every prompt as an opaque job: lacking any semantic awareness, they never answer an easy prompt with a smaller, cheaper model.
-Disregarding this optimization possibility means ignoring one of the largest efficiency levers available.
+Disregarding this possibility means ignoring a large efficiency lever.
+For example, GreenServ uses 64\% less energy than always using the largest model, while reaching a higher accuracy \cite{greenserv}.
+FrugalGPT matches the best single model at up to 98\% lower cost \cite{frugalgpt}.
 
 
 \section{Prompt-Aware LLM Routing}
@@ -34,7 +38,8 @@ Here, the choice between models of different sizes and specializations is made.
 This choice is a major factor in the trade-off between resource consumption and inference accuracy \cite{greenserv, frugalgpt, routellm}.
 
 The most logical and the most studied approach is to make this choice by inspecting/analyzing the input prompt and route based on its features.
-CARGO \cite{cargo} embeds the prompt and uses a single regression model to predict how well each LLM will answer it; if the two best LLMs are close, a small classifier decides between them.
+CARGO \cite{cargo} embeds the prompt and uses a single regression model to predict how well each LLM will answer it.
+If the two best LLMs are close, both answer, and a small classifier picks the better answer.
 Judge LLMs are only needed to label its training data: they compare the answers of several LLMs to the same prompts.
 TagRouter \cite{tagrouter} lets a small fine-tuned LLM generate semantic tags for each prompt.
 The model that has historically done best on these tags then does the inference.
@@ -52,7 +57,8 @@ The semantic cluster groups the query by topic or domain.
 And the text complexity describes how complex the prompt itself is.
 After this, the reinforcement learning concept contextual multi-armed bandit is used to create a router that is learning continuously and online.
 The features of the prompt are fed into the router, the bandit selects a model and lastly updates its preferences based on the received reward.
-Although GreenServ learns online which model best balances accuracy and energy for a prompt, it assumes a single cloud in which every model is always available, and its latency constraint is formulated but never enforced.
+Although GreenServ learns online which model best balances accuracy and energy for a prompt, it assumes a single GPU server on which every model is always available.
+Its latency constraint is formulated, but its released code never checks it \cite{greenserv_code}.
 It is therefore the natural starting point for this thesis, and the main baseline it is evaluated against.
 
 However, although these routers choose the best model for each prompt, they assume that model is always available: none of them checks whether the chosen model is loaded on any node and can answer in time on the current hardware state.
@@ -88,7 +94,7 @@ The authors report up to 25\% GPU-hour savings against the production baseline.
 They optimize routing and placement together, instead of as separate problems.
 
 A complementary line of work keeps the placement fixed and adapts the resources of a single device at runtime.
-CLONE \cite{clone} prunes a single LLM for a single edge device and recovers its accuracy with LoRA, offline.
+CLONE \cite{clone} prunes a single LLM for a single edge device, offline, and trains one LoRA adapter per task on top of it.
 At runtime, a learned controller sets the voltage and frequency of the device per layer, so that the model meets a latency target with little energy, and a router mixes LoRA adapters for each prompt.
 While not a cross-model allocation system, it is the natural counterpart on the edge tier:
 where ENOVA and SageServe ask which model lives on which GPU, CLONE asks how much capacity a fixed (model, GPU) pair can be made to yield.
@@ -130,7 +136,7 @@ Table~\ref{tab:related_work_summary} lists the surveyed work and positions this 
 \midrule
 BROS \cite{bros} & Serving & No, Yes, Yes & Implements a bidirectional KVC allocation strategy that dynamically shares cache blocks between latency-critical and throughput-oriented requests. & None (Treats requests as generic computational loads). \\
 
-EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues for prompt processing and token generation. A KVC pipelining technique lets requests share KVC space that is allocated but not yet used. & None. \\
+EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues for prompt processing and token generation. A KVC pipelining technique lets requests share KVC space that is allocated but not yet used. & Predicts the response length to batch requests; no semantic analysis. \\
 
 DynamoLLM \cite{dynamollm} & Serving & No, Yes, Yes & Employs hierarchical controllers to dynamically scale active instances, model parallelism, and GPU frequencies based on traffic. & Workload profiling (Analyzes request lengths and arrival rates, but lacks semantic awareness). \\
 
@@ -140,13 +146,13 @@ CARGO \cite{cargo} & Routing & Yes, No, No & Uses LLM judges to label which answ
 
 TagRouter \cite{tagrouter} & Routing & Yes, No, Yes & Maps incoming queries to specific models that have historically performed best for the identified semantic tags. & Generates open-ended semantic tags with a small fine-tuned LLM before inference. \\
 
-Marinelli et al. \cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Analyzes prompt metadata to estimate the required ``Number of Thoughts'' (reasoning complexity). \\
+Marinelli et al. \cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Estimates the required ``Number of Thoughts'' (reasoning complexity) from TF-IDF features of the prompt text. \\
 
 IRT-Router \cite{irtrouter} & Routing & Yes, No, Yes & Applies Item Response Theory (IRT) to mathematically model both the latent abilities of 20 LLMs and the difficulty of incoming prompts. & Embeds the prompt and estimates its difficulty and the abilities it needs (25 dimensions). \\
 
 Lookahead \cite{lookahead} & Routing & Yes, No, No & Trains a small language model to predict a representation of each candidate model's answer, and routes based on these predictions. No candidate model runs before routing. & Encodes the prompt with a small causal or masked language model (SmolLM2, ModernBERT). \\
 
-GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a contextual multi-armed bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. Formulates a latency constraint, but does not enforce it. & Extracts task type, semantic cluster (via embeddings), and text complexity (Flesch Reading Ease). \\
+GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a contextual multi-armed bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. Formulates a latency constraint, but its released code does not check it \cite{greenserv_code}. & Extracts task type, semantic cluster (via embeddings), and text complexity (Flesch Reading Ease). \\
 
 ENOVA \cite{enova} & Allocation & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
 
@@ -154,7 +160,7 @@ HAS-GPU \cite{hasgpu} & Allocation & No, Yes, Yes & Scales serverless GPU functi
 
 SageServe \cite{sageserve} & Allocation & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
 
-CLONE \cite{clone} & Allocation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and recovers its accuracy with LoRA (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
+CLONE \cite{clone} & Allocation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and trains one LoRA adapter per task (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
 
 \textbf{This work} & \textbf{Routing, Serving \& Allocation} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
 \bottomrule
