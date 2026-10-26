@@ -122,7 +122,8 @@ The pipeline above decides, per query, which model answers and which node runs i
 It takes as given which models the nodes hold in GPU memory.
 A background \emph{placement controller} closes this loop.
 It decides which models each node keeps loaded -- the \emph{placement} -- and how each model's traffic is split across the nodes that hold it.
-The controller consumes the same telemetry as Stage~1, evaluates a set of trigger rules at a fixed interval, and makes a new plan whenever a rule fires.
+The controller consumes the same telemetry as Stage~1.
+Every $T_{eval} = 5$\,s, it updates its predictions and evaluates a set of trigger rules, and it makes a new plan whenever a rule fires.
 It writes the \emph{target placement} of each node, the list of models the node should keep loaded, to the shared store, and the nodes follow it.
 The design adopts the lightweight trigger of HAS-GPU \cite{hasgpu} -- classical state-space estimation paired with simple threshold rules -- and a placement program in the spirit of the replica program of ENOVA \cite{enova} and the placement program of SageServe \cite{sageserve}.
 Unlike these systems, the controller plans with the demand of the router.
@@ -137,16 +138,20 @@ A model that no node holds is often masked, so the bandit cannot choose it, its 
 Many masked models become feasible once the controller loads them or spreads their traffic over more replicas.
 The shadow demand also contains the exploration of the bandit, so a model the bandit wants to try can be loaded if the placement program finds it worthwhile.
 
-For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman} over its shadow request rate $R_j^{(m)}$ at evaluation $j$ -- the number of queries whose shadow choice was $m$ since the previous evaluation, divided by the elapsed time, which is zero if there were none -- yielding the prediction
+For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman} over its shadow request rate $R_j^{(m)}$ at the $j$-th evaluation -- the number of queries whose shadow choice was $m$ since the previous evaluation, divided by the elapsed time, which is zero if there were none -- yielding the prediction
 $$ \hat{R}_j^{(m)} = \hat{R}_{j-1}^{(m)} + K_j \big( R_j^{(m)} - \hat{R}_{j-1}^{(m)} \big), \qquad K_j = \frac{P_{j-1} + Q}{P_{j-1} + Q + D}, $$
 where the process noise $Q$ and observation noise $D$ are the only hyperparameters.
 After each update, the uncertainty of the prediction becomes $P_j = (1 - K_j)(P_{j-1} + Q)$, starting from $P_0$.
 The gain $K_j$ thus adjusts itself: it is large while the prediction is uncertain and then settles at a constant value that depends only on the ratio of $Q$ and $D$. With the values of Table~\ref{tab:parameters}, it falls from about 0.5 to about 0.1. From then on, the filter works like an exponential smoother.
-The controller runs the same filter on the average latency that each node reports for each model.
-These per-(model, node) filters feed the latency-deviation rule below; they start at the first reported latency instead of zero.
-The predictions are compared against the current plan through the predicted load of each node
-$$ \rho_n = \sum_{m} \hat{R}^{(m)} \, w_{m,n} \, \bar{\tau}(m, n), $$
-the fraction of its time node $n$ needs for the queries the plan sends to it. The sum runs over the models of which $n$ holds a replica in the plan, and $w_{m,n}$ are the traffic shares defined below.
+The controller checks whether the current plan still fits these predicted rates.
+For this, it computes the predicted load of each node:
+$$ \rho_n = \sum_{m} \hat{R}^{(m)} \, w_{m,n} \, \bar{\tau}(m, n). $$
+Here, $\hat{R}^{(m)} \, w_{m,n}$ is the number of queries per second that the plan sends to node $n$ for model $m$, and $\bar{\tau}(m, n)$ is the time each of them takes.
+So the predicted load $\rho_n$ is the fraction of its time that node $n$ is predicted to be busy; for example, $\rho_n = 0.6$ means 60\%.
+
+Besides the rate filters, the controller keeps a second set of Kalman filters, one for each (model, node) pair.
+Each of them smooths the average latency $\bar{\tau}(m, n)$ that the node reports, starting at the first reported value instead of zero.
+These latency filters are used only by the latency-deviation rule below: their prediction is the pair's normal latency, which the rule compares with the newest report.
 
 A new plan is triggered when any of the following rules fires, all gated by a single cooldown interval $T_{cool}$ to suppress oscillation:
 \begin{itemize}
@@ -163,8 +168,10 @@ Here, the models on a node share its time, so the rules compare the load of each
 A check per model would miss a node that two models overload together, because each model on its own stays below the limit.
 Since $\theta_{up}$ is also the load limit of the placement program (Section~\ref{sec:placement-program}), scale-up fires when the current plan no longer meets that limit.
 If the demand exceeds what the nodes can serve, the rule keeps firing once per $T_{cool}$, and the program keeps its plan.
-For heterogeneous LLM routing, rules based on request rates are insufficient on their own: per-request cost varies by orders of magnitude with prompt length, the bandit shifts load between small edge models and large cloud models at constant arrival rate, and long-context requests can exhaust GPU memory at low request rates.
-The latency-deviation and memory-pressure rules extend the trigger to cover exactly these cases.
+For heterogeneous LLM routing, request rates alone are not enough: the cost of a request varies with the model and the output length, the bandit shifts load between small edge models and large cloud models at a constant arrival rate, and long-context requests can exhaust GPU memory at low request rates.
+The scale-up and scale-down rules handle the first two cases, because $\rho_n$ weighs each model's rate by its latency: a shift towards large models raises $\rho_n$ even when the arrival rate stays the same.
+The latency-deviation rule makes a new plan when a (model, node) pair becomes much slower than its history, even if no node is overloaded, so that the traffic shares follow the new latencies.
+The memory-pressure rule covers the third case.
 The placement rule is needed because a model may have no replica at all, while HAS-GPU always keeps at least one instance of each function.
 Its threshold is the break-even of the placement program below, about one request per planning horizon $T_{plan}$, so the rule fires whenever the program might decide to load the model.
 The thresholds $\theta_{up}$ and $\theta_{down}$ are deliberately far apart ($\theta_{up} = 0.85$, $\theta_{down} = 0.5$): this prevents the controller from alternating between scale-up and scale-down decisions when demand hovers around a single threshold.
@@ -256,7 +263,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
         -- & LinUCB ridge regularization & 1.0 \\
         \midrule
         \multicolumn{3}{l}{\emph{Placement controller}} \\
-        -- & Trigger evaluation interval & 5\,s \\
+        $T_{eval}$ & Trigger evaluation interval & 5\,s \\
         $Q$, $D$ & Kalman process / observation noise & 0.01, 1.0 \\
         $\hat{R}_0$, $P_0$ & Initial Kalman state and uncertainty; the latency filters start at the first reported latency & 0, 1 \\
         $\theta_{up}$, $\theta_{down}$ & Scale-up / scale-down thresholds on the predicted load of a node; $\theta_{up}$ is also the load limit of the placement program & 0.85, 0.5 \\
