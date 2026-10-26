@@ -4,7 +4,7 @@
 % TODO: This chapter is a methodology skeleton. Fill in testbed specifics,
 % figures, and measured numbers once the experiments have been run.
 
-This chapter answers the three research questions of Chapter~\ref{chapter:introduction}: whether tele\-metry-driven feasibility filtering reduces SLA violations (RQ1, Section~\ref{sec:eval-filter}), what restricting the choice to feasible models costs in accuracy and energy compared to GreenServ and simple baselines (RQ2, Section~\ref{sec:eval-routing}), and whether adapting which models each node keeps loaded to the router's demand reduces deadline violations (RQ3, Section~\ref{sec:eval-allocation}). Each question is answered by comparing the full system with variants that disable or replace the corresponding component. Together, the questions cover the three goals of Chapter~\ref{chapter:model}: RQ1 and RQ3 latency, and RQ2 accuracy and energy. For RQ3, the evaluation also reports how often the nodes load a model and how long this takes, which shows how the nodes use their GPU time and memory.
+This chapter answers the three research questions of Chapter~\ref{chapter:introduction}: whether tele\-metry-driven feasibility filtering reduces deadline violations (RQ1, Section~\ref{sec:eval-filter}), what restricting the choice to feasible models costs in accuracy and energy compared to GreenServ and simple baselines (RQ2, Section~\ref{sec:eval-routing}), and whether adapting which models each node keeps loaded to the router's demand reduces deadline violations (RQ3, Section~\ref{sec:eval-allocation}). Each question is answered by comparing the full system with variants that disable or replace the corresponding component. Together, the questions cover the three goals of Chapter~\ref{chapter:model}: RQ1 and RQ3 latency, and RQ2 accuracy and energy. For RQ3, the evaluation also reports how often the nodes load a model and how long this takes, which shows how the nodes use their GPU time and memory.
 
 \section{Experimental Setup}
 
@@ -16,7 +16,7 @@ The system is deployed on an edge-cloud testbed consisting of resource-constrain
 Queries are drawn from the five datasets underlying the task-type feature -- MMLU \cite{mmlu} (multiple-choice knowledge questions), GSM8K \cite{gsm8k} (math word problems), HellaSwag \cite{hellaswag} (sentence completion), WinoGrande \cite{winogrande} (commonsense reasoning) and CNN/DailyMail \cite{cnndm, see2017} (news summarization) --, interleaved to create a mixed stream. Each query is submitted with its dataset label and ground-truth reference, so the scheduler applies the dataset's answer extraction, quality metric and generation settings, and computes the reward online. % TODO: sample sizes, arrival process (open vs. closed loop), number of runs and seeds.
 
 \textbf{Metrics.}
-(i) SLA violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU during generation, without the energy of model loads (the reward itself uses energy per token, Section~\ref{sec:problem}); (iv) the scalarized reward $r_t$; (v) for the placement controller: trigger frequency, number of plans and placement changes, and the time to recover after the workload shifts; (vi) the number of model loads and the time spent on them, which the workers report with every result.
+(i) deadline violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU during generation, without the energy of model loads (the reward itself uses energy per token, Section~\ref{sec:problem}); (iv) the scalarized reward $r_t$; (v) for the placement controller: trigger frequency, number of plans and placement changes, and the time to recover after the workload shifts; (vi) the number of model loads and the time spent on them, which the workers report with every result.
 
 \textbf{Baselines.}
 (a) \emph{Largest-model}: every query to the most capable cloud model; (b) \emph{smallest-model}: every query to the cheapest edge model; (c) \emph{random routing}; (d) \emph{GreenServ-style}: the contextual bandit without feasibility filtering or placement control, i.e.\ routing as if every model ran on a single GPU server, as GreenServ assumes.
@@ -34,7 +34,7 @@ For RQ3, the full system is compared with three other ways to decide which model
 \section{Effect of the Feasibility Filter}
 \label{sec:eval-filter}
 % Ablation: full system vs. bandit-only routing (no Stage-1 filtering).
-% Load is increased until edge nodes saturate; report SLA violation rate and
+% Load is increased until edge nodes saturate; report deadline violation rate and
 % tail latency for both variants.
 % TODO: run and report.
 

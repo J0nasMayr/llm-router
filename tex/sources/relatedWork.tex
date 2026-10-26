@@ -62,7 +62,7 @@ Its latency constraint is formulated, but its released code never checks it \cit
 It is therefore the natural starting point for this thesis, and the main baseline it is evaluated against.
 
 However, although these routers choose the best model for each prompt, they assume that model is always available: none of them checks whether the chosen model is loaded on any node and can answer in time on the current hardware state.
-A decision that is right for the prompt can thus be unservable, and the resulting SLA violation is invisible to the router.
+A decision that is right for the prompt can thus be unservable, and the resulting deadline violation is invisible to the router.
 The same assumption also hides the option of serving a prompt from a nearby edge node instead.
 
 
@@ -122,7 +122,7 @@ CLONE comes closest, since it mixes LoRA adapters per prompt and meets a latency
 
 This thesis closes this gap by extending GreenServ's semantic bandit routing in two steps, each tied to the research questions of Chapter~\ref{chapter:introduction}.
 A telemetry-driven feasibility filter restricts the bandit to models that a node can hold and is expected to serve within the latency deadline, counting the time to load a model the node does not hold.
-The filter is evaluated for its effect on SLA violations (RQ1) and for what the restriction costs in accuracy and energy (RQ2).
+The filter is evaluated for its effect on deadline violations (RQ1) and for what the restriction costs in accuracy and energy (RQ2).
 A trigger-driven controller, combining HAS-GPU's trigger design with a placement program, decides which models each node keeps loaded, following the demand of the router;
 it is evaluated against on-demand loading, an LRU cache and a fixed placement (RQ3).
 Table~\ref{tab:related_work_summary} lists the surveyed work and positions this thesis against it.

@@ -43,3 +43,7 @@ tex/main.pdf
 # Claude Code local settings
 .claude/
 tmp_refs/
+
+
+# temporary files
+/tex/thesis-review.md
