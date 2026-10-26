@@ -224,7 +224,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
 \begin{figure}[htbp]
     \centering
     \input{figures/architecture}
-    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the placement controller (Section~\ref{sec:allocation}): the traffic shares used by the dispatch step, and the target placements that the nodes read from Redis. The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
+    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the placement controller (Section~\ref{sec:allocation}). The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
     \label{fig:architecture}
 \end{figure}
 
