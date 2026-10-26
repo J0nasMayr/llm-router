@@ -155,6 +155,7 @@ A new plan is triggered when any of the following rules fires, all gated by a si
     \item \textbf{Latency deviation:} the average latency of a (model, node) pair most recently reported by the node -- a rolling mean over its last executions of the model -- exceeds the pair's own Kalman prediction by more than $\kappa$ standard deviations of its recent residuals -- the pair is misbehaving relative to its history. The rule becomes active after a few observations, and the standard deviation is floored at a fraction of the prediction so that a perfectly stable history does not make the threshold unreachable.
     \item \textbf{Memory pressure:} a node's free GPU memory $G_n$ falls below $G_{min}$ -- the node can no longer safely host additional work.
 \end{itemize}
+Every rule only triggers a new plan; which models are loaded or unloaded is decided by the placement program below.
 The scale-up and scale-down rules follow HAS-GPU, whose trigger looks only at the request rate and was built for serverless deep-learning functions.
 HAS-GPU compares the predicted rate of each function with the summed capacity of its pods, because each pod has its own share of the GPU.
 Here, the models on a node share its time, so the rules compare the load of each node instead.
