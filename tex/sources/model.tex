@@ -5,7 +5,7 @@ The objective of this work is to dynamically orchestrate Large Language Model (L
 The system pursues three goals: high accuracy, answers within a latency deadline, and an efficient use of the nodes' resources -- GPU time, memory and energy.
 Two decisions share these goals.
 For each query, a router selects the model and the node: it trades accuracy against energy, and it only considers models that are expected to meet a latency deadline under the current state of the hardware (Sections~\ref{sec:problem} and~\ref{sec:method}).
-In the background, an allocation controller decides which models the nodes keep loaded: it keeps the models the router asks for in memory, so that queries rarely wait for a model load and the nodes spend their GPU time and memory on the models in demand (Section~\ref{sec:allocation}).
+In the background, a placement controller decides which models the nodes keep loaded: it keeps the models the router asks for in memory, so that queries rarely wait for a model load and the nodes spend their GPU time and memory on the models in demand (Section~\ref{sec:allocation}).
 
 \section{Problem Formulation}
 \label{sec:problem}
@@ -16,7 +16,7 @@ Let $M = \{m_1, m_2, \dots, m_K\}$ denote the heterogeneous pool of LLMs.
 Each model is assigned to one tier: a subset of smaller models $M_{edge} \subset M$ is only executed on edge nodes, while larger, high-precision models $M_{cloud} \subset M$ are only executed on cloud nodes.
 Nodes do not host a fixed set of models.
 A node keeps as many models in GPU memory as fit into its memory budget $S_n$, which is its GPU memory minus a headroom $H$ for activations and the KV cache.
-It loads the models that an allocation controller assigns to it (Section~\ref{sec:allocation}), and any other model a task requests on demand.
+It loads the models that a placement controller assigns to it (Section~\ref{sec:allocation}), and any other model a task requests on demand.
 When a new model does not fit, the node unloads the models it has used least recently until the new one fits, starting with those the controller has not assigned to it.
 
 The system processes a stream of user queries over time.
@@ -61,7 +61,7 @@ Because the true accuracy and energy consumption are only observed for the selec
 \section{Proposed Method}
 \label{sec:method}
 
-To solve the routing problem defined above, this thesis proposes a four-stage scheduling pipeline, complemented by a background allocation controller (Section~\ref{sec:allocation}) that decides which models each node keeps loaded and how each model's traffic is split across them.
+To solve the routing problem defined above, this thesis proposes a four-stage scheduling pipeline, complemented by a background placement controller (Section~\ref{sec:allocation}) that decides which models each node keeps loaded and how each model's traffic is split across them.
 Figure~\ref{fig:architecture} gives an overview.
 The architecture bridges real-time hardware telemetry with semantic prompt analysis to achieve resource-aware and prompt-aware inference.
 
@@ -75,7 +75,7 @@ Each entry expires shortly after its last update, so nodes that stop reporting d
 To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the edge tier. This allows it to be the initial point of contact and intercept incoming queries.
 When query $q_t$ arrives, the scheduler reads the latest state of all nodes, prunes any node whose free GPU memory falls below $G_{min}$, and evaluates $\hat{T}(m, n)$ for every model on the surviving nodes of its tier that can hold it.
 Any model for which no such node meets $T_{max}$ is excluded, yielding the feasible set $M_t^*$.
-Once the allocation controller (Section~\ref{sec:allocation}) has made a plan, a model that has replicas in it is considered only on the nodes that hold it.
+Once the placement controller (Section~\ref{sec:allocation}) has made a plan, a model that has replicas in it is considered only on the nodes that hold it.
 If none of them meets $T_{max}$, the other nodes of its tier serve as overflow and load the model on demand.
 Models without replica are not restricted. If node $n$ has not yet executed $m$, $\bar{\tau}(m, n)$ falls back to the node's average over the models it has served; a node that has served nothing yet reports zero, so only the network delay and the load time of the model count for it.
 This way, new nodes and untried models can still receive traffic. The filter is a best-effort mechanism built on estimates, not a hard guarantee: when no telemetry is available (e.g.\ at start-up) or no model is feasible, the scheduler does not reject the query.
@@ -96,7 +96,7 @@ Unlike GreenServ, which appends a constant 1 as a bias term ($d = 12$), this wor
 With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a contextual multi-armed bandit (MAB) algorithm to make the final routing decision.
 Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm \cite{linucb} is utilized. The algorithm assumes a linear relationship between the context $x_t$ and the expected reward of each model arm.
 LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models; models outside $M_t^*$ are masked by forcing their score to $-\infty$, so the bandit can only choose physically viable arms.
-The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if every model were loaded. The allocation controller plans with these choices (Section~\ref{sec:allocation}).
+The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if every model were loaded. The placement controller plans with these choices (Section~\ref{sec:allocation}).
 The bandit decides \emph{which model} answers; a final dispatch step decides \emph{which node} executes it.
 Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler selects the node with the lowest estimate $\hat{T}(m_t, n)$ -- or, when the controller's plan has replicas of $m_t$, draws one of the replicas at random in proportion to its traffic shares $w_{m_t,n}$.
 Since $\hat{T}$ includes the load time, a node that would first have to load $m_t$ can fail the deadline check, and the lowest estimate favors nodes that already hold $m_t$.
@@ -119,7 +119,7 @@ This continuous feedback loop lets the scheduler adapt to distribution shifts in
 
 The pipeline above decides, per query, which model answers and which node runs it.
 It takes as given which models the nodes hold in GPU memory.
-A background \emph{allocation controller} closes this loop.
+A background \emph{placement controller} closes this loop.
 It decides which models each node keeps loaded -- the \emph{placement} -- and how each model's traffic is split across the nodes that hold it.
 The controller consumes the same telemetry as Stage~1, evaluates a set of trigger rules at a fixed interval, and makes a new plan whenever a rule fires.
 It writes the \emph{target placement} of each node, the list of models the node should keep loaded, to the shared store, and the nodes follow it.
@@ -222,7 +222,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
 \begin{figure}[htbp]
     \centering
     \input{figures/architecture}
-    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the allocation controller (Section~\ref{sec:allocation}): the traffic shares used by the filter and the dispatch step, and the target placements that the nodes read from Redis. The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
+    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the placement controller (Section~\ref{sec:allocation}): the traffic shares used by the filter and the dispatch step, and the target placements that the nodes read from Redis. The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
     \label{fig:architecture}
 \end{figure}
 
@@ -251,7 +251,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
         $\alpha_{UCB}$ & LinUCB exploration weight & 1.0 \\
         -- & LinUCB ridge regularization & 1.0 \\
         \midrule
-        \multicolumn{3}{l}{\emph{Allocation controller}} \\
+        \multicolumn{3}{l}{\emph{Placement controller}} \\
         -- & Trigger evaluation interval & 5\,s \\
         $Q$, $D$ & Kalman process / observation noise & 0.01, 1.0 \\
         $\hat{R}_0$, $P_0$ & Initial Kalman state and uncertainty; the latency filters start at the first reported latency & 0, 1 \\

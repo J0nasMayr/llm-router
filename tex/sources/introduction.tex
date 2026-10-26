@@ -33,13 +33,13 @@ Existing work covers parts of this problem, but not all of it (Chapter~\ref{chap
 LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardware efficiently, but look at a prompt at most to estimate its length, and never choose a cheaper model for an easy one.
 Prompt-aware routers choose a model per prompt but assume it is always available.
 GreenServ formulates a latency constraint, but its released code never checks it \cite{greenserv_code}.
-Dynamic allocation systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router.
+Autoscaling and placement systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router.
 
 To address this problem, this thesis extends GreenServ to the edge-cloud continuum.
 A lightweight telemetry-driven feasibility filter first prunes nodes and models that are not expected to meet the latency deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.
 The filter takes into account each node's queue, the models it holds in GPU memory, and the time it would need to load a missing model.
 A contextual multi-armed bandit then selects a model from $M_t^*$ using GreenServ's prompt features and updates its policy online from an accuracy-energy reward.
-Complementing these per-query decisions, a background \emph{allocation controller} decides which models each node keeps loaded and how each model's traffic is split across them.
+Complementing these per-query decisions, a background \emph{placement controller} decides which models each node keeps loaded and how each model's traffic is split across them.
 It plans with the demand of the router: for every query, the model the bandit would choose if every model were loaded.
 It adopts the Kalman-filter trigger design of HAS-GPU \cite{hasgpu} and plans with a small mixed-integer program, in the spirit of the replica and placement programs of ENOVA \cite{enova} and SageServe \cite{sageserve}.
 
@@ -57,7 +57,7 @@ Third, a demand-driven placement controller that decides which models each node 
 Fourth, an empirical evaluation on this testbed that answers RQ1 (Section~\ref{sec:eval-filter}), RQ2 (Section~\ref{sec:eval-routing}), and RQ3 (Section~\ref{sec:eval-allocation}).
 
 The remainder of this thesis is organized as follows.
-Chapter~\ref{chapter:relatedWork} surveys the adjacent topics LLM serving, prompt-aware routing, and dynamic resource allocation, and identifies the specific gap this work targets.
+Chapter~\ref{chapter:relatedWork} surveys the adjacent topics LLM serving, prompt-aware routing, and model placement and autoscaling, and identifies the specific gap this work targets.
 Chapter~\ref{chapter:model} formalizes the routing problem, describes the architecture, and presents the demand-driven model placement.
 Chapter~\ref{chapter:evaluation} presents the experimental methodology and results.
 Chapter~\ref{chapter:conclusion} summarizes the contributions and outlines directions for future work.

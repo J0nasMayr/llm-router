@@ -47,11 +47,11 @@
 \node[tier] (cloud) at (6.9, 1.2) {\textbf{Cloud nodes}\\[1pt]
     \scriptsize inference workers,\\ 5 models (12--34B)};
 
-% --- telemetry and allocation controller --------------------------------
+% --- telemetry and placement controller --------------------------------
 \node[store, text width=2.3cm] (telem) at (11.45, 3.1)
     {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$,\\ loaded models, $\ell(m, n)$, $s_m$, $S_n$};
 \node[block, text width=2.3cm] (ctrl) at (11.45, 7.3)
-    {Allocation controller\\[1pt]
+    {Placement controller\\[1pt]
     \scriptsize Kalman forecast of shadow demand, trigger rules, placement program};
 
 % --- request path ---------------------------------------------------------
@@ -78,7 +78,7 @@
 \draw[telem] (telem.north) -- (ctrl.south);
 \draw[telem] (telem.east) -- ++(0.45, 0) |- ([yshift=0.3cm]filt.east);
 
-% --- plan of the allocation controller ----------------------------------
+% --- plan of the placement controller ----------------------------------
 \draw[elig] (ctrl.west) -- (disp.east);
 \draw[elig] (ctrl.north) |- node[lbl, pos=0.75, below=2pt] {traffic shares}
     ([yshift=-0.2cm]filt.east);

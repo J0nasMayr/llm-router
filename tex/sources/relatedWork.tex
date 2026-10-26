@@ -66,14 +66,18 @@ A decision that is right for the prompt can thus be unservable, and the resultin
 The same assumption also hides the option of serving a prompt from a nearby edge node instead.
 
 
-\section{Dynamic Resource Allocation for LLM Serving}
+\section{Model Placement and Autoscaling for LLM Serving}
 
 The systems discussed so far take the set of deployed models as fixed: the routers assume that every model is available, and the serving systems change at most how many instances of a given model run, as DynamoLLM does.
 A separate research area asks the orthogonal question of how the deployment itself should change over time, i.e., which models to replicate, on which devices, at what scale, in response to workload and hardware state.
-A recent survey of LLM inference scheduling \cite{llm_serving_survey} argues that such changes must be closely coordinated with how requests are dispatched.
+Autoscalers answer this by adding or removing capacity, such as replicas, virtual machines or GPU time.
+On a fixed set of nodes, the same question becomes one of placement: which models each node keeps loaded.
+A recent survey of LLM inference scheduling \cite{llm_serving_survey} calls this model management: requests go to nodes that already hold their model, models are loaded before demand for them rises, and rarely used models are removed.
+The survey also argues that changes to the deployment must be closely coordinated with how requests are dispatched.
 In its view, future autoscalers should combine demand forecasts, dispatch logic and the choice of which models stay loaded.
+This thesis works with a fixed set of nodes, so its controller decides placement.
 
-ENOVA \cite{enova} addresses this for serverless multi-GPU clusters.
+ENOVA \cite{enova} is an autoscaler for serverless multi-GPU clusters.
 It deconstructs the inference pipeline into measurable sub-stages and fits a recommendation module that maps each (LLM, GPU type) pair to an expected throughput configuration.
 Furthermore, it feeds live telemetry -- request rate, pending count, GPU utilization, response time -- into an autoscaling controller that adjusts how many replicas of each model are kept.
 
@@ -96,7 +100,7 @@ They optimize routing and placement together, instead of as separate problems.
 A complementary line of work keeps the placement fixed and adapts the resources of a single device at runtime.
 CLONE \cite{clone} prunes a single LLM for a single edge device, offline, and trains one LoRA adapter per task on top of it.
 At runtime, a learned controller sets the voltage and frequency of the device per layer, so that the model meets a latency target with little energy, and a router mixes LoRA adapters for each prompt.
-While not a cross-model allocation system, it is the natural counterpart on the edge tier:
+While not a cross-model placement system, it is the natural counterpart on the edge tier:
 where ENOVA and SageServe ask which model lives on which GPU, CLONE asks how much capacity a fixed (model, GPU) pair can be made to yield.
 
 However, although these systems adapt capacity to demand from live telemetry, they assume the traffic per model is given rather than chosen by a router that decides \emph{which model should answer} each query.
@@ -104,7 +108,7 @@ Their triggers also differ in how well they capture the cost of a request.
 HAS-GPU's trigger looks at the request rate alone, which misses that LLM requests can differ in cost by orders of magnitude.
 SageServe forecasts tokens per second, which partly captures this cost.
 The common control-loop pattern they share -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
-This thesis therefore integrates an allocation controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- extended with a placement rule for models without a replica and with per-(model, node) latency-deviation and memory-pressure rules, since a trigger based on request rates alone is insufficient when per-request cost, model selection, and memory pressure decouple from the arrival rate -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
+This thesis therefore integrates a placement controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- extended with a placement rule for models without a replica and with per-(model, node) latency-deviation and memory-pressure rules, since a trigger based on request rates alone is insufficient when per-request cost, model selection, and memory pressure decouple from the arrival rate -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
 Unlike the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if every model were loaded.
 
 \section{Research Gap and Thesis Contribution}
@@ -112,7 +116,7 @@ Unlike the systems above, the controller does not take the demand per model as g
 The three research areas leave complementary gaps:
 serving systems use the hardware efficiently but never choose the model;
 prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
-and allocation systems adapt capacity but take the traffic per model as given.
+and autoscaling and placement systems adapt the deployment but take the traffic per model as given.
 None of the surveyed systems both chooses among separate models per prompt and accounts for the live state of the nodes that would serve it, across edge and cloud.
 CLONE comes closest, since it mixes LoRA adapters per prompt and meets a latency target, but it does so for one model on one device.
 
@@ -127,7 +131,7 @@ Table~\ref{tab:related_work_summary} lists the surveyed work and positions this 
 \begin{sidewaystable}[htbp]
 \centering
 \scriptsize
-\caption{Detailed summary of related work in LLM serving, routing and resource allocation.}
+\caption{Detailed summary of related work in LLM serving, routing and model placement.}
 \label{tab:related_work_summary}
 \renewcommand{\arraystretch}{1.1}
 \begin{tabularx}{\textheight}{p{1.9cm} p{1.6cm} p{1.4cm} X X} 
@@ -154,15 +158,15 @@ Lookahead \cite{lookahead} & Routing & Yes, No, No & Trains a small language mod
 
 GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a contextual multi-armed bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. Formulates a latency constraint, but its released code does not check it \cite{greenserv_code}. & Extracts task type, semantic cluster (via embeddings), and text complexity (Flesch Reading Ease). \\
 
-ENOVA \cite{enova} & Allocation & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
+ENOVA \cite{enova} & Autoscaling & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
 
-HAS-GPU \cite{hasgpu} & Allocation & No, Yes, Yes & Scales serverless GPU functions vertically (the GPU time quota of a pod, on a fixed SM share) and horizontally (new pods). A Kalman filter predicts the request rate, and threshold rules trigger scaling. & None (only the request rate counts); built for deep-learning inference in general, not for LLMs. \\
+HAS-GPU \cite{hasgpu} & Autoscaling & No, Yes, Yes & Scales serverless GPU functions vertically (the GPU time quota of a pod, on a fixed SM share) and horizontally (new pods). A Kalman filter predicts the request rate, and threshold rules trigger scaling. & None (only the request rate counts); built for deep-learning inference in general, not for LLMs. \\
 
-SageServe \cite{sageserve} & Allocation & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
+SageServe \cite{sageserve} & Autoscaling \newline \& Placement & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
 
-CLONE \cite{clone} & Allocation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and trains one LoRA adapter per task (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
+CLONE \cite{clone} & Device \newline Adaptation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and trains one LoRA adapter per task (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
 
-\textbf{This work} & \textbf{Routing, Serving \& Allocation} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
+\textbf{This work} & \textbf{Routing, Serving \& Placement} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
 \bottomrule
 \end{tabularx}
 \end{sidewaystable}
