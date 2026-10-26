@@ -4,7 +4,7 @@
 % TODO: This chapter is a methodology skeleton. Fill in testbed specifics,
 % figures, and measured numbers once the experiments have been run.
 
-This chapter answers the three research questions of Chapter~\ref{chapter:introduction}: whether tele\-metry-driven feasibility filtering reduces SLA violations (RQ1, Section~\ref{sec:eval-filter}), what restricting the choice to feasible models costs in accuracy and energy compared to GreenServ and simple baselines (RQ2, Section~\ref{sec:eval-routing}), and whether adapting which models each node keeps loaded to the router's demand reduces deadline violations and cold starts (RQ3, Section~\ref{sec:eval-allocation}). Each question is answered by comparing the full system with variants that disable or replace the corresponding component. Together, the questions cover the three goals of Chapter~\ref{chapter:model}: RQ1 and RQ3 latency, RQ2 accuracy and energy, and RQ3 also the use of GPU memory and time.
+This chapter answers the three research questions of Chapter~\ref{chapter:introduction}: whether tele\-metry-driven feasibility filtering reduces SLA violations (RQ1, Section~\ref{sec:eval-filter}), what restricting the choice to feasible models costs in accuracy and energy compared to GreenServ and simple baselines (RQ2, Section~\ref{sec:eval-routing}), and whether adapting which models each node keeps loaded to the router's demand reduces deadline violations (RQ3, Section~\ref{sec:eval-allocation}). Each question is answered by comparing the full system with variants that disable or replace the corresponding component. Together, the questions cover the three goals of Chapter~\ref{chapter:model}: RQ1 and RQ3 latency, and RQ2 accuracy and energy. For RQ3, the evaluation also reports how often the nodes load a model and how long this takes, which shows how the nodes use their GPU time and memory.
 
 \section{Experimental Setup}
 
@@ -53,7 +53,7 @@ For RQ3, the full system is compared with three other ways to decide which model
 % Scenario: the workload mix shifts in phases (e.g. from multiple-choice
 % questions to GSM8K and summarization, moving demand towards larger models),
 % Poisson arrivals at two to three load levels, at least ten minutes per phase.
-% Report deadline violations, p95 latency, cold starts per 100 queries, time
+% Report deadline violations, p95 latency, model loads per 100 queries, time
 % spent loading, placement changes, accuracy and energy over time. Verify that
 % the cooldown suppresses oscillation.
 % TODO: run and report.
