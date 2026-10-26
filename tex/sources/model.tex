@@ -90,6 +90,7 @@ Its released experiment code, however, uses the label of the benchmark dataset a
 This work does the same: the client submits the dataset label together with the query, and a query without such a label receives an all-zero task-type component.
 The classifier is not used.
 Each feature is one-hot encoded, and the three encodings are concatenated into the context vector $x_t \in \{0, 1\}^d$ with $d = 5 + 3 + 3 = 11$ (five task types, three clusters, three complexity bins).
+Unlike GreenServ, which appends a constant 1 as a bias term ($d = 12$), this work adds no bias term.
 
 \textbf{3. Contextual Bandit Routing.}
 With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a contextual multi-armed bandit (MAB) algorithm to make the final routing decision.

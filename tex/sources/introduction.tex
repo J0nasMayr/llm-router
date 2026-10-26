@@ -30,7 +30,7 @@ For each query, a router trades accuracy against energy, and it only considers m
 In the background, a controller decides which models stay loaded, so that the models the router wants can answer without waiting for a load, and the GPU memory holds the models that are in demand.
 
 Existing work covers parts of this problem, but not all of it (Chapter~\ref{chapter:relatedWork}).
-LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardware efficiently, but treat every prompt as an opaque job and never choose a cheaper model for an easy one.
+LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardware efficiently, but look at a prompt at most to estimate its length, and never choose a cheaper model for an easy one.
 Prompt-aware routers choose a model per prompt but assume it is always available.
 GreenServ formulates a latency constraint, but its released code never checks it \cite{greenserv_code}.
 Dynamic allocation systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router.

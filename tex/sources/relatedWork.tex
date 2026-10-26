@@ -25,7 +25,7 @@ A rolling average latency describes the last few seconds, not the current state.
 Also, the same queue length means very different delays on different GPU types.
 NexusSched therefore replaces reactive load balancing with predictive scheduling that anticipates bottlenecks before they appear.
 
-However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they treat every prompt as an opaque job: lacking any semantic awareness, they never answer an easy prompt with a smaller, cheaper model.
+However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they look at a prompt at most to estimate its length, and they never answer an easy prompt with a smaller, cheaper model.
 Disregarding this possibility means ignoring a large efficiency lever.
 For example, GreenServ uses 64\% less energy than always using the largest model, while reaching a higher accuracy \cite{greenserv}.
 FrugalGPT matches the best single model at up to 98\% lower cost \cite{frugalgpt}.
@@ -136,11 +136,11 @@ Table~\ref{tab:related_work_summary} lists the surveyed work and positions this 
 \midrule
 BROS \cite{bros} & Serving & No, Yes, Yes & Implements a bidirectional KVC allocation strategy that dynamically shares cache blocks between latency-critical and throughput-oriented requests. & None (Treats requests as generic computational loads). \\
 
-EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues for prompt processing and token generation. A KVC pipelining technique lets requests share KVC space that is allocated but not yet used. & Predicts the response length to batch requests; no semantic analysis. \\
+EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues for prompt processing and token generation. A KVC pipelining technique lets requests share KVC space that is allocated but not yet used. & Predicts the response length from the prompt with a fine-tuned LLM, to batch requests; does not choose the model. \\
 
-DynamoLLM \cite{dynamollm} & Serving & No, Yes, Yes & Employs hierarchical controllers to dynamically scale active instances, model parallelism, and GPU frequencies based on traffic. & Workload profiling (Analyzes request lengths and arrival rates, but lacks semantic awareness). \\
+DynamoLLM \cite{dynamollm} & Serving & No, Yes, Yes & Employs hierarchical controllers to dynamically scale active instances, model parallelism, and GPU frequencies based on traffic. & Predicts the output length (short, medium, long) from the prompt to pick an instance pool; does not choose the model. \\
 
-NexusSched \cite{nexussched} & Serving \newline (Cluster) & No, Yes, Yes & Uses forward-looking telemetry (predicted processing latency and available KVC) to make proactive routing decisions across distributed engines. & None. \\
+NexusSched \cite{nexussched} & Serving \newline (Cluster) & No, Yes, Yes & Uses forward-looking telemetry (predicted processing latency and available KVC) to make proactive routing decisions across distributed engines. & Uses prompt lengths for its load estimate; does not read the content. \\
 
 CARGO \cite{cargo} & Routing & Yes, No, No & Uses LLM judges to label which answer is better, and trains a regression model that scores each LLM for a new prompt. If the top two scores are close, both LLMs answer and a classifier picks the better answer. & Encodes the input prompt into an embedding vector to feed into the routing regression model. \\
 
