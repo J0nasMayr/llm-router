@@ -2,7 +2,7 @@
 \label{chapter:model}
 
 The objective of this work is to dynamically orchestrate Large Language Model (LLM) inference tasks across an edge-cloud continuum.
-The system pursues three goals: high accuracy, low latency, and an efficient use of the nodes' resources -- GPU time, memory and energy.
+The system pursues three goals: high accuracy, answers within a latency deadline, and an efficient use of the nodes' resources -- GPU time, memory and energy.
 Two decisions share these goals.
 For each query, a router selects the model and the node: it trades accuracy against energy, and it only considers models that are expected to meet a latency deadline under the current state of the hardware (Sections~\ref{sec:problem} and~\ref{sec:method}).
 In the background, an allocation controller decides which models the nodes keep loaded: it keeps the models the router asks for in memory, so that queries rarely wait for a model load and the nodes spend their GPU time and memory on the models in demand (Section~\ref{sec:allocation}).

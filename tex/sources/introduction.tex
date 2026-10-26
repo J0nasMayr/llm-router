@@ -22,7 +22,7 @@ A router that cannot see the node's queue keeps choosing the large model, and ev
 The queue is not the only hidden cost: a node holds only the models that fit into its GPU memory, and if a model is not among them, its weights must be loaded first.
 This loading takes tens of seconds for the largest models.
 
-This thesis addresses the following problem: \emph{given a pool of LLMs of different sizes, spread over edge and cloud nodes whose load changes at runtime, decide for each query which model answers and which node runs it, and decide which models each node keeps in GPU memory, such that the answers are accurate, arrive with low latency, and use the GPU time, memory and energy of the nodes efficiently.}
+This thesis addresses the following problem: \emph{given a pool of LLMs of different sizes, spread over edge and cloud nodes whose load changes at runtime, decide for each query which model answers and which node runs it, and decide which models each node keeps in GPU memory, such that the answers are accurate, arrive within a deadline, and use the GPU time, memory and energy of the nodes efficiently.}
 The three goals pull in different directions, so the thesis splits them between two decisions.
 For each query, a router trades accuracy against energy, and it only considers models that are expected to answer within a latency deadline.
 In the background, a controller decides which models stay loaded, so that the models the router wants can answer without waiting for a load, and the GPU memory holds the models that are in demand.
