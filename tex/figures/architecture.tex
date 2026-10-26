@@ -18,13 +18,13 @@
 % --- scheduler (edge gateway) -------------------------------------------
 \node[block] (filt)   at (4.55, 9.5) {\textbf{1}~Feasibility filter\\[1pt]
     \scriptsize $G_n \ge G_{min}$, $s_m \le S_n$,\\ $\hat{T}(m, n) \le T_{max}$};
-\node[block] (ctx)    at (1.35, 7.3) {\textbf{2}~Context extraction\\[1pt]
+\node[block] (ctx)    at (1.1, 7.3) {\textbf{2}~Context extraction\\[1pt]
     \scriptsize task type, cluster, complexity};
 \node[block] (bandit) at (4.55, 7.3) {\textbf{3}~LinUCB bandit\\[1pt]
     \scriptsize arms outside $M_t^*$ masked};
-\node[block] (disp)   at (7.75, 7.3) {\textbf{3}~Node dispatch\\[1pt]
-    \scriptsize min.\ $\hat{T}(m_t, n)$ or shares $w_{m,n}$};
-\node[block] (reward) at (1.35, 5.1) {\textbf{4}~Reward \& update\\[1pt]
+\node[block] (disp)   at (8.0, 7.3) {\textbf{3}~Node dispatch\\[1pt]
+    \scriptsize shares $w_{m,n}$, else\\ min.\ $\hat{T}(m_t, n)$};
+\node[block] (reward) at (1.1, 5.1) {\textbf{4}~Reward \& update\\[1pt]
     \scriptsize $r_t = \alpha\,Acc + \beta\,(1 - E)$};
 
 \begin{scope}[on background layer]
@@ -35,7 +35,7 @@
     at (sched.north east) {Scheduler (gateway on the edge tier)};
 
 \node[draw, fill=white, align=center, text width=2.75cm, minimum height=0.7cm]
-    (client) at (1.35, 11.4) {Client};
+    (client) at (1.1, 11.4) {Client};
 
 % --- queues and nodes -----------------------------------------------------
 \node[store, minimum width=8.8cm] (queues) at (4.55, 3.1)
@@ -48,9 +48,9 @@
     \scriptsize inference workers,\\ 5 models (12--34B)};
 
 % --- telemetry and placement controller --------------------------------
-\node[store, text width=2.3cm] (telem) at (11.45, 3.1)
+\node[store, text width=2.3cm] (telem) at (11.6, 3.1)
     {Node telemetry\\[1pt]\scriptsize $W_n$, $G_n$, $\bar{\tau}(m, n)$,\\ loaded models, $\ell(m, n)$, $s_m$, $S_n$};
-\node[block, text width=2.3cm] (ctrl) at (11.45, 7.3)
+\node[block, text width=2.3cm] (ctrl) at (11.6, 7.3)
     {Placement controller\\[1pt]
     \scriptsize Kalman forecast of shadow demand, trigger rules, placement program};
 
@@ -67,7 +67,7 @@
     -- node[lbl, right=2pt, text=black] {result} (reward.south);
 \draw[flow, gray] (reward.east) -| node[lbl, pos=0.25, below=1pt, text=black] {update}
     ([xshift=-0.6cm]bandit.south);
-\draw[flow] (reward.west) -- ++(-0.45, 0) |- node[lbl, pos=0.75, above=1pt] {response}
+\draw[flow] (reward.west) -- ++(-0.45, 0) |- node[lbl, pos=0.3, sloped, above=1pt] {response}
     (client.west);
 
 % --- telemetry ------------------------------------------------------------
@@ -79,9 +79,7 @@
 \draw[telem] (telem.east) -- ++(0.45, 0) |- ([yshift=0.3cm]filt.east);
 
 % --- plan of the placement controller ----------------------------------
-\draw[elig] (ctrl.west) -- (disp.east);
-\draw[elig] (ctrl.north) |- node[lbl, pos=0.75, below=2pt] {traffic shares}
-    ([yshift=-0.2cm]filt.east);
+\draw[elig] (ctrl.west) -- node[lbl, above=2pt] {$w_{m,n}$} (disp.east);
 \draw[elig] ([yshift=-0.45cm]ctrl.west) -| node[lbl, pos=0.75, right=2pt, align=left]
     {target\\ placement} ($(queues.east) + (0.8, 0)$) -- (queues.east);
 \end{tikzpicture}

@@ -75,9 +75,7 @@ Each entry expires shortly after its last update, so nodes that stop reporting d
 To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the edge tier. This allows it to be the initial point of contact and intercept incoming queries.
 When query $q_t$ arrives, the scheduler reads the latest state of all nodes, prunes any node whose free GPU memory falls below $G_{min}$, and evaluates $\hat{T}(m, n)$ for every model on the surviving nodes of its tier that can hold it.
 Any model for which no such node meets $T_{max}$ is excluded, yielding the feasible set $M_t^*$.
-Once the placement controller (Section~\ref{sec:allocation}) has made a plan, a model that has replicas in it is considered only on the nodes that hold it.
-If none of them meets $T_{max}$, the other nodes of its tier serve as overflow and load the model on demand.
-Models without replica are not restricted. If node $n$ has not yet executed $m$, $\bar{\tau}(m, n)$ falls back to the node's average over the models it has served; a node that has served nothing yet reports zero, so only the network delay and the load time of the model count for it.
+If node $n$ has not yet executed $m$, $\bar{\tau}(m, n)$ falls back to the node's average over the models it has served; a node that has served nothing yet reports zero, so only the network delay and the load time of the model count for it.
 This way, new nodes and untried models can still receive traffic. The filter is a best-effort mechanism built on estimates, not a hard guarantee: when no telemetry is available (e.g.\ at start-up) or no model is feasible, the scheduler does not reject the query.
 The bandit then chooses among all models, and the query is placed on a shared fallback queue of the chosen model's tier, which every node of that tier consumes after its own queue.
 
@@ -98,7 +96,9 @@ Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm \cite{linucb}
 LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models; models outside $M_t^*$ are masked by forcing their score to $-\infty$, so the bandit can only choose physically viable arms.
 The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if no model were masked. The placement controller plans with these choices (Section~\ref{sec:allocation}).
 The bandit decides \emph{which model} answers; a final dispatch step decides \emph{which node} executes it.
-Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler selects the node with the lowest estimate $\hat{T}(m_t, n)$ -- or, when the controller's plan has replicas of $m_t$, draws one of the replicas at random in proportion to its traffic shares $w_{m_t,n}$.
+Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler draws one of $m_t$'s replicas at random in proportion to their traffic shares $w_{m_t,n}$, if the plan of the placement controller (Section~\ref{sec:allocation}) has such replicas.
+Otherwise, it selects the node with the lowest estimate $\hat{T}(m_t, n)$.
+In particular, if $m_t$ has replicas but none of them meets $T_{max}$, another node of the tier serves as overflow and loads the model on demand.
 Since $\hat{T}$ includes the load time, a node that would first have to load $m_t$ can fail the deadline check, and the lowest estimate favors nodes that already hold $m_t$.
 The query is then enqueued to that node's dedicated task queue.
 
@@ -192,7 +192,7 @@ Loading a model therefore pays off roughly once one request for it is expected w
 The constraints let a node serve a model only if it holds it, keep each node within its memory budget, and keep its load below $\theta_{up}$.
 When a model's demand exceeds what its nodes can serve, the program plans to serve only part of it.
 The dispatch step still sends all of the model's queries to its replicas, because the traffic shares are normalized (see below).
-Only when none of the replicas meets $T_{max}$ does another node of the tier take the query and load the model on demand (Stage~1).
+Only when none of the replicas meets $T_{max}$ does another node of the tier take the query and load the model on demand (Stage~3).
 Loading nothing is always a valid solution, so the program is always feasible.
 A tiny bonus for keeping the current placement prevents changes between equally good plans.
 The program is solved with the HiGHS solver \cite{highs} in SciPy \cite{scipy}; for the testbed, it has a few dozen variables and takes well under a second.
@@ -224,7 +224,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
 \begin{figure}[htbp]
     \centering
     \input{figures/architecture}
-    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the placement controller (Section~\ref{sec:allocation}): the traffic shares used by the filter and the dispatch step, and the target placements that the nodes read from Redis. The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
+    \caption[Overview of the edge-cloud scheduling architecture]{Overview of the edge-cloud scheduling architecture. Numbers refer to the stages of Section~\ref{sec:method}. Solid arrows show the path of a query, dashed arrows the node telemetry, and dash-dotted arrows the plan of the placement controller (Section~\ref{sec:allocation}): the traffic shares used by the dispatch step, and the target placements that the nodes read from Redis. The dispatch step also reads the telemetry to compute $\hat{T}(m_t, n)$, and the controller reads the bandit's shadow choices; these arrows are omitted for readability.}
     \label{fig:architecture}
 \end{figure}
 
