@@ -96,7 +96,7 @@ Unlike GreenServ, which appends a constant 1 as a bias term ($d = 12$), this wor
 With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ established, the system employs a contextual multi-armed bandit (MAB) algorithm to make the final routing decision.
 Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm \cite{linucb} is utilized. The algorithm assumes a linear relationship between the context $x_t$ and the expected reward of each model arm.
 LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models; models outside $M_t^*$ are masked by forcing their score to $-\infty$, so the bandit can only choose physically viable arms.
-The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if every model were loaded. The placement controller plans with these choices (Section~\ref{sec:allocation}).
+The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if no model were masked. The placement controller plans with these choices (Section~\ref{sec:allocation}).
 The bandit decides \emph{which model} answers; a final dispatch step decides \emph{which node} executes it.
 Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler selects the node with the lowest estimate $\hat{T}(m_t, n)$ -- or, when the controller's plan has replicas of $m_t$, draws one of the replicas at random in proportion to its traffic shares $w_{m_t,n}$.
 Since $\hat{T}$ includes the load time, a node that would first have to load $m_t$ can fail the deadline check, and the lowest estimate favors nodes that already hold $m_t$.
@@ -130,9 +130,10 @@ LRU is a common eviction policy, but it is not always a good choice when models 
 
 \subsection{Shadow Demand and Trigger}
 
-The controller plans with the \emph{shadow demand}: for every query, the model the bandit would choose if every model were loaded (its shadow choice, Stage~3).
+The controller plans with the \emph{shadow demand}: for every query, the model the bandit would choose if no model were masked (its shadow choice, Stage~3).
 Planning with the realized demand -- the models the queries are actually routed to -- would lock models out.
 A model that no node holds is often masked, so the bandit cannot choose it, its demand stays at zero, and it is never loaded.
+Many masked models become feasible once the controller loads them or spreads their traffic over more replicas.
 The shadow demand also contains the exploration of the bandit, so a model the bandit wants to try can be loaded if the placement program finds it worthwhile.
 
 For each model $m$, the controller maintains a scalar Kalman filter \cite{kalman} over its shadow request rate $R_t^{(m)}$ -- the number of queries whose shadow choice was $m$ since the previous evaluation, divided by the elapsed time, which is zero if there were none -- yielding the prediction

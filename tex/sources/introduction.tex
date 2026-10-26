@@ -40,7 +40,7 @@ A lightweight telemetry-driven feasibility filter first prunes nodes and models 
 The filter takes into account each node's queue, the models it holds in GPU memory, and the time it would need to load a missing model.
 A contextual multi-armed bandit then selects a model from $M_t^*$ using GreenServ's prompt features and updates its policy online from an accuracy-energy reward.
 Complementing these per-query decisions, a background \emph{placement controller} decides which models each node keeps loaded and how each model's traffic is split across them.
-It plans with the demand of the router: for every query, the model the bandit would choose if every model were loaded.
+It plans with the demand of the router: for every query, the model the bandit would choose if no model were masked.
 It adopts the Kalman-filter trigger design of HAS-GPU \cite{hasgpu} and plans with a small mixed-integer program, in the spirit of the replica and placement programs of ENOVA \cite{enova} and SageServe \cite{sageserve}.
 
 The thesis answers three research questions:

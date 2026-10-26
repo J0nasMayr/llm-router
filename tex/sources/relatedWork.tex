@@ -109,7 +109,7 @@ HAS-GPU's trigger looks at the request rate alone, which misses that LLM request
 SageServe forecasts tokens per second, which partly captures this cost.
 The common control-loop pattern they share -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
 This thesis therefore integrates a placement controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- extended with a placement rule for models without a replica and with per-(model, node) latency-deviation and memory-pressure rules, since a trigger based on request rates alone is insufficient when per-request cost, model selection, and memory pressure decouple from the arrival rate -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
-Unlike the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if every model were loaded.
+Unlike the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if no model were masked.
 
 \section{Research Gap and Thesis Contribution}
 
