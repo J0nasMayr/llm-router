@@ -18,6 +18,10 @@ This allows the system to minimize energy use and cost while meeting its latency
 As a result, it also reduces carbon emissions.
 The framework decomposes its decisions into a hierarchy of controllers operating on different timescales, separating slow choices such as instance count from fast ones such as GPU frequency scaling.
 
+CLONE \cite{clone} applies a similar idea to a single edge device.
+It prunes one LLM for the device, offline, and trains one LoRA adapter per task on top of it.
+At runtime, a learned controller sets the voltage and frequency of the device per layer, so that the model meets a latency target with little energy, and a router mixes the LoRA adapters for each prompt.
+
 Finally, systems like NexusSched \cite{nexussched} look at the layer above and try to bridge the ``information gap'' between the central cluster router and the individual inference engines.
 Instead of relying on naive metrics like queue length and average latency, NexusSched uses forward-looking telemetry -- such as predicted latency and available KVC -- to make proactive routing decisions across the cluster.
 The motivating insight is that these metrics lag behind the real load.
@@ -25,7 +29,7 @@ A rolling average latency describes the last few seconds, not the current state.
 Also, the same queue length means very different delays on different GPU types.
 NexusSched therefore replaces reactive load balancing with predictive scheduling that anticipates bottlenecks before they appear.
 
-However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they look at a prompt at most to estimate its length, and they never answer an easy prompt with a smaller, cheaper model.
+However, although these serving systems use the hardware efficiently -- through KVC management, request scheduling, and frequency scaling -- they look at a prompt at most to estimate its length or, in CLONE's case, to mix the adapters of a single model, and they never answer an easy prompt with a smaller, cheaper model.
 Disregarding this possibility means ignoring a large efficiency lever.
 For example, GreenServ uses 64\% less energy than always using the largest model, while reaching a higher accuracy \cite{greenserv}.
 FrugalGPT matches the best single model at up to 98\% lower cost \cite{frugalgpt}.
@@ -97,12 +101,6 @@ an ARIMA traffic forecast predicts per-region demand and an integer linear progr
 The authors report up to 25\% GPU-hour savings against the production baseline.
 They optimize routing and placement together, instead of as separate problems.
 
-A complementary line of work keeps the placement fixed and adapts the resources of a single device at runtime.
-CLONE \cite{clone} prunes a single LLM for a single edge device, offline, and trains one LoRA adapter per task on top of it.
-At runtime, a learned controller sets the voltage and frequency of the device per layer, so that the model meets a latency target with little energy, and a router mixes LoRA adapters for each prompt.
-While not a cross-model placement system, it is the natural counterpart on the edge tier:
-where ENOVA and SageServe ask which model lives on which GPU, CLONE asks how much capacity a fixed (model, GPU) pair can be made to yield.
-
 However, although these systems adapt capacity to demand from live telemetry, they assume the traffic per model is given rather than chosen by a router that decides \emph{which model should answer} each query.
 Their triggers also differ in how well they capture the cost of a request.
 HAS-GPU's trigger looks at the request rate alone, which misses that LLM requests can differ in cost by orders of magnitude.
@@ -144,6 +142,8 @@ EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues fo
 
 DynamoLLM \cite{dynamollm} & Serving & No, Yes, Yes & Employs hierarchical controllers to dynamically scale active instances, model parallelism, and GPU frequencies based on traffic. & Predicts the output length (short, medium, long) from the prompt to pick an instance pool; does not choose the model. \\
 
+CLONE \cite{clone} & Serving \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and trains one LoRA adapter per task (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
+
 NexusSched \cite{nexussched} & Serving \newline (Cluster) & No, Yes, Yes & Uses forward-looking telemetry (predicted processing latency and available KVC) to make proactive routing decisions across distributed engines. & Uses prompt lengths for its load estimate; does not read the content. \\
 
 CARGO \cite{cargo} & Routing & Yes, No, No & Uses LLM judges to label which answer is better, and trains a regression model that scores each LLM for a new prompt. If the top two scores are close, both LLMs answer and a classifier picks the better answer. & Encodes the input prompt into an embedding vector to feed into the routing regression model. \\
@@ -163,8 +163,6 @@ ENOVA \cite{enova} & Autoscaling & No, Yes, Yes & Recommends a serving configura
 HAS-GPU \cite{hasgpu} & Autoscaling & No, Yes, Yes & Scales serverless GPU functions vertically (the GPU time quota of a pod, on a fixed SM share) and horizontally (new pods). A Kalman filter predicts the request rate, and threshold rules trigger scaling. & None (only the request rate counts); built for deep-learning inference in general, not for LLMs. \\
 
 SageServe \cite{sageserve} & Autoscaling \newline \& Placement & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
-
-CLONE \cite{clone} & Device \newline Adaptation \newline (Edge) & Yes, Yes, Yes & Prunes one LLM for one edge device and trains one LoRA adapter per task (offline). At runtime, a learned DVFS controller sets voltage and frequency per layer to meet a latency target with little energy. & Embeds the prompt to mix LoRA adapters by similarity, and predicts the output length to guide the DVFS controller. \\
 
 \textbf{This work} & \textbf{Routing, Serving \& Placement} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
 \bottomrule
