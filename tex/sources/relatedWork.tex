@@ -81,6 +81,14 @@ The survey also argues that changes to the deployment must be closely coordinate
 In its view, future autoscalers should combine demand forecasts, dispatch logic and the choice of which models stay loaded.
 This thesis works with a fixed set of nodes, so its controller decides placement.
 
+AlpaServe \cite{alpaserve} solves this placement problem for a fixed GPU cluster that serves several large models.
+It splits the cluster into groups of GPUs and decides which models each group holds, with replicas for popular models.
+It uses model parallelism: several models are split across the same GPUs, so that a burst of requests for one model can use all of them.
+The authors show that this pays off mainly when GPU memory is tight, since splitting adds communication overhead.
+A greedy search, guided by a simulator, picks the placement that serves the most requests within the latency SLO.
+This search needs each model's arrival process in advance, taken from past request traces, and no model is loaded or unloaded between the periodic re-placements.
+AlpaServe also only serves models that answer with a single forward pass, not autoregressive LLMs.
+
 ENOVA \cite{enova} is an autoscaler for serverless multi-GPU clusters.
 It deconstructs the inference pipeline into measurable sub-stages and fits a recommendation module that maps each (LLM, GPU type) pair to an expected throughput configuration.
 Furthermore, it feeds live telemetry -- request rate, pending count, GPU utilization, response time -- into an autoscaling controller that adjusts how many replicas of each model are kept.
@@ -101,11 +109,11 @@ an ARIMA traffic forecast predicts per-region demand and an integer linear progr
 The authors report up to 25\% GPU-hour savings against the production baseline.
 They optimize routing and placement together, instead of as separate problems.
 
-However, although these systems adapt capacity to demand from live telemetry, they assume the traffic per model is given rather than chosen by a router that decides \emph{which model should answer} each query.
+However, although these systems adapt the deployment to demand, they assume the traffic per model is given rather than chosen by a router that decides \emph{which model should answer} each query.
 Their triggers also differ in how well they capture the cost of a request.
 HAS-GPU's trigger looks at the request rate alone, which misses that LLM requests can differ in cost by orders of magnitude.
 SageServe forecasts tokens per second, which partly captures this cost.
-The common control-loop pattern they share -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
+The control loop of the autoscalers -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
 This thesis therefore integrates a placement controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- applied to the load of each node rather than to request rates, since per-request cost and model selection decouple from the arrival rate, and extended with a placement rule for models without a replica, a per-(model, node) latency-deviation rule and a memory-pressure rule -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
 Unlike the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if no model were masked.
 
@@ -126,16 +134,27 @@ it is evaluated against on-demand loading, an LRU cache and a fixed placement (R
 Table~\ref{tab:related_work_summary} lists the surveyed work and positions this thesis against it.
 
 
-\begin{sidewaystable}[htbp]
-\centering
+\begin{landscape}
 \scriptsize
+\renewcommand{\arraystretch}{1.0}
+\setlength{\tabcolsep}{4pt}
+\begin{xltabular}{\linewidth}{p{1.75cm} p{1.55cm} p{1.3cm} X X}
 \caption{Detailed summary of related work in LLM serving, routing and model placement.}
-\label{tab:related_work_summary}
-\renewcommand{\arraystretch}{1.1}
-\begin{tabularx}{\textheight}{p{1.9cm} p{1.6cm} p{1.4cm} X X} 
+\label{tab:related_work_summary} \\
 \toprule
 \textbf{Paper} & \textbf{Focus Area} & \textbf{Goals \newline (Acc, Lat, Res)} & \textbf{Detailed Methodology} & \textbf{Prompt Analysis Method} \\
 \midrule
+\endfirsthead
+\multicolumn{5}{l}{\emph{Table~\ref{tab:related_work_summary}, continued}} \\
+\toprule
+\textbf{Paper} & \textbf{Focus Area} & \textbf{Goals \newline (Acc, Lat, Res)} & \textbf{Detailed Methodology} & \textbf{Prompt Analysis Method} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{5}{r}{\emph{Continued on the next page}} \\
+\endfoot
+\bottomrule
+\endlastfoot
 BROS \cite{bros} & Serving & No, Yes, Yes & Implements a bidirectional KVC allocation strategy that dynamically shares cache blocks between latency-critical and throughput-oriented requests. & None (Treats requests as generic computational loads). \\
 
 EconoServe \cite{econoserve} & Serving & No, Yes, Yes & Keeps separate queues for prompt processing and token generation. A KVC pipelining technique lets requests share KVC space that is allocated but not yet used. & Predicts the response length from the prompt with a fine-tuned LLM, to batch requests; does not choose the model. \\
@@ -158,6 +177,8 @@ Lookahead \cite{lookahead} & Routing & Yes, No, No & Trains a small language mod
 
 GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a contextual multi-armed bandit (LinUCB) to continuously learn the optimal routing policy balancing accuracy and energy. Formulates a latency constraint, but its released code does not check it \cite{greenserv_code}. & Extracts task type, semantic cluster (via embeddings), and text complexity (Flesch Reading Ease). \\
 
+AlpaServe \cite{alpaserve} & Placement & No, Yes, Yes & Places several models on groups of GPUs in a fixed cluster, with replicas and model parallelism, to absorb bursts. A simulator-guided greedy search maximizes the share of requests within the SLO; re-planned periodically from past traces. & None (only each model's arrival process counts); single-forward-pass models only. \\
+
 ENOVA \cite{enova} & Autoscaling & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
 
 HAS-GPU \cite{hasgpu} & Autoscaling & No, Yes, Yes & Scales serverless GPU functions vertically (the GPU time quota of a pod, on a fixed SM share) and horizontally (new pods). A Kalman filter predicts the request rate, and threshold rules trigger scaling. & None (only the request rate counts); built for deep-learning inference in general, not for LLMs. \\
@@ -165,6 +186,5 @@ HAS-GPU \cite{hasgpu} & Autoscaling & No, Yes, Yes & Scales serverless GPU funct
 SageServe \cite{sageserve} & Autoscaling \newline \& Placement & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
 
 \textbf{This work} & \textbf{Routing, Serving \& Placement} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
-\bottomrule
-\end{tabularx}
-\end{sidewaystable}
+\end{xltabular}
+\end{landscape}

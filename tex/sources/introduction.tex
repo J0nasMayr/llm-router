@@ -7,7 +7,7 @@ a simple factual question, such as naming a country's capital, is answered corre
 A provider that serves every prompt with its largest model therefore pays -- in energy and hardware time -- for capability most requests never use, while one that serves every prompt with a small model silently fails harder requests.
 No single model dominates across the full space of prompt complexities \cite{greenserv, frugalgpt, routellm}, which has motivated a growing research area: \emph{routing} each prompt to the model that suits it best \cite{cargo, tagrouter, noft, irtrouter, lookahead, greenserv}.
 Several of these routers also prefer a cheaper model when it is expected to answer well enough \cite{tagrouter, noft, irtrouter, greenserv}.
-With generative AI already used by roughly 40\% of the U.S. working-age population \cite{Bick2024Rapid}, and AI in general by nearly nine in ten surveyed organizations \cite{McKinsey2025State}, the cost of these decisions accumulates over a very large number of requests.
+With generative AI already used by roughly 40\% of the U.S. working-age population \cite{Bick2024Rapid} and by nearly four-fifths of surveyed organizations \cite{McKinsey2025State}, the cost of these decisions accumulates over a very large number of requests.
 One such router is GreenServ \cite{greenserv}, the system this thesis builds on.
 GreenServ describes each prompt by its task type, its semantic cluster and its text complexity.
 From these features, a contextual multi-armed bandit learns which model gives the best trade-off between answer accuracy and energy use.
@@ -33,7 +33,7 @@ Existing work covers parts of this problem, but not all of it (Chapter~\ref{chap
 LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardware efficiently, but look at a prompt at most to estimate its length, and never choose a cheaper model for an easy one.
 Prompt-aware routers choose a model per prompt but assume it is always available.
 GreenServ formulates a latency constraint, but its released code never checks it \cite{greenserv_code}.
-Autoscaling and placement systems \cite{enova, hasgpu, sageserve} adapt capacity to demand, but take the traffic per model as given rather than chosen by a router.
+Autoscaling and placement systems \cite{alpaserve, enova, hasgpu, sageserve} adapt the deployment to demand, but take the traffic per model as given rather than chosen by a router.
 
 To address this problem, this thesis extends GreenServ to the edge-cloud continuum.
 A lightweight telemetry-driven feasibility filter first prunes nodes and models that are not expected to meet the latency deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.
