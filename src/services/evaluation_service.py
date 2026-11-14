@@ -14,7 +14,7 @@ class EvaluationService:
         self.metric_normalizer = MetricNormalizer()
         self.energy_metrics = EnergyMetrics()
 
-    def evaluate(
+    def _evaluate(
         self,
         response,
         reference,
@@ -42,13 +42,13 @@ class EvaluationService:
 
         return score
 
-    def normalize_metric(self, metric_name, value, task_type=None):
+    def _normalize_metric(self, metric_name, value, task_type=None):
         """Normalize a metric value to [0,1] range."""
         normalized = self.metric_normalizer.normalize(metric_name, value, task_type)
         self.metric_normalizer.update_bounds(metric_name, value, task_type)
         return normalized
 
-    def calculate_energy_metrics(
+    def _calculate_energy_metrics(
         self, energy_consumption, input_tokens, output_tokens, task_type=None
     ):
         """Calculate energy-related metrics."""
@@ -57,7 +57,7 @@ class EvaluationService:
         )
         # Bounds in metrics.yaml are per dataset; without task_type the
         # normalizer finds none and returns a constant 0.5.
-        normalized_energy = self.normalize_metric(
+        normalized_energy = self._normalize_metric(
             "energy_per_token", energy_per_token, task_type
         )
 
@@ -88,15 +88,15 @@ class EvaluationService:
         — the bandit only cares about relative differences between arms.
         """
 
-        accuracy = self.evaluate(
+        accuracy = self._evaluate(
             response, reference, task_type, extraction_method, evaluation_metric
         )
-        energy_metrics = self.calculate_energy_metrics(
+        energy_metrics = self._calculate_energy_metrics(
             energy_consumption, input_tokens, output_tokens, task_type
         )
         # metrics.yaml keys the quality bounds as "accuracy" for every dataset,
         # whichever evaluation_metric (exact_match, rouge, ...) produced it.
-        normalized_accuracy = self.normalize_metric("accuracy", accuracy, task_type)
+        normalized_accuracy = self._normalize_metric("accuracy", accuracy, task_type)
         reward = alpha * normalized_accuracy + beta * (
             1 - energy_metrics["normalized_energy"]
         )

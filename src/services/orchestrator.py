@@ -359,7 +359,7 @@ class Orchestrator:
                 return response
             response["response"] = result["response"]
             # The worker nests its measurements under "metrics" (see
-            # InferenceService.run_inference): generation latency and energy,
+            # InferenceService._run_inference): generation latency and energy,
             # token counts and model load time. They are returned with every
             # response so that clients, e.g. a load generator, can log them.
             worker_metrics = result.get("metrics") or {}

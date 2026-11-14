@@ -19,7 +19,7 @@ class DataProcessor:
         self.columns = self.config.get("columns", {})
         self.preprocessing = self.config.get("preprocessing", {})
         
-    def process_example(self, example):
+    def _process_example(self, example):
         """Process a single example to standardized format"""
         processed = {
             "dataset": self.name,
@@ -91,7 +91,7 @@ class DataProcessor:
         # Process all examples
         processed_data = []
         for i, example in enumerate(dataset):
-            processed = self.process_example(example)
+            processed = self._process_example(example)
             processed["id"] = f"{self.name}_{i+1}"
             processed_data.append(processed)
         

@@ -30,6 +30,11 @@ class FakeWorkerTestCase(unittest.TestCase):
             mock.patch.object(
                 InferenceService, "_warm_up_model", lambda *args, **kwargs: None
             ),
+            # On a host with a GPU, a fake load would be measured as 0 GB.
+            mock.patch(
+                "src.services.inference_service.torch.cuda.is_available",
+                return_value=False,
+            ),
         ]
         mocks = [p.start() for p in patches]
         for p in patches:

@@ -528,7 +528,3 @@ class AllocationController:
     def has_plan(self) -> bool:
         """True once the controller has made its first plan."""
         return self._planned
-
-    def available_models(self) -> List[str]:
-        """Models with at least one replica in the current plan."""
-        return [m for m, v in self._weights.items() if v]

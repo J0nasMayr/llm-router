@@ -283,7 +283,7 @@ class InferenceService:
                     f"target models; skipped"
                 )
 
-    def run_inference(self, query_text, model_id, generation_parameters=None):
+    def _run_inference(self, query_text, model_id, generation_parameters=None):
         """Run inference on a query"""
         model, tokenizer, load_seconds = self._load_model(model_id)
         inputs, input_tokens, gen_params = self._prepare_generation_params(
@@ -462,7 +462,7 @@ class InferenceService:
             self._publish_telemetry()
             self._telemetry_stop.wait(self.telemetry_interval)
 
-    def start_telemetry(self):
+    def _start_telemetry(self):
         if self._telemetry_thread and self._telemetry_thread.is_alive():
             return
         self._telemetry_stop.clear()
@@ -472,18 +472,13 @@ class InferenceService:
         self._telemetry_thread.start()
         logger.info(f"Telemetry loop started for node {self.node_id}")
 
-    def stop_telemetry(self):
-        self._telemetry_stop.set()
-        if self._telemetry_thread:
-            self._telemetry_thread.join(timeout=2.0)
-
     def run(self):
         """Main worker loop"""
         logger.info(
             f"Worker started on {self.device} as node={self.node_id} tier={self.tier} "
             f"listening to queues: {self.listen_queues}"
         )
-        self.start_telemetry()
+        self._start_telemetry()
 
         while True:
             self._reconcile_placement()
@@ -497,7 +492,7 @@ class InferenceService:
             )
 
             try:
-                result = self.run_inference(
+                result = self._run_inference(
                     task["query_text"],
                     task["selected_model"],
                     task.get("generation_parameters"),

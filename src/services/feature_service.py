@@ -33,7 +33,7 @@ class FeatureService:
 
     @property
     def context_dimension(self):
-        """Length of the context vector built by `get_context_vector`:
+        """Length of the context vector built by `_get_context_vector`:
         three one-hot blocks in a row (task type, cluster, complexity bin)."""
         return len(self.task_types) + self.num_clusters + self.num_complexity_bins
 
@@ -61,11 +61,11 @@ class FeatureService:
         )
         features["complexity_score"] = complexity_result["score"]
         features["complexity_bin"] = complexity_result["bin"]
-        features["context_vector"] = self.get_context_vector(features)
+        features["context_vector"] = self._get_context_vector(features)
 
         return features
 
-    def get_context_vector(self, features):
+    def _get_context_vector(self, features):
         """Convert features dictionary to a context vector for MAB algorithms"""
         context_vector = []
         if "task_type" in features:

@@ -16,6 +16,8 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
+The only edit to these files is an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`.
+
 **Extended**
 
 - `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.

@@ -101,7 +101,7 @@ def edge_node(node_id="e1", **fields):
 
 
 class ControllerTest(unittest.TestCase):
-    def run_controller(self, ticks, telemetry, demand=None, **kwargs):
+    def _run_controller(self, ticks, telemetry, demand=None, **kwargs):
         """Build a controller with a fake queue client and run `ticks` ticks;
         returns (controller, queue client)."""
         queue = mock.MagicMock()
@@ -121,7 +121,7 @@ class ControllerTest(unittest.TestCase):
         return asyncio.run(scenario()), queue
 
     def test_first_plan_from_the_prior_is_published(self):
-        controller, queue = self.run_controller(
+        controller, queue = self._run_controller(
             1, [edge_node()], prior_demand={"big": 0.05, "mid": 0.02}
         )
         # Published with an expiry: 3 ticks of 5 s plus 1 s.
@@ -132,7 +132,7 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(controller.traffic_shares("big"), [("e1", 1.0)])
 
     def test_plan_is_renewed_every_tick(self):
-        _, queue = self.run_controller(3, [edge_node()], prior_demand={"big": 0.05})
+        _, queue = self._run_controller(3, [edge_node()], prior_demand={"big": 0.05})
         self.assertEqual(queue.set_node_placement.call_count, 3)
         for call in queue.set_node_placement.call_args_list:
             self.assertEqual(call, mock.call("e1", ["big"], ttl_seconds=16))
@@ -141,7 +141,7 @@ class ControllerTest(unittest.TestCase):
         with mock.patch(
             "src.services.allocation_controller.solve_placement", wraps=solve_placement
         ) as solver:
-            _, queue = self.run_controller(
+            _, queue = self._run_controller(
                 3, [edge_node()], demand={"big": 5.0}, policy="static", T_cool=0.0
             )
         self.assertEqual(solver.call_count, 1)
@@ -150,7 +150,7 @@ class ControllerTest(unittest.TestCase):
     def test_placement_rule_fires_once_loading_can_pay_off(self):
         # The prior places nothing. Demand for mid then stays far below
         # R_min (0.1 req/s), but above 1/T_plan, so mid is placed.
-        controller, queue = self.run_controller(
+        controller, queue = self._run_controller(
             2, [edge_node()], prior_demand={"small": 0.0}, demand={"mid": 0.05}, T_cool=0.0
         )
         self.assertEqual(queue.set_node_placement.call_args_list[0][0][1], [])
@@ -158,7 +158,7 @@ class ControllerTest(unittest.TestCase):
         self.assertEqual(controller.traffic_shares("mid"), [("e1", 1.0)])
 
     def test_never_places_a_model_on_a_node_too_small_for_it(self):
-        _, queue = self.run_controller(
+        _, queue = self._run_controller(
             1, [edge_node(memory_budget_gb=10.0)], prior_demand={"big": 1.0}
         )
         queue.set_node_placement.assert_called_once_with("e1", [], ttl_seconds=16)
@@ -168,7 +168,7 @@ class TriggerTest(unittest.TestCase):
     """Scale-up and scale-down compare the predicted load of each node with
     theta_up (0.85) and theta_down (0.5)."""
 
-    def reason(self, weights, demand, telemetry):
+    def _reason(self, weights, demand, telemetry):
         async def scenario():
             controller = AllocationController(
                 queue_client=mock.MagicMock(),
@@ -182,42 +182,42 @@ class TriggerTest(unittest.TestCase):
 
         return asyncio.run(scenario())
 
-    def two_replicas(self, rate):
+    def _two_replicas(self, rate):
         # small takes 2 s on e1 and e2, which split its traffic equally.
         telemetry = [
             edge_node(node_id, latency_by_model={"small": 2.0}) for node_id in ("e1", "e2")
         ]
         weights = {"small": [("e1", 0.5), ("e2", 0.5)]}
-        return self.reason(weights, {"small": rate}, telemetry)
+        return self._reason(weights, {"small": rate}, telemetry)
 
     def test_replicas_add_up(self):
         # 0.5 req/s keeps each node 50 % busy: no new plan. Averaging the
         # replicas' throughput would have fired at 0.43 req/s.
-        self.assertIsNone(self.two_replicas(0.5))
-        self.assertTrue(self.two_replicas(0.9).startswith("scale_up"))
+        self.assertIsNone(self._two_replicas(0.5))
+        self.assertTrue(self._two_replicas(0.9).startswith("scale_up"))
 
     def test_models_on_one_node_share_its_time(self):
         # Each model alone needs 60 % of e1, together 120 %.
         telemetry = [edge_node(latency_by_model={"small": 1.0, "mid": 1.0})]
         weights = {"small": [("e1", 1.0)], "mid": [("e1", 1.0)]}
-        reason = self.reason(weights, {"small": 0.6, "mid": 0.6}, telemetry)
+        reason = self._reason(weights, {"small": 0.6, "mid": 0.6}, telemetry)
         self.assertTrue(reason.startswith("scale_up(node=e1"))
 
     def test_scale_down_when_every_node_is_below_theta_down(self):
         telemetry = [edge_node(latency_by_model={"small": 1.0})]
-        reason = self.reason({"small": [("e1", 1.0)]}, {"small": 0.2}, telemetry)
+        reason = self._reason({"small": [("e1", 1.0)]}, {"small": 0.2}, telemetry)
         self.assertTrue(reason.startswith("scale_down"))
 
     def test_replica_on_a_silent_node_does_not_count(self):
         # mid's only replica is on e2, which no longer reports telemetry.
         telemetry = [edge_node(latency_by_model={"small": 1.0})]
         weights = {"small": [("e1", 1.0)], "mid": [("e2", 1.0)]}
-        reason = self.reason(weights, {"small": 0.6, "mid": 0.05}, telemetry)
+        reason = self._reason(weights, {"small": 0.6, "mid": 0.05}, telemetry)
         self.assertTrue(reason.startswith("place(mid"))
 
 
 class WorkerTargetTest(FakeWorkerTestCase):
-    def reconcile(self, target):
+    def _reconcile(self, target):
         self.redis.get_node_placement.return_value = target
         self.worker._last_reconcile = 0.0
         self.worker._reconcile_placement()
@@ -225,26 +225,26 @@ class WorkerTargetTest(FakeWorkerTestCase):
 
     def test_loads_one_missing_target_model_per_call(self):
         self.make_worker(memory_budget_gb=20.0)
-        self.assertEqual(self.reconcile(["mid", "small"]), ["mid"])
-        self.assertEqual(self.reconcile(["mid", "small"]), ["mid", "small"])
+        self.assertEqual(self._reconcile(["mid", "small"]), ["mid"])
+        self.assertEqual(self._reconcile(["mid", "small"]), ["mid", "small"])
 
     def test_target_load_never_unloads_other_target_models(self):
         self.make_worker(memory_budget_gb=18.0)
-        self.reconcile(["big"])
+        self._reconcile(["big"])
         # mid (4 GB) does not fit next to big (16 GB) within 18 GB.
-        self.assertEqual(self.reconcile(["big", "mid"]), ["big"])
+        self.assertEqual(self._reconcile(["big", "mid"]), ["big"])
 
     def test_target_load_unloads_models_outside_the_target_first(self):
         worker = self.make_worker(memory_budget_gb=20.0)
         worker._load_model("small")
-        self.reconcile(["big"])
+        self._reconcile(["big"])
         # 2 + 16 + 4 > 20: small, outside the target, makes room for mid.
-        self.assertEqual(self.reconcile(["big", "mid"]), ["big", "mid"])
+        self.assertEqual(self._reconcile(["big", "mid"]), ["big", "mid"])
 
     def test_task_load_unloads_target_models_only_as_last_resort(self):
         worker = self.make_worker(memory_budget_gb=20.0)
         worker._load_model("small")
-        self.reconcile(["big"])
+        self._reconcile(["big"])
         worker._load_model("mid")  # a task: small goes first, big can stay
         self.assertEqual(worker._model_state_snapshot()["resident_models"], ["big", "mid"])
         worker.memory_budget_gb = 17.0
@@ -255,16 +255,16 @@ class WorkerTargetTest(FakeWorkerTestCase):
     def test_target_models_load_only_while_the_queue_is_empty(self):
         self.make_worker(memory_budget_gb=20.0)
         self.redis.get_queue_length.return_value = 3
-        self.assertEqual(self.reconcile(["mid"]), [])
+        self.assertEqual(self._reconcile(["mid"]), [])
         self.assertEqual(self.worker._model_state_snapshot()["target_models"], ["mid"])
         self.redis.get_queue_length.return_value = 0
-        self.assertEqual(self.reconcile(["mid"]), ["mid"])
+        self.assertEqual(self._reconcile(["mid"]), ["mid"])
 
     def test_node_falls_back_to_lru_when_its_target_expires(self):
         worker = self.make_worker(memory_budget_gb=20.0)
-        self.reconcile(["mid"])
+        self._reconcile(["mid"])
         worker._load_model("small")  # a task; mid is now least recently used
-        self.reconcile(None)  # the target expired
+        self._reconcile(None)  # the target expired
         self.assertIsNone(worker._model_state_snapshot()["target_models"])
         # Plain LRU: mid goes first. With mid still a target, small would go.
         worker._load_model("big")
@@ -272,7 +272,7 @@ class WorkerTargetTest(FakeWorkerTestCase):
 
     def test_without_a_target_the_node_loads_on_demand_only(self):
         self.make_worker(memory_budget_gb=20.0)
-        self.assertEqual(self.reconcile(None), [])
+        self.assertEqual(self._reconcile(None), [])
         self.assertIsNone(self.worker._model_state_snapshot()["target_models"])
 
 
@@ -355,7 +355,7 @@ class StubController:
 
 
 class OrchestratorPlacementTest(unittest.TestCase):
-    def nodes(self):
+    def _nodes(self):
         return [
             node(node_id="a", queue_name="qa", resident_models=["big"]),
             node(node_id="b", queue_name="qb", resident_models=["big"]),
@@ -364,13 +364,13 @@ class OrchestratorPlacementTest(unittest.TestCase):
     def test_replicas_are_used_when_they_meet_the_deadline(self):
         orch = make_orchestrator()
         orch.allocation_controller = StubController({"big": [("a", 1.0)]})
-        options = orch._node_options_for_model("big", self.nodes())
+        options = orch._node_options_for_model("big", self._nodes())
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 
     def test_other_nodes_serve_as_overflow(self):
         orch = make_orchestrator()
         orch.allocation_controller = StubController({"big": [("a", 1.0)]})
-        busy_a, b = self.nodes()
+        busy_a, b = self._nodes()
         busy_a["queue_length"] = 100
         options = orch._node_options_for_model("big", [busy_a, b])
         self.assertEqual([n["node_id"] for n, _ in options], ["b"])
@@ -378,7 +378,7 @@ class OrchestratorPlacementTest(unittest.TestCase):
     def test_model_without_replica_is_not_restricted(self):
         orch = make_orchestrator()
         orch.allocation_controller = StubController({})
-        self.assertEqual(len(orch._node_options_for_model("big", self.nodes())), 2)
+        self.assertEqual(len(orch._node_options_for_model("big", self._nodes())), 2)
 
     def test_shadow_demand_counts_the_unmasked_choice(self):
         router = mock.MagicMock()
