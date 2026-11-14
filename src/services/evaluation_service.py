@@ -8,11 +8,10 @@ from src.metrics.text_utils import TextNormalizer
 class EvaluationService:
     """Service for evaluating model responses and calculating rewards."""
 
-    def __init__(self, metrics_config=None):
-        self.metrics_config = metrics_config or {}
+    def __init__(self):
         self.quality_metrics = QualityMetrics()
         self.text_normalizer = TextNormalizer()
-        self.metric_normalizer = MetricNormalizer(metrics_config)
+        self.metric_normalizer = MetricNormalizer()
         self.energy_metrics = EnergyMetrics()
 
     def evaluate(

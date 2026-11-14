@@ -46,8 +46,6 @@ def _build_services():
     )
 
     feature_service = FeatureService(features)
-    # MetricNormalizer reads config/metrics.yaml itself; its constructor takes
-    # a path, not the already-loaded dict.
     evaluation_service = EvaluationService()
 
     # Bandit choice: prefer linucb if configured, else fall back to epsilon-greedy.
