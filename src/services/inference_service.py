@@ -528,9 +528,6 @@ class InferenceService:
 
 def main():
     parser = argparse.ArgumentParser(description="LLM Inference Worker")
-    # Redis settings come from config/infrastructure.yaml, like the API's
-    # (run_api.py), so that both sides use the same server. The flags override
-    # the file, e.g. for a worker on another machine.
     parser.add_argument(
         "--redis-host", default=None, help="Overrides redis.host of the config"
     )
@@ -591,6 +588,8 @@ def main():
         "(1 = one model at a time, as in GreenServ).",
     )
     args = parser.parse_args()
+    # Redis settings come from the same config-file that the API (run_api.py) uses.
+    # The flags may still override that file, e.g. for a worker on another machine.
     redis_cfg = load_config("infrastructure").get("redis") or {}
     redis_client = RedisClient(
         host=args.redis_host or redis_cfg.get("host", "localhost"),

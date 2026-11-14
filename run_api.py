@@ -37,7 +37,7 @@ def _build_services():
     infrastructure = load_config("infrastructure")
     datasets = load_config("datasets").get("datasets") or {}
 
-    # The workers read the same Redis settings (inference_service.main)
+    # The workers (inference_service.main) read the same Redis settings
     redis_cfg = infrastructure.get("redis") or {}
     redis_client = RedisClient(
         host=redis_cfg.get("host", "localhost"),
