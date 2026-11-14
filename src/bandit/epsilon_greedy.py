@@ -456,32 +456,25 @@ class LinearEpsilonGreedy(BaseBandit):
             f"LinearEpsilonGreedy initialized with d={context_dimension}, lambda={lambda_}"
         )
 
-    def select_model(self, context, available_models=None):
+    def select_model(self, context):
         """Selects a model using epsilon-greedy strategy based on linear reward prediction."""
-        allowed = set(available_models) if available_models else None
-        candidates = (
-            [m for m in self.model_ids if m in allowed] if allowed else list(self.model_ids)
-        )
-        if not candidates:
-            candidates = list(self.model_ids)
-
         if context is None:
 
             logger.warning(
                 "LinearEpsilonGreedy received None context, selecting randomly."
             )
-            return random.choice(candidates)
+            return random.choice(self.model_ids)
         context = np.asarray(context).reshape(-1)
         if context.shape[0] != self.context_dimension:
             logger.error(
                 f"Context dimension mismatch. Expected {self.context_dimension}, got {context.shape}. Selecting randomly."
             )
-            return random.choice(candidates)
+            return random.choice(self.model_ids)
         if random.random() < self.epsilon:
-            return random.choice(candidates)
+            return random.choice(self.model_ids)
         else:
             predictions = {}
-            for mid in candidates:
+            for mid in self.model_ids:
                 predictions[mid] = context @ self.theta[mid]
             max_pred = -np.inf
             best_models = []
