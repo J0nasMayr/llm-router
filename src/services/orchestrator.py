@@ -36,7 +36,6 @@ class Orchestrator:
         self.alpha = alpha
         self.beta = beta
         self.model_configs = model_configs
-        self.model_usage_counts = {}
         self.T_max = T_max
         # How long to wait for a worker result. Must exceed the deadline T_max,
         # otherwise a request that just meets it still times out here.
@@ -302,9 +301,6 @@ class Orchestrator:
                 available_models=available_models or None,
             )
             preferred_model = self.router_service.preferred_model() or model_id
-        if model_id not in self.model_usage_counts:
-            self.model_usage_counts[model_id] = 0
-        self.model_usage_counts[model_id] += 1
         self._count("realized", model_id)
         self._count("shadow", preferred_model)
         # Explicit arguments win; otherwise use the dataset's own extraction,
@@ -392,10 +388,3 @@ class Orchestrator:
             response["error"] = str(e)
 
         return response
-
-    def get_metrics(self):
-        """Get orchestrator metrics"""
-        return {
-            "model_usage": self.model_usage_counts,
-            "total_queries_processed": sum(self.model_usage_counts.values()),
-        }
