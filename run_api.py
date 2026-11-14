@@ -50,10 +50,7 @@ def _build_services():
 
     # Bandit choice: prefer linucb if configured, else fall back to epsilon-greedy.
     algo = "linucb" if "linucb" in mab else next(iter(mab.keys()), "epsilon_greedy")
-    algo_params = (mab.get(algo) or {}).copy()
-    algo_params.pop("name", None)
-    algo_params.pop("type", None)
-    algo_params.pop("num_actions", None)
+    algo_params = mab.get(algo) or {}
     router_service = RouterService(
         algorithm_name=algo,
         model_ids=list(models.keys()),
