@@ -19,7 +19,8 @@ class LinUCB(BaseBandit):
         Args:
             model_ids (list): List of model identifiers (arms).
             context_dimension (int): Dimensionality of context vectors.
-            alpha (float): Exploration parameter.
+            alpha (float): Exploration weight, alpha_UCB in the thesis. Not
+                the reward weight alpha, which the orchestrator holds.
             regularization (float): Regularization parameter (lambda).
             seed (int, optional): Random seed.
         """

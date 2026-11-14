@@ -3,7 +3,7 @@
 # entries are selectable by removing/reordering. Keys must match the bandit
 # constructor signatures in src/bandit/.
 linucb:
-  alpha: 1.0            # exploration strength
+  alpha: 1.0            # exploration weight, alpha_UCB in the thesis (not the reward weight alpha)
   regularization: 1.0   # ridge lambda for the per-arm design matrix
   seed: 40
 

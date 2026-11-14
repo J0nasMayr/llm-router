@@ -5,7 +5,7 @@ model's traffic is split across the nodes that hold it. Adopts HAS-GPU's
 Kalman + threshold + cooldown trigger; the placement is a small mixed-integer
 program in the spirit of ENOVA's replica program and SageServe's placement
 ILP. Nodes read their target placement from Redis and load or unload models
-to follow it; the orchestrator reads the traffic shares via eligibility_for().
+to follow it; the orchestrator reads the traffic shares via traffic_shares().
 
 The controller is optional: without it, nodes load models on demand and keep
 the most recently used ones.
@@ -67,19 +67,19 @@ def solve_placement(
     budget_gb: Dict[str, Optional[float]],
     eligible: Dict[Pair, bool],
     current: Dict[Pair, bool],
-    target_utilization: float = 0.85,
+    theta_up: float = 0.85,
     planning_horizon_s: float = 300.0,
 ) -> Tuple[Dict[str, List[str]], Dict[str, List[Tuple[str, float]]]]:
     """Placement program: which models each node keeps loaded, and how each
     model's traffic is split across the nodes that hold it.
 
     Variables, per eligible (model m, node n) pair: y[m,n] in {0, 1}, node n
-    keeps m loaded, and x[m,n] in [0, 1], the share of m's requests that n
-    serves. The rest of m's requests, 1 - sum_n x[m,n], find no loaded
+    keeps m loaded, and f[m,n] in [0, 1], the share of m's requests that n
+    serves. The rest of m's requests, 1 - sum_n f[m,n], find no loaded
     replica.
 
     Objective, in node-seconds per second:
-        sum d[m] * tau[m,n] * x[m,n]                     served requests
+        sum d[m] * tau[m,n] * f[m,n]                     served requests
       + sum d[m] * (tau_avg[m] + load_avg[m]) * rest[m]   requests without a
                                                           replica: a load, then
                                                           the inference
@@ -87,10 +87,10 @@ def solve_placement(
                                                           the planning horizon
     so a model is worth loading once about one request for it is expected
     within the horizon. Constraints:
-        sum_n x[m,n] <= 1                    for each model
-        x[m,n] <= y[m,n]                     traffic only to nodes that hold m
+        sum_n f[m,n] <= 1                    for each model
+        f[m,n] <= y[m,n]                     traffic only to nodes that hold m
         sum_m size[m,n] * y[m,n] <= S[n]     memory budget of each node
-        sum_m d[m] * tau[m,n] * x[m,n] <= rho   load of each node
+        sum_m d[m] * tau[m,n] * f[m,n] <= theta_up   load of each node
     Loading nothing is always feasible. A tiny bonus for the current placement
     (y0) keeps plans that are equally good from replacing it.
 
@@ -107,7 +107,7 @@ def solve_placement(
 
     by_demand = {m: -demand.get(m, 0.0) for m in models}
     P = len(pairs)
-    num_vars = 2 * P  # y for every pair, then x for every pair
+    num_vars = 2 * P  # y for every pair, then f for every pair
     keep_bonus = 1e-6
 
     c = np.zeros(num_vars)
@@ -148,7 +148,7 @@ def solve_placement(
         add_row(
             [(P + q, demand.get(pairs[q][0], 0.0) * latency[pairs[q]]) for q in own],
             -np.inf,
-            target_utilization,
+            theta_up,
         )
 
     integrality = np.zeros(num_vars)
@@ -163,12 +163,12 @@ def solve_placement(
 
     shares: Dict[str, List[Tuple[str, float]]] = {}
     if res.success and res.x is not None:
-        y, x = res.x[:P], res.x[P:]
+        y, f = res.x[:P], res.x[P:]
         for p, (m, n) in enumerate(pairs):
             if y[p] > 0.5:
                 placement[n].append(m)
-            if x[p] > 1e-6:
-                shares.setdefault(m, []).append((n, float(x[p])))
+            if f[p] > 1e-6:
+                shares.setdefault(m, []).append((n, float(f[p])))
     else:
         logger.warning(f"Placement program failed ({res.message}); keeping the current placement")
         for m, n in pairs:
@@ -437,7 +437,7 @@ class AllocationController:
             budget_gb,
             eligible,
             current,
-            target_utilization=self.theta_up,
+            theta_up=self.theta_up,
             planning_horizon_s=self.planning_horizon_s,
         )
         self._targets = {n: list(placement.get(n, [])) for n in nodes}
@@ -520,12 +520,12 @@ class AllocationController:
 
     # ---------- public read API ----------
 
-    def eligibility_for(self, model_id) -> List[Tuple[str, float]]:
+    def traffic_shares(self, model_id) -> List[Tuple[str, float]]:
         """[(node_id, share)] over the nodes that hold the model in the current
         plan. Empty for a model without replicas, which is not restricted."""
         return self._weights.get(model_id, [])
 
-    def has_eligibility(self) -> bool:
+    def has_plan(self) -> bool:
         """True once the controller has made its first plan."""
         return self._planned
 

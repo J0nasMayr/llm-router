@@ -21,7 +21,7 @@ class Orchestrator:
         model_configs,
         alpha=0.5,
         beta=0.5,
-        sla_max_latency_seconds=60.0,
+        T_max=60.0,
         min_free_gpu_memory_gb=0.5,
         network_delay_by_tier=None,
         allocation_controller=None,
@@ -37,13 +37,13 @@ class Orchestrator:
         self.beta = beta
         self.model_configs = model_configs
         self.model_usage_counts = {}
-        self.sla_max_latency_seconds = sla_max_latency_seconds
-        # How long to wait for a worker result. Must exceed the SLA deadline,
-        # otherwise a request that just meets the SLA still times out here.
+        self.T_max = T_max
+        # How long to wait for a worker result. Must exceed the deadline T_max,
+        # otherwise a request that just meets it still times out here.
         self.result_timeout_seconds = (
             result_timeout_seconds
             if result_timeout_seconds is not None
-            else sla_max_latency_seconds + 30.0
+            else T_max + 30.0
         )
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.network_delay_by_tier = network_delay_by_tier or {
@@ -166,29 +166,30 @@ class Orchestrator:
             surviving.append(t)
         return surviving
 
-    def _allocation_weights(self, model_id):
-        """{node_id: weight} over the nodes the controller's placement assigns
-        to the model, or None if there is no controller, no placement yet, or
-        no replica of the model in it. A model without replicas is not
-        restricted: it runs wherever the filter allows, loaded on demand."""
+    def _traffic_shares(self, model_id):
+        """{node_id: share}: the model's traffic shares w[m,n] over its
+        replicas in the controller's plan, or None if there is no controller,
+        no plan yet, or no replica of the model in it. A model without replicas
+        is not restricted: it runs wherever the filter allows, loaded on
+        demand."""
         if self.allocation_controller is None:
             return None
-        if not self.allocation_controller.has_eligibility():
+        if not self.allocation_controller.has_plan():
             return None
-        weights = dict(self.allocation_controller.eligibility_for(model_id))
+        weights = dict(self.allocation_controller.traffic_shares(model_id))
         return weights or None
 
     def _node_options_for_model(self, model_id, surviving_nodes):
         """Return [(node, expected_latency)] of nodes whose tier matches `model_id`,
         whose memory budget can hold the model, and whose per-model expected
-        latency satisfies the SLA. Sorted by latency. When the placement has
-        replicas of the model, only their nodes are returned, unless none of
-        them meets the SLA; then the other nodes serve as overflow and load the
-        model on demand."""
+        latency meets the deadline T_max. Sorted by latency. When the placement
+        has replicas of the model, only their nodes are returned, unless none
+        of them meets the deadline; then the other nodes serve as overflow and
+        load the model on demand."""
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
             return []
-        weights = self._allocation_weights(model_id)
+        weights = self._traffic_shares(model_id)
         options, overflow = [], []
         for n in surviving_nodes:
             if n.get("tier") != target_tier:
@@ -196,7 +197,7 @@ class Orchestrator:
             if not fits_on_node(n, model_id, self.model_configs.get(model_id)):
                 continue
             elat = self._expected_latency(n, model_id)
-            if elat > self.sla_max_latency_seconds:
+            if elat > self.T_max:
                 continue
             if weights is None or n.get("node_id") in weights:
                 options.append((n, elat))
@@ -208,7 +209,7 @@ class Orchestrator:
         return options
 
     def _available_models(self, surviving_nodes):
-        """Models with at least one feasible node under the per-model SLA."""
+        """Models with at least one node that meets the deadline T_max."""
         return [
             mid
             for mid in self.model_configs
@@ -219,9 +220,9 @@ class Orchestrator:
         options = self._node_options_for_model(model_id, surviving_nodes)
         if not options:
             return None
-        weights = self._allocation_weights(model_id)
+        weights = self._traffic_shares(model_id)
         if weights:
-            # Weighted random selection over SLA-passing options; falls back
+            # Weighted random selection over the options that meet T_max; falls back
             # to lowest-latency when none of them has a weight (overflow).
             pool = [(n, weights.get(n.get("node_id"), 0.0)) for n, _ in options]
             total = sum(w for _, w in pool)

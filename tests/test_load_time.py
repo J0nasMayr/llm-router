@@ -9,14 +9,14 @@ from src.services.orchestrator import Orchestrator
 from tests.worker_fixture import MODELS, FakeWorkerTestCase
 
 
-def make_orchestrator(sla=30.0):
+def make_orchestrator(T_max=30.0):
     return Orchestrator(
         feature_service=None,
         router_service=None,
         evaluation_service=None,
         queue_client=None,
         model_configs=MODELS,
-        sla_max_latency_seconds=sla,
+        T_max=T_max,
         load_bandwidth_gb_per_s=2.0,
     )
 
@@ -69,7 +69,7 @@ class ExpectedLatencyTest(unittest.TestCase):
     def test_load_time_can_make_a_node_infeasible(self):
         loaded = node(node_id="a", queue_name="qa", resident_models=["big"])
         empty = node(node_id="b", queue_name="qb", resident_models=[])
-        options = make_orchestrator(sla=9.0)._node_options_for_model("big", [loaded, empty])
+        options = make_orchestrator(T_max=9.0)._node_options_for_model("big", [loaded, empty])
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 
 

@@ -128,8 +128,8 @@ class ControllerTest(unittest.TestCase):
         queue.set_node_placement.assert_called_once_with(
             "e1", ["big", "mid"], ttl_seconds=16
         )
-        self.assertTrue(controller.has_eligibility())
-        self.assertEqual(controller.eligibility_for("big"), [("e1", 1.0)])
+        self.assertTrue(controller.has_plan())
+        self.assertEqual(controller.traffic_shares("big"), [("e1", 1.0)])
 
     def test_plan_is_renewed_every_tick(self):
         _, queue = self.run_controller(3, [edge_node()], prior_demand={"big": 0.05})
@@ -155,7 +155,7 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(queue.set_node_placement.call_args_list[0][0][1], [])
         self.assertEqual(queue.set_node_placement.call_args[0][1], ["mid"])
-        self.assertEqual(controller.eligibility_for("mid"), [("e1", 1.0)])
+        self.assertEqual(controller.traffic_shares("mid"), [("e1", 1.0)])
 
     def test_never_places_a_model_on_a_node_too_small_for_it(self):
         _, queue = self.run_controller(
@@ -347,10 +347,10 @@ class StubController:
     def __init__(self, weights):
         self.weights = weights
 
-    def has_eligibility(self):
+    def has_plan(self):
         return True
 
-    def eligibility_for(self, model_id):
+    def traffic_shares(self, model_id):
         return self.weights.get(model_id, [])
 
 

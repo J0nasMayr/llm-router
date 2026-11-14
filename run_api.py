@@ -66,7 +66,7 @@ def _build_services():
     )
 
     feasibility = features.get("feasibility") or {}
-    sla_seconds = float(feasibility.get("max_latency", 60.0))
+    T_max = float(feasibility.get("max_latency", 60.0))
     load_bandwidth = float(feasibility.get("load_bandwidth_gb_per_s", 2.0))
     orch = Orchestrator(
         feature_service=feature_service,
@@ -74,7 +74,7 @@ def _build_services():
         evaluation_service=evaluation_service,
         queue_client=redis_client,
         model_configs=models,
-        sla_max_latency_seconds=sla_seconds,
+        T_max=T_max,
         dataset_configs=datasets,
         load_bandwidth_gb_per_s=load_bandwidth,
     )
@@ -141,7 +141,7 @@ def health():
         "status": "ok",
         "orchestrator_ready": orchestrator is not None,
         "controller_ready": allocation_controller is not None
-        and allocation_controller.has_eligibility(),
+        and allocation_controller.has_plan(),
     }
 
 

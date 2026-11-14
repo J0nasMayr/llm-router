@@ -34,7 +34,7 @@ feature_extraction:
     include_raw_embeddings: false
     normalize_numeric: true
 
-# SLA deadline (seconds) for the orchestrator's feasibility filter (T_max).
+# Latency deadline T_max (seconds) of the orchestrator's feasibility filter.
 # Tune per deployment: must exceed the realistic single-inference latency of
 # the largest model, or every node gets filtered and routing degrades to the
 # cold-start fallback path.
