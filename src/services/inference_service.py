@@ -528,10 +528,22 @@ class InferenceService:
 
 def main():
     parser = argparse.ArgumentParser(description="LLM Inference Worker")
-    parser.add_argument("--redis-host", default="localhost")
-    parser.add_argument("--redis-port", type=int, default=6380)
+    # Redis settings come from config/infrastructure.yaml, like the API's
+    # (run_api.py), so that both sides use the same server. The flags override
+    # the file, e.g. for a worker on another machine.
     parser.add_argument(
-        "--redis-password", default=None, help="Redis password (if required)"
+        "--redis-host", default=None, help="Overrides redis.host of the config"
+    )
+    parser.add_argument(
+        "--redis-port",
+        type=int,
+        default=None,
+        help="Overrides redis.port of the config",
+    )
+    parser.add_argument(
+        "--redis-password",
+        default=None,
+        help="Overrides redis.password of the config",
     )
     parser.add_argument("--device", type=int, default=0)
     parser.add_argument(
@@ -579,8 +591,11 @@ def main():
         "(1 = one model at a time, as in GreenServ).",
     )
     args = parser.parse_args()
+    redis_cfg = load_config("infrastructure").get("redis") or {}
     redis_client = RedisClient(
-        host=args.redis_host, port=args.redis_port, password=args.redis_password
+        host=args.redis_host or redis_cfg.get("host", "localhost"),
+        port=args.redis_port or int(redis_cfg.get("port", 6380)),
+        password=args.redis_password or redis_cfg.get("password"),
     )
 
     model_configs = load_config("models")

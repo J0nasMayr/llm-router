@@ -31,16 +31,14 @@ allocation_controller: Optional[AllocationController] = None
 
 def _build_services():
     """Wire the service graph. Returns (orchestrator, allocation_controller)."""
-    general = load_config("general")
     models = load_config("models")
     features = load_config("feature_extraction")
     mab = load_config("mab")
     infrastructure = load_config("infrastructure")
     datasets = load_config("datasets").get("datasets") or {}
 
-    # Redis lives in infrastructure.yaml (port 6380 by default — must match
-    # the workers' --redis-port); general.yaml is a legacy fallback.
-    redis_cfg = infrastructure.get("redis") or general.get("redis") or {}
+    # The workers read the same Redis settings (inference_service.main)
+    redis_cfg = infrastructure.get("redis") or {}
     redis_client = RedisClient(
         host=redis_cfg.get("host", "localhost"),
         port=int(redis_cfg.get("port", 6380)),
