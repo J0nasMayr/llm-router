@@ -273,9 +273,6 @@ class Orchestrator:
         metadata=None,
         model_id=None,
         wait_for_result=True,
-        extraction_method=None,
-        evaluation_metric=None,
-        generation_parameters=None,
     ):
         """Process a query through the routing pipeline"""
 
@@ -303,15 +300,12 @@ class Orchestrator:
             preferred_model = self.router_service.preferred_model() or model_id
         self._count("realized", model_id)
         self._count("shadow", preferred_model)
-        # Explicit arguments win; otherwise use the dataset's own extraction,
-        # metric and generation settings so online rewards are computed the
-        # same way as in the offline GreenServ setup.
-        ds_extraction, ds_metric, ds_generation = self._dataset_settings(
-            (metadata or {}).get("dataset")
+        # The dataset's own extraction, metric and generation settings, so
+        # online rewards are computed the same way as in the offline GreenServ
+        # setup.
+        extraction_method, evaluation_metric, generation_parameters = (
+            self._dataset_settings((metadata or {}).get("dataset"))
         )
-        extraction_method = extraction_method or ds_extraction
-        evaluation_metric = evaluation_metric or ds_metric
-        generation_parameters = generation_parameters or ds_generation
         # Note: the queue client assigns the definitive task id in enqueue_task.
         task = {
             "query_text": query_text,
