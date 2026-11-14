@@ -23,12 +23,14 @@ class FeatureService:
         self.complexity_extractor = ComplexityExtractor(
             feature_config.get("complexity", {})
         )
-        print(
-            f"Task types: {self.task_extractor.task_types}; Semantic clusters: {self.semantic_extractor.k}; Complexity bins: {self.complexity_extractor.complexity_bins}"
-        )
         self.task_types = self.task_extractor.task_types
         self.num_clusters = self.semantic_extractor.k
         self.num_complexity_bins = len(self.complexity_extractor.complexity_bins)
+        print(
+            f"Task types: {self.task_types}; "
+            f"Semantic clusters: {self.num_clusters}; "
+            f"Complexity bins: {self.complexity_extractor.complexity_bins}"
+        )
 
     @property
     def context_dimension(self):
