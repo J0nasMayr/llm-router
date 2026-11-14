@@ -30,11 +30,6 @@ class FeatureService:
         self.num_clusters = self.semantic_extractor.k
         self.num_complexity_bins = len(self.complexity_extractor.complexity_bins)
 
-        print(
-            f"FeatureService: {len(self.task_types)} tasks, "
-            f"{self.num_clusters} clusters, {self.num_complexity_bins} complexity bins"
-        )
-
     @property
     def context_dimension(self):
         """Length of the one-hot context vector built by `get_context_vector`."""
