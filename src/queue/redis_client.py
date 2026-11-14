@@ -1,5 +1,4 @@
 # src/queue/redis_client.py
-import asyncio
 import json
 import time
 import uuid
@@ -22,12 +21,11 @@ class RedisClient:
         self.redis.ping()
         print(f"Successfully connected to Redis at {host}:{port}")
 
-        self.default_queue = "llm_inference_tasks"
         self.result_prefix = "result:"
         self.telemetry_prefix = "telemetry:node:"
         self.placement_prefix = "placement:node:"
 
-    def enqueue_task(self, task_data, queue_name=None):
+    def enqueue_task(self, task_data, queue_name):
         """Add task to queue and return task ID"""
         # uuid suffix keeps IDs unique even for concurrent same-millisecond tasks
         task_id = (
@@ -37,25 +35,20 @@ class RedisClient:
         task_data["id"] = task_id
         task_json = json.dumps(task_data)
 
-        # Use the provided queue or fall back to default
-        target_queue = queue_name or self.default_queue
-
         # Store task data and add to queue using Redis
         self.redis.set(task_id, task_json)
-        self.redis.lpush(target_queue, task_id)
+        self.redis.lpush(queue_name, task_id)
 
         return task_id
 
-    def get_next_task(self, queue_name=None, timeout=1):
+    def get_next_task(self, queue_name, timeout=1):
         """Get next task from queue, waiting up to timeout seconds.
 
         queue_name may be a single queue or a list of queues; with a list,
         BRPOP pops from the first non-empty queue (earlier entries win).
         """
-        target_queue = queue_name or self.default_queue
-
         # Use BRPOP to wait for a task with timeout
-        result = self.redis.brpop(target_queue, timeout)
+        result = self.redis.brpop(queue_name, timeout)
         if not result:
             return None
 
@@ -75,29 +68,10 @@ class RedisClient:
 
         self.redis.set(result_id, result_json)
 
-    def get_result(self, task_id, timeout=None):
-        """Get result for a task, optionally waiting for completion"""
-        result_id = f"{self.result_prefix}{task_id}"
-
-        # If no timeout, just get current result
-        if timeout is None:
-            result_json = self.redis.get(result_id)
-
-            if not result_json:
-                return None
-            return json.loads(result_json)
-
-        # With timeout, poll until timeout expires
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            result_json = self.redis.get(result_id)
-
-            if result_json:
-                return json.loads(result_json)
-
-            time.sleep(0.1)
-
-        return None
+    def get_result(self, task_id):
+        """Get result for a task, or None if it is not finished"""
+        result_json = self.redis.get(f"{self.result_prefix}{task_id}")
+        return json.loads(result_json) if result_json else None
 
     def get_queue_length(self, queue_name):
         """Return the number of pending tasks in the given queue."""
@@ -145,17 +119,3 @@ class RedisClient:
         except Exception:
             return []
         return results
-
-    async def wait_for_result(self, task_id, timeout=60):
-        """Async wait for result with timeout"""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            result = self.get_result(task_id)
-            if result:
-                return result
-
-            # Sleep briefly to avoid hammering Redis
-            await asyncio.sleep(0.1)
-
-        # Timeout expired
-        raise TimeoutError(f"Timeout waiting for result of task {task_id}")
