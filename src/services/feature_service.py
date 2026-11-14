@@ -1,6 +1,5 @@
 # src/services/feature_service.py
 import logging
-import time
 
 from src.feature_extractor.complexity import ComplexityExtractor
 from src.feature_extractor.semantic_cluster import SemanticClusterExtractor
@@ -43,7 +42,6 @@ class FeatureService:
         query_metadata = query_metadata or {}
         dataset_name = query_metadata.get("dataset", None)
 
-        time.time()
         if dataset_name and dataset_name in self.task_types:
             features["task_type"] = dataset_name
             logger.debug(f"Using dataset '{dataset_name}' directly as task_type.")
@@ -54,11 +52,9 @@ class FeatureService:
             features["task_type"] = self.task_extractor.extract(
                 query_text, query_metadata
             )
-        time.time()
         features["semantic_cluster"] = self.semantic_extractor.extract(
             query_text, query_metadata
         )
-        time.time()
         complexity_result = self.complexity_extractor.extract(
             query_text, query_metadata
         )
