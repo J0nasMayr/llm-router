@@ -42,6 +42,7 @@ class ThompsonSampling(BaseBandit):
         self.f = {}
         self.mu = {}
         self.cov = {}
+        self.decisions = []
 
         for model_id in model_ids:
             self._initialize_model(model_id)

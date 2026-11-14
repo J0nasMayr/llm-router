@@ -1,14 +1,27 @@
 # config/mab.yaml
-# The API picks "linucb" when present (see run_api._build_services); other
-# entries are selectable by removing/reordering. Keys must match the bandit
-# constructor signatures in src/bandit/.
+# `algorithm` names the bandit the API uses; the valid names are the keys of
+# ALGORITHM_TO_CLASS_MAP in src/services/router_service.py. The keys of each
+# block must match the bandit constructor signatures in src/bandit/.
+algorithm: linucb
+
 linucb:
   alpha: 1.0            # exploration weight, alpha_UCB in the thesis (not the reward weight alpha)
   regularization: 1.0   # ridge lambda for the per-arm design matrix
   seed: 40
 
-epsilon-greedy:
+epsilon_greedy:
   initial_epsilon: 0.1
   decay_factor: 0.995
   min_epsilon: 0.01
+  seed: 40
+
+contextual_epsilon_greedy:
+  initial_epsilon: 0.1
+  decay_factor: 0.995
+  min_epsilon: 0.01
+  seed: 40
+
+thompson_sampling:
+  sigma: 0.1
+  prior_variance: 2.0
   seed: 40

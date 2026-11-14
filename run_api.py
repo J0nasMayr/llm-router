@@ -48,15 +48,11 @@ def _build_services():
     feature_service = FeatureService(features)
     evaluation_service = EvaluationService()
 
-    # Bandit choice: prefer linucb if configured, else fall back to epsilon-greedy.
-    algo = "linucb" if "linucb" in mab else next(iter(mab.keys()), "epsilon_greedy")
-    algo_params = mab.get(algo) or {}
+    algo = mab["algorithm"]
     router_service = RouterService(
         algorithm_name=algo,
         model_ids=list(models.keys()),
-        algorithm_params=algo_params,
-        # Must match the one-hot vector FeatureService actually produces
-        # (task types + clusters + complexity bins), not a hardcoded guess.
+        algorithm_params=mab[algo],
         context_dimension=feature_service.context_dimension,
     )
 
