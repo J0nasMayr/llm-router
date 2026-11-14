@@ -310,8 +310,6 @@ class Orchestrator:
         task = {
             "query_text": query_text,
             "selected_model": model_id,
-            "extraction_method": extraction_method,
-            "evaluation_metric": evaluation_metric,
             "generation_parameters": generation_parameters,
         }
 

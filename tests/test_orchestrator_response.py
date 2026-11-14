@@ -67,7 +67,6 @@ class ProcessQueryResponseTest(unittest.TestCase):
         self.queue.get_result.return_value = {
             "status": "failed",
             "error": "CUDA out of memory",
-            "selected_model": "small",
         }
         response = self.query(reference="42")
         self.assertEqual(response["error"], "CUDA out of memory")

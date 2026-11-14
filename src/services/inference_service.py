@@ -312,7 +312,6 @@ class InferenceService:
 
         return {
             "response": output_text,
-            "latency": latency,
             "metrics": {
                 "latency": latency,
                 "energy_consumption": energy,
@@ -498,26 +497,14 @@ class InferenceService:
                     task.get("generation_parameters"),
                 )
                 self.redis_client.set_result(
-                    task["id"],
-                    {
-                        **result,
-                        "status": "completed",
-                        "selected_model": task["selected_model"],
-                        "extraction_method": task.get("extraction_method"),
-                        "evaluation_metric": task.get("evaluation_metric"),
-                    },
+                    task["id"], {**result, "status": "completed"}
                 )
 
                 logger.info(f"Completed task {task['id']}")
             except Exception as e:
                 logger.error(f"Error processing task {task['id']}: {e}")
                 self.redis_client.set_result(
-                    task["id"],
-                    {
-                        "error": str(e),
-                        "status": "failed",
-                        "selected_model": task["selected_model"],
-                    },
+                    task["id"], {"error": str(e), "status": "failed"}
                 )
 
 
