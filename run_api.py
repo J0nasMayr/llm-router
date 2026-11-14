@@ -31,12 +31,12 @@ allocation_controller: Optional[AllocationController] = None
 
 def _build_services():
     """Wire the service graph. Returns (orchestrator, allocation_controller)."""
-    general = load_config("general") or {}
-    models = load_config("models") or {}
-    features = load_config("feature_extraction") or {}
-    mab = load_config("mab") or {}
-    infrastructure = load_config("infrastructure") or {}
-    datasets = (load_config("datasets") or {}).get("datasets") or {}
+    general = load_config("general")
+    models = load_config("models")
+    features = load_config("feature_extraction")
+    mab = load_config("mab")
+    infrastructure = load_config("infrastructure")
+    datasets = load_config("datasets").get("datasets") or {}
 
     # Redis lives in infrastructure.yaml (port 6380 by default — must match
     # the workers' --redis-port); general.yaml is a legacy fallback.
@@ -89,7 +89,7 @@ def _build_services():
 def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
     """The allocation controller configured in allocation.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
-    cfg = (load_config("allocation") or {}).get("allocation") or {}
+    cfg = load_config("allocation").get("allocation") or {}
     policy = cfg.get("policy", "dynamic")
     if policy == "none":
         logger.info("Allocation controller disabled (policy: none)")
@@ -101,7 +101,7 @@ def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
     # assumed total request rate.
     prior_demand = None
     if cfg.get("prior"):
-        shares = (load_config(cfg["prior"]) or {}).get("placement_prior") or {}
+        shares = load_config(cfg["prior"]).get("placement_prior") or {}
         total_rps = float(cfg.get("prior_total_rps", 1.0))
         prior_demand = {m: float(s) * total_rps for m, s in shares.items() if m in models}
     return AllocationController(
