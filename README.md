@@ -1,3 +1,41 @@
+# Resource-Aware LLM Routing in the Edge-Cloud Continuum
+
+A router for LLM inference across edge and cloud nodes.
+For each query, a contextual bandit picks the model that best trades accuracy against energy, choosing only among the models expected to answer within a latency deadline given the current state of the nodes.
+In the background, a placement controller decides which models each node keeps in GPU memory, following the demand of the router.
+
+## About this fork
+
+This repository is a fork of [GreenServ](https://github.com/TZData1/llm-inference-router) ([paper](https://arxiv.org/abs/2601.17551)) at commit `8e055dd`.
+It holds the code and LaTeX source (`tex/`) of a bachelor thesis that extends GreenServ's router to several edge and cloud nodes.
+Everything below the horizontal line is GreenServ's original README, unchanged; it describes GreenServ's offline experiments, which this fork leaves untouched.
+
+**Inherited from GreenServ, unchanged**
+
+- `src/feature_extractor/`, `src/metrics/`: the context features (task type, semantic cluster, text complexity) and the accuracy, energy and normalization code behind the reward.
+- `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
+- `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
+
+**Extended**
+
+- `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
+- `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and the demand counters the placement controller reads.
+- `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry.
+- `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
+- `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
+- `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
+
+**New**
+
+- `src/services/allocation_controller.py`: the placement controller (Kalman trigger and placement program).
+- `src/services/model_memory.py`: model size and load-time estimates shared by the worker, the filter and the controller.
+- `run_api.py`: wires the services together and starts the API and the controller.
+- `config/allocation.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
+- `tests/`: unit tests for the latency estimate of the filter, the worker and the placement controller.
+- `tex/`: the thesis.
+
+-------------------------------------------------------------------------------------------------------------------------------------------------
+
 # Contextual Multi-Armed Bandits for LLM Routing
 
 Implementation of contextual multi-armed bandit algorithms for dynamic LLM routing, optimizing the accuracy-efficiency trade-off in large language model inference.
