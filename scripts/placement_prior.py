@@ -95,7 +95,7 @@ def main():
             "# scripts/placement_prior.py; do not edit by hand.\n"
         )
         yaml.safe_dump(
-            {"placement_prior": {m: round(s, 4) for m, s in ordered.items()}},
+            {m: round(s, 4) for m, s in ordered.items()},
             f,
             sort_keys=False,
         )

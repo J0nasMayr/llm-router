@@ -16,7 +16,7 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-The only edit to these files is an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`.
+The only edits to these files are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`, and the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it.
 
 **Extended**
 

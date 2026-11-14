@@ -12,15 +12,15 @@ def load_datasets(dataset_names=None):
     
     # Use all datasets if none specified
     if dataset_names is None:
-        dataset_names = list(config["datasets"].keys())
+        dataset_names = list(config.keys())
     
     loaded_datasets = {}
     for name in dataset_names:
-        if name not in config["datasets"]:
+        if name not in config:
             print(f"Dataset {name} not found in config")
             continue
             
-        dataset_config = config["datasets"][name]
+        dataset_config = config[name]
         load_params = dataset_config.get("load_params", {})
         split = dataset_config.get("split", "")
         try:

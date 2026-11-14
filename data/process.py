@@ -15,7 +15,7 @@ class DataProcessor:
     def __init__(self, dataset_name):
         self.name = dataset_name
         config = load_config("datasets")
-        self.config = config["datasets"].get(dataset_name, {})
+        self.config = config.get(dataset_name, {})
         self.columns = self.config.get("columns", {})
         self.preprocessing = self.config.get("preprocessing", {})
         

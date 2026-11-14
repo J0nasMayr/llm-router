@@ -1,101 +1,100 @@
 # config/datasets.yaml
-datasets:
-  mmlu:
-    load_params:
-      path: "cais/mmlu"
-      name: "all"
+mmlu:
+  load_params:
+    path: "cais/mmlu"
+    name: "all"
+  split: "test"
+  columns:
+    input1: "question"
+    input2: "choices"
+    reference: "answer"
+  preprocessing:
+    input1_prefix: "Choose the correct answer. Respond with a single letter.\nQuestion:\n"
+    input2_prefix: "Options:\n"
+    output_prefix: "Answer:\n"
+    reference_mapping: "index_to_letter"
+  extraction:
+    method: "multiple_choice"
+    pattern: "([A-D])"
+  evaluation_metric: "exact_match"
+  generation:
+    max_new_tokens: 1
+    stop_sequence: ["\n"]
+
+hellaswag:
+  load_params:
+    path: "Rowan/hellaswag"
+    name: ""
+    split: "validation"
+  columns:
+    input1: "ctx"
+    input2: "endings"
+    reference: "label"
+  preprocessing:
+    input1_prefix: "Choose the correct answer. Respond with a single letter.\nContext:\n"
+    input2_prefix: "Options:\n"
+    output_prefix: "Answer:\n"
+    reference_mapping: "index_to_letter"
+  extraction:
+    method: "multiple_choice"
+    pattern: "([A-D])"
+  evaluation_metric: "exact_match"
+  generation:
+    max_new_tokens: 1
+    stop_sequence: ["\n"]
+
+winogrande:
+  load_params:
+    path: "allenai/winogrande"
+    name: "winogrande_xl"
+    split: "validation"
+  columns:
+    input1: "sentence"
+    input2: ["option1", "option2"]
+    reference: "answer"
+  preprocessing:
+    input1_prefix: "Choose the correct answer. Respond with a single letter.\nContext:\n"
+    input2_prefix: "Options:\n"
+    output_prefix: "Answer:\n"
+    reference_mapping: "index_to_letter"
+  extraction:
+    method: "multiple_choice"
+    pattern: "([A-B])"
+  evaluation_metric: "exact_match"
+  generation:
+    max_new_tokens: 1
+    stop_sequence: ["\n"]
+
+gsm8k:
+  load_params:
+    path: "gsm8k"
+    name: "main"
     split: "test"
-    columns:
-      input1: "question"
-      input2: "choices"
-      reference: "answer"
-    preprocessing:
-      input1_prefix: "Choose the correct answer. Respond with a single letter.\nQuestion:\n"
-      input2_prefix: "Options:\n"
-      output_prefix: "Answer:\n"
-      reference_mapping: "index_to_letter"
-    extraction:
-      method: "multiple_choice"
-      pattern: "([A-D])"
-    evaluation_metric: "exact_match"
-    generation:
-      max_new_tokens: 1
-      stop_sequence: ["\n"]
-
-  hellaswag:
-    load_params:
-      path: "Rowan/hellaswag"
-      name: ""
-      split: "validation"
-    columns:
-      input1: "ctx"
-      input2: "endings"
-      reference: "label"
-    preprocessing:
-      input1_prefix: "Choose the correct answer. Respond with a single letter.\nContext:\n"
-      input2_prefix: "Options:\n"
-      output_prefix: "Answer:\n"
-      reference_mapping: "index_to_letter"
-    extraction:
-      method: "multiple_choice"
-      pattern: "([A-D])"
-    evaluation_metric: "exact_match"
-    generation:
-      max_new_tokens: 1
-      stop_sequence: ["\n"]
-
-  winogrande:
-    load_params:
-      path: "allenai/winogrande"
-      name: "winogrande_xl"
-      split: "validation"
-    columns:
-      input1: "sentence"
-      input2: ["option1", "option2"]
-      reference: "answer"
-    preprocessing:
-      input1_prefix: "Choose the correct answer. Respond with a single letter.\nContext:\n"
-      input2_prefix: "Options:\n"
-      output_prefix: "Answer:\n"
-      reference_mapping: "index_to_letter"
-    extraction:
-      method: "multiple_choice"
-      pattern: "([A-B])"
-    evaluation_metric: "exact_match"
-    generation:
-      max_new_tokens: 1
-      stop_sequence: ["\n"]
-
-  gsm8k:
-    load_params:
-      path: "gsm8k"
-      name: "main"
-      split: "test"
-    columns:
-      input1: "question"
-      reference: "answer"
-    preprocessing:
-      input1_prefix: "Solve this step by step. Provide your final answer in the format 'Answer: <answer> ####'.\nQuestion:\n"
-    extraction:
-      method: "numeric"
-    evaluation_metric: "exact_match"
-    generation:
-      max_new_tokens: 256
-      stop_sequence: ["####"]
-      
-  cnn_dailymail:
-    load_params:
-      path: "cnn_dailymail"
-      name: "3.0.0"
-      split: "test"
-    columns:
-      input1: "article"
-      reference: "highlights"
-    preprocessing:
-      input1_prefix: "Write 2-3 concise sentences summarizing the key details of the article. End with ####.\nArticle:\n"
-    extraction:
-      method: "raw"
-    evaluation_metric: "rouge"
-    generation:
-      max_new_tokens: 128
-      stop_sequence: ["####", "\n\n\n"]
+  columns:
+    input1: "question"
+    reference: "answer"
+  preprocessing:
+    input1_prefix: "Solve this step by step. Provide your final answer in the format 'Answer: <answer> ####'.\nQuestion:\n"
+  extraction:
+    method: "numeric"
+  evaluation_metric: "exact_match"
+  generation:
+    max_new_tokens: 256
+    stop_sequence: ["####"]
+    
+cnn_dailymail:
+  load_params:
+    path: "cnn_dailymail"
+    name: "3.0.0"
+    split: "test"
+  columns:
+    input1: "article"
+    reference: "highlights"
+  preprocessing:
+    input1_prefix: "Write 2-3 concise sentences summarizing the key details of the article. End with ####.\nArticle:\n"
+  extraction:
+    method: "raw"
+  evaluation_metric: "rouge"
+  generation:
+    max_new_tokens: 128
+    stop_sequence: ["####", "\n\n\n"]

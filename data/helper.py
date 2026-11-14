@@ -3,7 +3,7 @@ from config.manager import load_config
 from datasets import Dataset
 
 
-dataset_config = load_config("datasets")["datasets"]
+dataset_config = load_config("datasets")
 
 
 def restructure_mmlu(entry, config):

@@ -35,7 +35,7 @@ def _build_services():
     features = load_config("feature_extraction")
     mab = load_config("mab")
     infrastructure = load_config("infrastructure")
-    datasets = load_config("datasets").get("datasets") or {}
+    datasets = load_config("datasets")
 
     # The workers (inference_service.main) read the same Redis settings
     redis_cfg = infrastructure.get("redis") or {}
@@ -78,7 +78,7 @@ def _build_services():
 def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
     """The allocation controller configured in allocation.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
-    cfg = load_config("allocation").get("allocation") or {}
+    cfg = load_config("allocation")
     policy = cfg.get("policy", "dynamic")
     if policy == "none":
         logger.info("Allocation controller disabled (policy: none)")
@@ -90,7 +90,7 @@ def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
     # assumed total request rate.
     prior_demand = None
     if cfg.get("prior"):
-        shares = load_config(cfg["prior"]).get("placement_prior") or {}
+        shares = load_config(cfg["prior"])
         total_rps = float(cfg.get("prior_total_rps", 1.0))
         prior_demand = {m: float(s) * total_rps for m, s in shares.items() if m in models}
     return AllocationController(
