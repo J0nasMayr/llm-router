@@ -46,7 +46,6 @@ def _build_services():
     )
 
     feature_service = FeatureService(features)
-    evaluation_service = EvaluationService()
 
     algo = mab["algorithm"]
     router_service = RouterService(
@@ -55,6 +54,8 @@ def _build_services():
         algorithm_params=mab[algo],
         context_dimension=feature_service.context_dimension,
     )
+
+    evaluation_service = EvaluationService()
 
     feasibility = features.get("feasibility") or {}
     T_max = float(feasibility.get("max_latency", 60.0))
