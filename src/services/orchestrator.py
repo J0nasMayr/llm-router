@@ -3,6 +3,7 @@ import logging
 import random
 import time
 
+from src.queue.redis_client import node_queue_name, tier_queue_name
 from src.services.model_memory import fits_on_node, load_time_on_node
 
 logger = logging.getLogger(__name__)
@@ -282,10 +283,10 @@ class Orchestrator:
         options = options_by_model.get(model_id)
         if options:
             node = self._pick_node(model_id, options)
-            target_queue = f"llm_tasks_node_{node['node_id']}"
+            target_queue = node_queue_name(node["node_id"])
         else:
             model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
-            target_queue = f"llm_inference_tasks_{model_tier}"
+            target_queue = tier_queue_name(model_tier)
 
         # Pass the targeted queue to the redis client
         task_id = self.queue_client.enqueue_task(task, queue_name=target_queue)

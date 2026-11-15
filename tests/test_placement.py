@@ -17,6 +17,7 @@ import numpy as np
 
 from scripts.placement_prior import model_shares, read_tables
 from src.bandit.linucb import LinUCB
+from src.queue.redis_client import node_queue_name
 from src.services.allocation_controller import AllocationController, solve_placement
 from src.services.evaluation_service import EvaluationService
 from src.services.orchestrator import Orchestrator
@@ -283,7 +284,6 @@ class PlacementKeyTest(unittest.TestCase):
 
         client = RedisClient.__new__(RedisClient)  # no connection attempt
         client.redis = mock.MagicMock()
-        client.placement_prefix = "placement:node:"
         client.set_node_placement("e1", ["mid"], ttl_seconds=16)
         client.redis.set.assert_called_once_with("placement:node:e1", '["mid"]', ex=16)
 
@@ -342,7 +342,7 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
         orch.allocation_controller = controller
         surviving = orch._filter_nodes(store.get_all_node_telemetry())
         node = orch._pick_node("big", orch._options_by_model(surviving)["big"])
-        self.assertEqual(f"llm_tasks_node_{node['node_id']}", worker.queue_name)
+        self.assertEqual(node_queue_name(node["node_id"]), worker.queue_name)
         self.assertEqual(orch._pending_load_time(surviving[0], "big"), 0.0)
 
 

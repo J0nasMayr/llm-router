@@ -48,9 +48,10 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | `e7c5b3d` |
 | C4 | `_pick_queue_for_model` → `_pick_node` with `random.choices`; options computed once per query (`_options_by_model`); `has_plan()` check dropped; Stage 3 comment corrected (first bullet of E4) | `c74cd8f` |
 | C5 | `_get_context_vector` builds three `_one_hot` blocks; always `context_dimension` long, a missing feature raises | `822841a` |
-| E3 | Removed the path comment on line 1 of the fifteen in-scope files (`src/feature_extractor/` and `src/models/registry.py` keep theirs) | uncommitted |
-| E4 | Removed the commented-out `TORCH_USE_CUDA_DSA` line from the worker; the "Setting task_type to None" warning is now a debug message that says what happens (the classifier branch itself is untouched) | uncommitted |
-| E6 | README: `config/mab.yaml`, `config/feature_extraction.yaml`, `config/manager.py` and `feature_service.py` under "Extended"; the cosmetic-edits sentence names the path comments in GreenServ's files | uncommitted |
+| E3 | Removed the path comment on line 1 of the fifteen in-scope files (`src/feature_extractor/` and `src/models/registry.py` keep theirs) | `de0ac8e` |
+| E4 | Removed the commented-out `TORCH_USE_CUDA_DSA` line from the worker; the "Setting task_type to None" warning is now a debug message that says what happens (the classifier branch itself is untouched) | `de0ac8e` |
+| E6 | README: `config/mab.yaml`, `config/feature_extraction.yaml`, `config/manager.py` and `feature_service.py` under "Extended"; the cosmetic-edits sentence names the path comments in GreenServ's files | `de0ac8e` |
+| C2 | `node_queue_name` and `tier_queue_name` in `redis_client.py`, used by the worker, the orchestrator and the test; the Redis key prefixes are class attributes of `RedisClient` | uncommitted |
 
 ## A. Dead code
 

@@ -15,7 +15,7 @@ from transformers import (
 
 from config.manager import load_config
 from src.metrics.energy import EnergyMeasurement
-from src.queue.redis_client import RedisClient
+from src.queue.redis_client import RedisClient, node_queue_name, tier_queue_name
 from src.services.model_memory import estimated_size_gb
 
 logging.basicConfig(level=logging.INFO)
@@ -99,14 +99,11 @@ class InferenceService:
         self.memory_budget_gb = memory_budget_gb
         self.tier = tier
         self.node_id = node_id or f"{tier}-{device_id}"
-        self.queue_name = f"llm_tasks_node_{self.node_id}"
+        self.queue_name = node_queue_name(self.node_id)
         # Listen on the per-node queue (targeted dispatch) AND the tier
         # broadcast queue the orchestrator falls back to when no telemetry is
         # available yet (cold start). Node queue first so targeted tasks win.
-        self.listen_queues = [self.queue_name]
-        tier_queue = f"llm_inference_tasks_{self.tier}"
-        if tier_queue not in self.listen_queues:
-            self.listen_queues.append(tier_queue)
+        self.listen_queues = [self.queue_name, tier_queue_name(self.tier)]
         self.telemetry_interval = telemetry_interval
         self._latency_by_model = defaultdict(lambda: deque(maxlen=telemetry_window))
         self._latency_lock = threading.Lock()

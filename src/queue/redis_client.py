@@ -7,8 +7,24 @@ import redis
 from config.manager import load_config
 
 
+def node_queue_name(node_id):
+    """The task queue of one worker node."""
+    return f"llm_tasks_node_{node_id}"
+
+
+def tier_queue_name(tier):
+    """The task queue every worker of a tier also listens on: the
+    orchestrator's fallback when no node of the model's tier meets the
+    deadline, or before any telemetry has arrived."""
+    return f"llm_inference_tasks_{tier}"
+
+
 class RedisClient:
     """Client for managing Redis task queue"""
+
+    result_prefix = "result:"
+    telemetry_prefix = "telemetry:node:"
+    placement_prefix = "placement:node:"
 
     def __init__(self, host, port, password=None, db=0):
         self.redis = redis.Redis(
@@ -21,10 +37,6 @@ class RedisClient:
         # Test connection
         self.redis.ping()
         print(f"Successfully connected to Redis at {host}:{port}")
-
-        self.result_prefix = "result:"
-        self.telemetry_prefix = "telemetry:node:"
-        self.placement_prefix = "placement:node:"
 
     @classmethod
     def from_config(cls, host=None, port=None, password=None):
