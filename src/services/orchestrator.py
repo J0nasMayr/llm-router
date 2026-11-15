@@ -86,15 +86,8 @@ class Orchestrator:
         return float(self.network_delay_by_tier.get(tier, 0.0))
 
     def _node_free_memory_gb(self, telemetry):
-        hw = telemetry.get("hardware_state") or {}
-        if "gpu_memory_free_gb" in hw:
-            return float(hw["gpu_memory_free_gb"])
-        # Older telemetry only reports used/total — derive free if both present.
-        total = hw.get("gpu_memory_total_gb")
-        used = hw.get("gpu_memory_used_gb")
-        if total is not None and used is not None:
-            return max(0.0, float(total) - float(used))
-        return None
+        free = (telemetry.get("hardware_state") or {}).get("gpu_memory_free_gb")
+        return None if free is None else float(free)
 
     def _avg_latency_for_model(self, telemetry, model_id):
         """Per-model avg latency on this node, falling back to the node-wide avg

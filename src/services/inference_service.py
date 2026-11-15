@@ -426,10 +426,8 @@ class InferenceService:
         state = {"device": self.device}
         if torch.cuda.is_available():
             try:
-                free, total = torch.cuda.mem_get_info(self.device_id)
+                free, _ = torch.cuda.mem_get_info(self.device_id)
                 state["gpu_memory_free_gb"] = round(free / (1024**3), 3)
-                state["gpu_memory_used_gb"] = round((total - free) / (1024**3), 3)
-                state["gpu_memory_total_gb"] = round(total / (1024**3), 3)
             except Exception:
                 pass
         return state

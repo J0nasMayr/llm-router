@@ -254,13 +254,8 @@ class AllocationController:
 
     @staticmethod
     def _node_free_memory_gb(telemetry) -> Optional[float]:
-        hw = telemetry.get("hardware_state") or {}
-        if "gpu_memory_free_gb" in hw:
-            return float(hw["gpu_memory_free_gb"])
-        total, used = hw.get("gpu_memory_total_gb"), hw.get("gpu_memory_used_gb")
-        if total is not None and used is not None:
-            return max(0.0, float(total) - float(used))
-        return None
+        free = (telemetry.get("hardware_state") or {}).get("gpu_memory_free_gb")
+        return None if free is None else float(free)
 
     @staticmethod
     def _latency_for_pair(telemetry, model_id) -> float:
