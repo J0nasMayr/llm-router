@@ -21,8 +21,6 @@ class Orchestrator:
         model_configs,
         T_max,
         load_bandwidth_gb_per_s,
-        alpha=0.5,
-        beta=0.5,
         min_free_gpu_memory_gb=0.5,
         network_delay_by_tier=None,
         allocation_controller=None,
@@ -33,8 +31,6 @@ class Orchestrator:
         self.router_service = router_service
         self.evaluation_service = evaluation_service
         self.queue_client = queue_client
-        self.alpha = alpha
-        self.beta = beta
         self.model_configs = model_configs
         self.T_max = T_max
         # How long to wait for a worker result. Must exceed the deadline T_max,
@@ -358,8 +354,6 @@ class Orchestrator:
                     output_tokens=output_tokens,
                     evaluation_metric=evaluation_metric or "exact_match",
                     extraction_method=extraction_method or "raw",
-                    alpha=self.alpha,
-                    beta=self.beta,
                 )
                 self.router_service.update(features, model_id, metrics["reward"])
                 response["metrics"].update(metrics)

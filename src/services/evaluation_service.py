@@ -8,7 +8,9 @@ from src.metrics.text_utils import TextNormalizer
 class EvaluationService:
     """Service for evaluating model responses and calculating rewards."""
 
-    def __init__(self):
+    def __init__(self, alpha=0.5, beta=0.5):
+        self.alpha = alpha
+        self.beta = beta
         self.quality_metrics = QualityMetrics()
         self.text_normalizer = TextNormalizer()
         self.metric_normalizer = MetricNormalizer()
@@ -66,6 +68,10 @@ class EvaluationService:
             "normalized_energy": normalized_energy,
         }
 
+    def reward(self, normalized_accuracy, normalized_energy):
+        """r = alpha*Acc + beta*(1 - E); see evaluate_and_calculate_reward."""
+        return self.alpha * normalized_accuracy + self.beta * (1 - normalized_energy)
+
     def evaluate_and_calculate_reward(
         self,
         response,
@@ -76,8 +82,6 @@ class EvaluationService:
         output_tokens,
         evaluation_metric="exact_match",
         extraction_method="raw",
-        alpha=0.5,
-        beta=0.5,
     ):
         """Evaluate response and calculate reward r = alpha*Acc - beta*E.
 
@@ -96,9 +100,7 @@ class EvaluationService:
         # metrics.yaml keys the quality bounds as "accuracy" for every dataset,
         # whichever evaluation_metric (exact_match, rouge, ...) produced it.
         normalized_accuracy = self._normalize_metric("accuracy", accuracy, task_type)
-        reward = alpha * normalized_accuracy + beta * (
-            1 - energy_metrics["normalized_energy"]
-        )
+        reward = self.reward(normalized_accuracy, energy_metrics["normalized_energy"])
 
         return {
             "accuracy": accuracy,

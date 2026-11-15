@@ -18,6 +18,7 @@ import numpy as np
 from scripts.placement_prior import model_shares, read_tables
 from src.bandit.linucb import LinUCB
 from src.services.allocation_controller import AllocationController, solve_placement
+from src.services.evaluation_service import EvaluationService
 from src.services.orchestrator import Orchestrator
 from tests.test_load_time import make_orchestrator, node
 from tests.worker_fixture import CONTROLLER_SETTINGS, MODELS, FakeWorkerTestCase
@@ -451,7 +452,7 @@ class PlacementPriorTest(unittest.TestCase):
             row("2", "small", 0.0), row("2", "phi-4-14b", 1.0),
         ]
         # GreenServ's id phi-4-14b maps to phi-4 in config/models.yaml.
-        shares = model_shares(results, queries, {"small", "phi-4"})
+        shares = model_shares(results, queries, {"small", "phi-4"}, EvaluationService())
         self.assertEqual(shares, {"small": 0.5, "phi-4": 0.5})
 
 
