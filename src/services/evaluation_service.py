@@ -18,11 +18,10 @@ class EvaluationService:
         self,
         response,
         reference,
-        task_type="default",
         extraction_method="raw",
         evaluation_metric="exact_match",
     ):
-        """Evaluate response against reference for a specific task type."""
+        """Score the response against the reference."""
 
         extractor = get_extractor(extraction_method)
         extracted_response = extractor.extract(response)
@@ -89,7 +88,7 @@ class EvaluationService:
         """
 
         accuracy = self._evaluate(
-            response, reference, task_type, extraction_method, evaluation_metric
+            response, reference, extraction_method, evaluation_metric
         )
         energy_metrics = self._calculate_energy_metrics(
             energy_consumption, input_tokens, output_tokens, task_type
