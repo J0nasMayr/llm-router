@@ -24,12 +24,13 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 - `src/api/router.py`: reads the orchestrator from the app state, and passes the orchestrator's error message to the client unchanged.
 - `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
-- `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry.
+- `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry. It measures energy with Zeus only, as GreenServ's paper did (GreenServ's PyNVML fallback is not used), and exits at startup if Zeus cannot measure its GPU.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
 - `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
 - `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
 - `config/mab.yaml`: an `algorithm` key selects the bandit, with one block of constructor parameters per bandit (GreenServ's file held a single epsilon-greedy block).
 - `config/feature_extraction.yaml`: complexity bins that every score falls into (with the bounds in GreenServ's file, the first slot stayed unused and the hardest texts got none).
+- `requirements.txt`: Zeus 0.11, which measures the GPU without root (0.10 also needed access to the CPU's RAPL counters).
 - `config/manager.py`: a missing or invalid config file raises instead of loading as empty, and `config/` is found from any working directory.
 
 **New**

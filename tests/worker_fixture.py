@@ -31,7 +31,7 @@ class FakeWorkerTestCase(unittest.TestCase):
 
     def setUp(self):
         patches = [
-            mock.patch("src.services.inference_service.EnergyMeasurement"),
+            mock.patch("src.services.inference_service.ZeusMeasurement"),
             mock.patch("src.services.inference_service.AutoTokenizer"),
             mock.patch("src.services.inference_service.AutoModelForCausalLM"),
             # A plain function, not a mock: a mock would keep references to
@@ -61,7 +61,6 @@ class FakeWorkerTestCase(unittest.TestCase):
             redis_client or self.redis,
             {},
             MODELS,
-            energy_method="zeus",
             tier="edge",
             node_id=node_id,
             **kwargs,

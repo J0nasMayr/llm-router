@@ -61,7 +61,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | E1 | "allocation" → "placement": `placement_controller.py`, `PlacementController`, `config/placement.yaml`, `placement_controller` in the orchestrator and on `app.state`, all comments and log messages; LaTeX labels `sec:placement`, `sec:eval-placement`; CLAUDE.md, README, `evaluation.tex`, `evaluation_plan.md` | `963e9ae` |
 | E2 | One name and one shape for the traffic shares: `solve_placement` returns and the controller stores `{model: {node: share}}` (`_shares`), `traffic_shares()` returns `{node: share}`, no `dict(...)` conversion in the orchestrator | `4ef62d4` |
 | E5 | `basicConfig` only in `run_api.py` and the worker's `main()`; `getLogger(__name__)` everywhere (the worker logs as `__main__` when started with `-m`); the prints in `config/manager.py` (now `debug`), `redis_client.py` and `feature_service.py` are log messages | `bf7f50d` |
-| — | Removed GreenServ's leftovers that nothing imported (not even in GreenServ): `src/models/` with its `ModelRegistry` stub, and the empty `src/api/schemas.py`; README lists them under "Removed" | uncommitted |
+| — | Removed GreenServ's leftovers that nothing imported (not even in GreenServ): `src/models/` with its `ModelRegistry` stub, and the empty `src/api/schemas.py`; README lists them under "Removed" | `a2f5cf9` |
+| — | Zeus only: `zeus-ml` 0.10.0 → 0.11.0.post1 (measures the GPU without root; venv upgraded, adds `amdsmi`); the worker creates `ZeusMeasurement` directly, `--energy-method` and `energy_method` are gone, and `_check_zeus` in `main()` exits at startup if Zeus cannot measure the GPU. GreenServ's paper measured with Zeus too; its PyNVML fallback in `src/metrics/energy.py` stays, unused | uncommitted |
 
 ## A. Dead code
 
@@ -414,10 +415,24 @@ None of the points changes a value in the thesis table.
   reward; only the `task_type` in the response metrics becomes `None`), and
   possibly not building `TaskTypeExtractor` at all. Left alone for now, as
   decided on 2026-11-15; E4 only reworded the log message of that branch.
-- `EnergyMeasurement.create` (`src/metrics/energy.py`, GreenServ's) falls
-  back to PyNVML with only a `print` when Zeus cannot be imported, so a worker
-  started with `--energy-method zeus` may measure with PyNVML without any
-  trace in its results. The worker could log the class it got, or `create`
-  could raise. Found on 2026-11-15 while doing B8.
-- `PlacementController._tick` is declared `async` but never awaits, so a
-  placement solve (time limit 10 s) blocks the API's event loop while it runs.
+- Energy measurement, measured on 2026-11-15 on the development machine
+  (RTX 2060, Intel CPU, as a normal user):
+  - Zeus 0.10 always opened the CPU's RAPL counters in `ZeusMonitor`, and
+    reading `/sys/class/powercap/intel-rapl/*/energy_uj` needs root by
+    default, so it could not measure here. Zeus 0.11 falls back to the GPU
+    alone; with it, `ZeusMeasurement` measures here as a normal user
+    (resolved by the Zeus-only change above). Still, before the experiments,
+    start one worker per testbed node as the user that runs them: a node
+    where Zeus cannot measure now stops the worker with the reason.
+  - Per-query overhead: Zeus starts in about 3 ms and stops in about 4 ms,
+    but a worker's first query pays a one-time 0.3 to 1.3 s
+    (`ZeusMeasurement.start` creates a new `ZeusMonitor` per task; the
+    startup check does not absorb it). This happens outside the latency the
+    worker reports (`start` before its timer, `stop` after), so it is not in
+    τ̄(m, n), but it is in the end-to-end latency the client measures. (The
+    unused PyNVML would have added about 54 ms to every query's stop.)
+  - Zeus 0.11 prints two lines about a missing `/opt/rocm/lib/libamd_smi.so`
+    when imported on a machine without AMD's ROCm: its AMD backend finding
+    no AMD GPU. Harmless.
+  - The evaluation's setup section should say that energy is measured with
+    Zeus, as in GreenServ's paper.

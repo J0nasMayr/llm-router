@@ -28,7 +28,8 @@ pandas==2.0.0
 
 # Measurements
 pynvml==12.0.0
-zeus-ml==0.10.0
+# 0.11 measures the GPU without root; 0.10 also opened the CPU's RAPL counters.
+zeus-ml==0.11.0.post1
 
 # API
 uvicorn==0.34.0

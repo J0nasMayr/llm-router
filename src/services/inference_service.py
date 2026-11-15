@@ -1,6 +1,7 @@
 import argparse
 import gc
 import logging
+import sys
 import threading
 import time
 from collections import OrderedDict, defaultdict, deque
@@ -14,7 +15,7 @@ from transformers import (
 )
 
 from config.manager import load_config
-from src.metrics.energy import EnergyMeasurement
+from src.metrics.energy import ZeusMeasurement
 from src.queue.redis_client import RedisClient, node_queue_name, tier_queue_name
 from src.services.node_telemetry import estimated_size_gb
 
@@ -56,7 +57,6 @@ class InferenceService:
         redis_client,
         general_configs,
         model_configs,
-        energy_method,
         device_id=0,
         tier="cloud",
         node_id=None,
@@ -73,9 +73,7 @@ class InferenceService:
         self.model_configs = model_configs
         self.device_id = device_id
         self.device = f"cuda:{device_id}" if torch.cuda.is_available() else "cpu"
-        self.energy_measurement = EnergyMeasurement.create(
-            method=energy_method, device_id=device_id
-        )
+        self.energy_measurement = ZeusMeasurement(device_id=device_id)
         # Models in GPU memory as model_id -> (model, tokenizer), least
         # recently used first. The node keeps as many models as fit into its
         # memory budget (and at most max_models, if set; 1 reproduces
@@ -487,6 +485,19 @@ class InferenceService:
                 )
 
 
+def _check_zeus(device_id):
+    """Exit unless Zeus can measure this GPU. Otherwise every task would fail
+    instead of the worker's start: ZeusMeasurement.start only prints why it
+    cannot measure."""
+    try:
+        from zeus.monitor import ZeusMonitor
+
+        # As ZeusMeasurement.start creates it for every task.
+        ZeusMonitor(gpu_indices=[device_id])
+    except Exception as e:
+        sys.exit(f"Zeus cannot measure the energy of GPU {device_id}: {e}")
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="LLM Inference Worker")
@@ -505,12 +516,6 @@ def main():
         help="Overrides redis.password of the config",
     )
     parser.add_argument("--device", type=int, default=0)
-    parser.add_argument(
-        "--energy-method",
-        default="zeus",
-        choices=["pynvml", "zeus"],
-        help="Energy measurement method",
-    )
     parser.add_argument("--tier", default="cloud", choices=["cloud", "edge"], help="Is this an edge or cloud worker?")
     parser.add_argument(
         "--node-id",
@@ -545,6 +550,7 @@ def main():
         "(1 = one model at a time, as in GreenServ).",
     )
     args = parser.parse_args()
+    _check_zeus(args.device)
     redis_client = RedisClient.from_config(
         args.redis_host, args.redis_port, args.redis_password
     )
@@ -556,7 +562,6 @@ def main():
         general_configs,
         model_configs,
         device_id=args.device,
-        energy_method=args.energy_method,
         tier=args.tier,
         node_id=args.node_id,
         telemetry_interval=args.telemetry_interval,
