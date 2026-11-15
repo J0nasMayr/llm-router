@@ -46,7 +46,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B9 | The deviation rule's warm-up, sigma floor and smoothing, and the worker's `load_window` and `reconcile_interval`, are constructor defaults (the optional `keep_bonus` and solver time limit stay as they are) | `9d451df` |
 | A10 | Removed the ineffective `update_bounds` call and inlined `_normalize_metric` | `4adfa45` |
 | C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | `e7c5b3d` |
-| C4 | `_pick_queue_for_model` → `_pick_node` with `random.choices`; options computed once per query (`_options_by_model`); `has_plan()` check dropped; Stage 3 comment corrected (first bullet of E4) | uncommitted |
+| C4 | `_pick_queue_for_model` → `_pick_node` with `random.choices`; options computed once per query (`_options_by_model`); `has_plan()` check dropped; Stage 3 comment corrected (first bullet of E4) | `c74cd8f` |
+| C5 | `_get_context_vector` builds three `_one_hot` blocks; always `context_dimension` long, a missing feature raises | uncommitted |
 
 ## A. Dead code
 
@@ -391,6 +392,15 @@ None of the points changes a value in the thesis table.
   whose `predict` raises for every query without a known dataset, and falls
   back to keyword classification. The path is also relative to the current
   directory. Found on 2026-11-15 while doing B3.
+  Update (C5): the thesis says the classifier is not used and an unlabelled
+  query gets an all-zero task-type block (`model.tex:89`–`90`). The outcome
+  matches, because the keyword labels are not in `task_types` (zero block)
+  nor in `metrics.yaml` (normalized 0.5). But every unlabelled query still
+  pays for an embedding and a failing `predict`. Simpler and as described:
+  `task_type = None` without calling the extractor (same vector, same
+  reward; only the `task_type` in the response metrics becomes `None`), and
+  possibly not building `TaskTypeExtractor` at all. Belongs with the second
+  bullet of E4. Left alone for now, as decided on 2026-11-15.
 - `EnergyMeasurement.create` (`src/metrics/energy.py`, GreenServ's) falls
   back to PyNVML with only a `print` when Zeus cannot be imported, so a worker
   started with `--energy-method zeus` may measure with PyNVML without any

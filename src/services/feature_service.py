@@ -66,19 +66,18 @@ class FeatureService:
         return features
 
     def _get_context_vector(self, features):
-        """Convert features dictionary to a context vector for MAB algorithms"""
-        context_vector = []
-        if "task_type" in features:
-            task_type = features["task_type"]
-            for task in self.task_types:
-                context_vector.append(1.0 if task == task_type else 0.0)
-        if "semantic_cluster" in features:
-            cluster_id = features["semantic_cluster"]
-            for i in range(self.num_clusters):
-                context_vector.append(1.0 if i == cluster_id else 0.0)
-        if "complexity_bin" in features:
-            bin_id = features["complexity_bin"]
-            for i in range(self.num_complexity_bins):
-                context_vector.append(1.0 if i == bin_id else 0.0)
+        """Three one-hot blocks in a row (task type, cluster, complexity bin),
+        of length context_dimension. A task type outside task_types leaves its
+        block all zero."""
+        task = features["task_type"]
+        task_index = self.task_types.index(task) if task in self.task_types else None
+        return (
+            _one_hot(task_index, len(self.task_types))
+            + _one_hot(features["semantic_cluster"], self.num_clusters)
+            + _one_hot(features["complexity_bin"], self.num_complexity_bins)
+        )
 
-        return context_vector
+
+def _one_hot(index, size):
+    """[0, …, 1 at index, …, 0] of length size; all zero if index is None."""
+    return [1.0 if i == index else 0.0 for i in range(size)]
