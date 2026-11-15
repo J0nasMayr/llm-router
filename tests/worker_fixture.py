@@ -18,6 +18,7 @@ MODELS = {
 CONTROLLER_SETTINGS = {
     "policy": "dynamic",
     "load_bandwidth_gb_per_s": 2.0,
+    "min_free_gpu_memory_gb": 0.5,
     "planning_horizon_s": 300.0,
     "T_cool": 30.0,
 }

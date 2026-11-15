@@ -38,7 +38,7 @@ Running alongside:
 # Where the parameters are
 
 - [config/allocation.yaml](./config/allocation.yaml): placement policy (dynamic, static, none), demand signal (shadow, realized), prior, planning horizon, cooldown
-- [config/feature_extraction.yaml](./config/feature_extraction.yaml): context features; its `feasibility` block holds the latency deadline and the assumed load speed
+- [config/feature_extraction.yaml](./config/feature_extraction.yaml): context features; its `feasibility` block holds the latency deadline, the assumed load speed and the minimum free GPU memory
 - [config/mab.yaml](./config/mab.yaml): bandit parameters
 - [config/models.yaml](./config/models.yaml): the 16 models with their tier (edge or cloud)
 - Everything else is a constructor default or a command-line flag: the other controller parameters in allocation_controller.py, the worker parameters in inference_service.py, the reward weights in evaluation_service.py, the network delays in orchestrator.py.

@@ -48,6 +48,7 @@ class ProcessQueryResponseTest(unittest.TestCase):
             model_configs=MODELS,
             T_max=30.0,
             load_bandwidth_gb_per_s=2.0,
+            min_free_gpu_memory_gb=0.5,
         )
 
     def query(self, **kwargs):

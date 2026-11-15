@@ -40,7 +40,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B3 | `load_config` raises on a missing or invalid file and resolves `config/` relative to itself, not the current directory | `4c126b8` |
 | B4 | `RedisClient.from_config()` reads the redis block for the API and the worker (flags override it); the constructor has no host/port defaults | `15ba151` |
 | B5 | `EvaluationService` holds the reward weights and the formula (`reward`); the orchestrator no longer passes them, and `scripts/placement_prior.py` reuses them | `7c18241` |
-| B6 | The `"raw"`/`"exact_match"` defaults only in `_dataset_settings`; known datasets read their keys directly; `task_type` read without a guard. Also corrects the docstring of `scripts/placement_prior.py` from B5 (the live system does not widen its bounds, see A10) | uncommitted |
+| B6 | The `"raw"`/`"exact_match"` defaults only in `_dataset_settings`; known datasets read their keys directly; `task_type` read without a guard. Also corrects the docstring of `scripts/placement_prior.py` from B5 (the live system does not widen its bounds, see A10) | `c08687c` |
+| B7 | `min_free_gpu_memory_gb` is read once from the `feasibility` block and passed to the orchestrator and the controller; no constructor defaults | uncommitted |
 
 ## A. Dead code
 
@@ -288,7 +289,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 ### D4. The `feasibility` block sits in `feature_extraction.yaml`
 
 - **Where:** `config/feature_extraction.yaml:41`, read in `run_api.py:60`.
-- **Problem:** it holds the latency deadline and the load speed, which have
+- **Problem:** it holds the latency deadline, the load speed and (since B7)
+  the minimum free GPU memory, which have
   nothing to do with feature extraction.
 - **Fix:** move it to its own file, then flatten `feature_extraction.yaml`
   (its `feature_extraction:` root is the last wrapped root; it is read in

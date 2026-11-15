@@ -21,7 +21,7 @@ class Orchestrator:
         model_configs,
         T_max,
         load_bandwidth_gb_per_s,
-        min_free_gpu_memory_gb=0.5,
+        min_free_gpu_memory_gb,
         network_delay_by_tier=None,
         allocation_controller=None,
         result_timeout_seconds=None,

@@ -53,6 +53,7 @@ def _build_services():
     feasibility = features["feasibility"]
     T_max = float(feasibility["max_latency"])
     load_bandwidth = float(feasibility["load_bandwidth_gb_per_s"])
+    min_free_gb = float(feasibility["min_free_gpu_memory_gb"])
     orch = Orchestrator(
         feature_service=feature_service,
         router_service=router_service,
@@ -62,14 +63,19 @@ def _build_services():
         T_max=T_max,
         dataset_configs=datasets,
         load_bandwidth_gb_per_s=load_bandwidth,
+        min_free_gpu_memory_gb=min_free_gb,
     )
 
-    controller = _build_controller(redis_client, models, orch, load_bandwidth)
+    controller = _build_controller(
+        redis_client, models, orch, load_bandwidth, min_free_gb
+    )
     orch.allocation_controller = controller
     return orch, controller
 
 
-def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
+def _build_controller(
+    redis_client, models, orch, load_bandwidth_gb_per_s, min_free_gpu_memory_gb
+):
     """The allocation controller configured in allocation.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
     cfg = load_config("allocation")
@@ -96,6 +102,7 @@ def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
         policy=policy,
         prior_demand=prior_demand,
         load_bandwidth_gb_per_s=load_bandwidth_gb_per_s,
+        min_free_gpu_memory_gb=min_free_gpu_memory_gb,
         planning_horizon_s=float(cfg["planning_horizon_s"]),
         T_cool=float(cfg["cooldown_s"]),
     )

@@ -18,6 +18,7 @@ def make_orchestrator(T_max=30.0):
         model_configs=MODELS,
         T_max=T_max,
         load_bandwidth_gb_per_s=2.0,
+        min_free_gpu_memory_gb=0.5,
     )
 
 
