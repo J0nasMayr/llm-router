@@ -49,11 +49,11 @@ def plan(demand, nodes=("e1",), budget=20.0, current=(), horizon=300.0, latency=
 
 class SolvePlacementTest(unittest.TestCase):
     def test_fills_the_memory_budget_by_demand(self):
-        placement, weights = plan({"big": 0.05, "mid": 0.02, "small": 0.01})
+        placement, shares = plan({"big": 0.05, "mid": 0.02, "small": 0.01})
         # 16 + 4 GB fill the 20 GB budget; small no longer fits.
         self.assertEqual(placement["e1"], ["big", "mid"])
-        self.assertEqual(weights["big"], [("e1", 1.0)])
-        self.assertNotIn("small", weights)
+        self.assertEqual(shares["big"], {"e1": 1.0})
+        self.assertNotIn("small", shares)
 
     def test_loads_a_model_once_a_request_is_expected_within_the_horizon(self):
         # One request every 200 s pays off within 300 s; one every 500 s not.
@@ -80,20 +80,19 @@ class SolvePlacementTest(unittest.TestCase):
         self.assertEqual(solve({"big": 0.010, "big2": 0.050}), ["big2"])
 
     def test_adds_a_replica_when_one_node_is_not_enough(self):
-        placement, weights = plan({"small": 1.5}, nodes=("e1", "e2"))
+        placement, shares = plan({"small": 1.5}, nodes=("e1", "e2"))
         self.assertIn("small", placement["e1"])
         self.assertIn("small", placement["e2"])
-        shares = dict(weights["small"])
-        self.assertAlmostEqual(sum(shares.values()), 1.0)
-        for share in shares.values():
+        self.assertAlmostEqual(sum(shares["small"].values()), 1.0)
+        for share in shares["small"].values():
             self.assertLessEqual(1.5 * share, 0.85 + 1e-6)
 
     def test_nothing_eligible(self):
-        placement, weights = solve_placement(
+        placement, shares = solve_placement(
             ["small"], ["c1"], {"small": 1.0}, {}, {}, {}, {"c1": 20.0}, {}, {}
         )
         self.assertEqual(placement, {"c1": []})
-        self.assertEqual(weights, {})
+        self.assertEqual(shares, {})
 
 
 def edge_node(node_id="e1", **fields):
@@ -132,7 +131,7 @@ class ControllerTest(unittest.TestCase):
             "e1", ["big", "mid"], ttl_seconds=16
         )
         self.assertTrue(controller.has_plan())
-        self.assertEqual(controller.traffic_shares("big"), [("e1", 1.0)])
+        self.assertEqual(controller.traffic_shares("big"), {"e1": 1.0})
 
     def test_plan_is_renewed_every_tick(self):
         _, queue = self._run_controller(3, [edge_node()], prior_demand={"big": 0.05})
@@ -158,7 +157,7 @@ class ControllerTest(unittest.TestCase):
         )
         self.assertEqual(queue.set_node_placement.call_args_list[0][0][1], [])
         self.assertEqual(queue.set_node_placement.call_args[0][1], ["mid"])
-        self.assertEqual(controller.traffic_shares("mid"), [("e1", 1.0)])
+        self.assertEqual(controller.traffic_shares("mid"), {"e1": 1.0})
 
     def test_never_places_a_model_on_a_node_too_small_for_it(self):
         _, queue = self._run_controller(
@@ -171,7 +170,7 @@ class TriggerTest(unittest.TestCase):
     """Scale-up and scale-down compare the predicted load of each node with
     theta_up (0.85) and theta_down (0.5)."""
 
-    def _reason(self, weights, demand, telemetry):
+    def _reason(self, shares, demand, telemetry):
         async def scenario():
             controller = PlacementController(
                 queue_client=mock.MagicMock(),
@@ -179,7 +178,7 @@ class TriggerTest(unittest.TestCase):
                 demand_provider=dict,
                 **{**CONTROLLER_SETTINGS, "T_cool": 0.0},
             )
-            controller._weights = weights
+            controller._shares = shares
             loads, replicated = controller._node_loads(demand, telemetry)
             return controller._trigger_reason(demand, loads, replicated, telemetry)
 
@@ -190,8 +189,8 @@ class TriggerTest(unittest.TestCase):
         telemetry = [
             edge_node(node_id, latency_by_model={"small": 2.0}) for node_id in ("e1", "e2")
         ]
-        weights = {"small": [("e1", 0.5), ("e2", 0.5)]}
-        return self._reason(weights, {"small": rate}, telemetry)
+        shares = {"small": {"e1": 0.5, "e2": 0.5}}
+        return self._reason(shares, {"small": rate}, telemetry)
 
     def test_replicas_add_up(self):
         # 0.5 req/s keeps each node 50 % busy: no new plan. Averaging the
@@ -202,20 +201,20 @@ class TriggerTest(unittest.TestCase):
     def test_models_on_one_node_share_its_time(self):
         # Each model alone needs 60 % of e1, together 120 %.
         telemetry = [edge_node(latency_by_model={"small": 1.0, "mid": 1.0})]
-        weights = {"small": [("e1", 1.0)], "mid": [("e1", 1.0)]}
-        reason = self._reason(weights, {"small": 0.6, "mid": 0.6}, telemetry)
+        shares = {"small": {"e1": 1.0}, "mid": {"e1": 1.0}}
+        reason = self._reason(shares, {"small": 0.6, "mid": 0.6}, telemetry)
         self.assertTrue(reason.startswith("scale_up(node=e1"))
 
     def test_scale_down_when_every_node_is_below_theta_down(self):
         telemetry = [edge_node(latency_by_model={"small": 1.0})]
-        reason = self._reason({"small": [("e1", 1.0)]}, {"small": 0.2}, telemetry)
+        reason = self._reason({"small": {"e1": 1.0}}, {"small": 0.2}, telemetry)
         self.assertTrue(reason.startswith("scale_down"))
 
     def test_replica_on_a_silent_node_does_not_count(self):
         # mid's only replica is on e2, which no longer reports telemetry.
         telemetry = [edge_node(latency_by_model={"small": 1.0})]
-        weights = {"small": [("e1", 1.0)], "mid": [("e2", 1.0)]}
-        reason = self._reason(weights, {"small": 0.6, "mid": 0.05}, telemetry)
+        shares = {"small": {"e1": 1.0}, "mid": {"e2": 1.0}}
+        reason = self._reason(shares, {"small": 0.6, "mid": 0.05}, telemetry)
         self.assertTrue(reason.startswith("place(mid"))
 
 
@@ -348,11 +347,11 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
 
 
 class StubController:
-    def __init__(self, weights):
-        self.weights = weights
+    def __init__(self, shares):
+        self.shares = shares
 
     def traffic_shares(self, model_id):
-        return self.weights.get(model_id, [])
+        return self.shares.get(model_id, {})
 
 
 class OrchestratorPlacementTest(unittest.TestCase):
@@ -364,13 +363,13 @@ class OrchestratorPlacementTest(unittest.TestCase):
 
     def test_replicas_are_used_when_they_meet_the_deadline(self):
         orch = make_orchestrator()
-        orch.placement_controller = StubController({"big": [("a", 1.0)]})
+        orch.placement_controller = StubController({"big": {"a": 1.0}})
         options = orch._node_options_for_model("big", self._nodes())
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 
     def test_other_nodes_serve_as_overflow(self):
         orch = make_orchestrator()
-        orch.placement_controller = StubController({"big": [("a", 1.0)]})
+        orch.placement_controller = StubController({"big": {"a": 1.0}})
         busy_a, b = self._nodes()
         busy_a["queue_length"] = 100
         options = orch._node_options_for_model("big", [busy_a, b])

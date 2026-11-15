@@ -57,7 +57,7 @@ class Orchestrator:
         self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
         # Optional placement controller. Once it has a placement, a model
         # with replicas is routed to the nodes that hold it, in proportion to
-        # its traffic weights; see _node_options_for_model.
+        # its traffic shares; see _node_options_for_model.
         self.placement_controller = placement_controller
         # Per-dataset scoring and generation settings (datasets.yaml), applied
         # when a request names its dataset in metadata.
@@ -149,8 +149,7 @@ class Orchestrator:
         demand."""
         if self.placement_controller is None:
             return None
-        weights = dict(self.placement_controller.traffic_shares(model_id))
-        return weights or None
+        return self.placement_controller.traffic_shares(model_id) or None
 
     def _node_options_for_model(self, model_id, surviving_nodes):
         """Return [(node, expected_latency)] of nodes whose tier matches `model_id`,
@@ -162,7 +161,7 @@ class Orchestrator:
         target_tier = self.model_configs.get(model_id, {}).get("tier")
         if not target_tier:
             return []
-        weights = self._traffic_shares(model_id)
+        shares = self._traffic_shares(model_id)
         options, overflow = [], []
         for n in surviving_nodes:
             if n.get("tier") != target_tier:
@@ -172,7 +171,7 @@ class Orchestrator:
             elat = self._expected_latency(n, model_id)
             if elat > self.T_max:
                 continue
-            if weights is None or n.get("node_id") in weights:
+            if shares is None or n.get("node_id") in shares:
                 options.append((n, elat))
             else:
                 overflow.append((n, elat))
@@ -193,9 +192,9 @@ class Orchestrator:
         a replica, chosen at random in proportion to the traffic shares; else
         the option with the lowest expected latency."""
         shares = self._traffic_shares(model_id) or {}
-        weights = [shares.get(n["node_id"], 0.0) for n, _ in options]
-        if sum(weights) > 0:
-            return random.choices([n for n, _ in options], weights=weights)[0]
+        option_shares = [shares.get(n["node_id"], 0.0) for n, _ in options]
+        if sum(option_shares) > 0:
+            return random.choices([n for n, _ in options], weights=option_shares)[0]
         return options[0][0]
 
     def _choose_model(self, features, options_by_model, model_id=None):

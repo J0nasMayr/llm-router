@@ -108,7 +108,7 @@ def solve_placement(
     current: Dict[Pair, bool],
     theta_up: float = 0.85,
     planning_horizon_s: float = 300.0,
-) -> Tuple[Dict[str, List[str]], Dict[str, List[Tuple[str, float]]]]:
+) -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, float]]]:
     """Placement program: which models each node keeps loaded, and how each
     model's traffic is split across the nodes that hold it.
 
@@ -133,9 +133,9 @@ def solve_placement(
     Loading nothing is always feasible. A tiny bonus for the current placement
     (y0) keeps plans that are equally good from replacing it.
 
-    Returns (placement, weights): for every node, the models to keep loaded
+    Returns (placement, shares): for every node, the models to keep loaded
     (highest demand first), and for every model with traffic on a replica,
-    its shares [(node, share)] summing to 1. If the solver fails, the current
+    its shares {node: share} summing to 1. If the solver fails, the current
     placement is kept and each model's traffic is split equally over the
     nodes that hold it.
     """
@@ -200,28 +200,28 @@ def solve_placement(
         options={"time_limit": 10.0},
     )
 
-    shares: Dict[str, List[Tuple[str, float]]] = {}
+    served: Dict[str, Dict[str, float]] = {}
     if res.success and res.x is not None:
         y, f = res.x[:P], res.x[P:]
         for p, (m, n) in enumerate(pairs):
             if y[p] > 0.5:
                 placement[n].append(m)
             if f[p] > 1e-6:
-                shares.setdefault(m, []).append((n, float(f[p])))
+                served.setdefault(m, {})[n] = float(f[p])
     else:
         logger.warning(f"Placement program failed ({res.message}); keeping the current placement")
         for m, n in pairs:
             if current.get((m, n)):
                 placement[n].append(m)
-                shares.setdefault(m, []).append((n, 1.0))
+                served.setdefault(m, {})[n] = 1.0
 
-    weights = {}
-    for m, node_shares in shares.items():
-        total = sum(s for _, s in node_shares)
-        weights[m] = [(n, s / total) for n, s in node_shares]
+    shares = {}
+    for m, node_served in served.items():
+        total = sum(node_served.values())
+        shares[m] = {n: s / total for n, s in node_served.items()}
     for n in placement:
         placement[n].sort(key=lambda m: by_demand[m])
-    return placement, weights
+    return placement, shares
 
 
 class PlacementController:
@@ -288,7 +288,7 @@ class PlacementController:
         self._planned = False
         # Last plan: models each node should keep loaded, and traffic shares.
         self._targets: Dict[str, List[str]] = {}
-        self._weights: Dict[str, List[Tuple[str, float]]] = {}
+        self._shares: Dict[str, Dict[str, float]] = {}
         self._stop = asyncio.Event()
         self._task: Optional[asyncio.Task] = None
 
@@ -324,9 +324,9 @@ class PlacementController:
         tel_by_node = {t.get("node_id"): t for t in telemetry_list}
         loads: Dict[str, float] = {}
         replicated = set()
-        for m, shares in self._weights.items():
+        for m, shares in self._shares.items():
             R = predicted_rps.get(m, 0.0)
-            for n, w in shares:
+            for n, w in shares.items():
                 t = tel_by_node.get(n)
                 if t is None:
                     continue
@@ -437,7 +437,7 @@ class PlacementController:
                 size_gb[(m, n)] = size_on_node_gb(t, m, cfg)
                 current[(m, n)] = m in held
 
-        placement, weights = solve_placement(
+        placement, shares = solve_placement(
             models,
             nodes,
             demand,
@@ -451,14 +451,14 @@ class PlacementController:
             planning_horizon_s=self.planning_horizon_s,
         )
         self._targets = {n: list(placement.get(n, [])) for n in nodes}
-        self._weights = weights
+        self._shares = shares
         self._planned = True
         self._last_rerun = time.time()
         self._publish_targets()
         loaded = sum(len(v) for v in self._targets.values())
         logger.info(
             f"Placement planned ({reason}): {loaded} replicas of "
-            f"{len(weights)} models on {len(nodes)} nodes"
+            f"{len(shares)} models on {len(nodes)} nodes"
         )
 
     def _publish_targets(self):
@@ -530,10 +530,10 @@ class PlacementController:
 
     # ---------- public read API ----------
 
-    def traffic_shares(self, model_id) -> List[Tuple[str, float]]:
-        """[(node_id, share)] over the nodes that hold the model in the current
+    def traffic_shares(self, model_id) -> Dict[str, float]:
+        """{node_id: share} over the nodes that hold the model in the current
         plan. Empty for a model without replicas, which is not restricted."""
-        return self._weights.get(model_id, [])
+        return self._shares.get(model_id, {})
 
     def has_plan(self) -> bool:
         """True once the controller has made its first plan."""
