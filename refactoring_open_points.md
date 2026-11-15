@@ -37,7 +37,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A9 | Removed `--dedicated-queue` and `queue_name` from the telemetry; the orchestrator derives the queue from the node id | `55fc2c8` |
 | B1 | `T_max` is a required argument of `Orchestrator`; `run_api.py` reads `max_latency` without a default | `5ed51f7` |
 | B2 | `run_api.py` indexes the YAML values directly (except Redis, see B4); the YAML-backed constructor parameters of `Orchestrator` and `AllocationController` have no default | `ebbcfc7` |
-| B3 | `load_config` raises on a missing or invalid file and resolves `config/` relative to itself, not the current directory | uncommitted |
+| B3 | `load_config` raises on a missing or invalid file and resolves `config/` relative to itself, not the current directory | `4c126b8` |
+| B4 | `RedisClient.from_config()` reads the redis block for the API and the worker (flags override it); the constructor has no host/port defaults | uncommitted |
 
 ## A. Dead code
 

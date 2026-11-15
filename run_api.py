@@ -34,16 +34,9 @@ def _build_services():
     models = load_config("models")
     features = load_config("feature_extraction")
     mab = load_config("mab")
-    infrastructure = load_config("infrastructure")
     datasets = load_config("datasets")
 
-    # The workers (inference_service.main) read the same Redis settings
-    redis_cfg = infrastructure.get("redis") or {}
-    redis_client = RedisClient(
-        host=redis_cfg.get("host", "localhost"),
-        port=int(redis_cfg.get("port", 6380)),
-        password=redis_cfg.get("password"),
-    )
+    redis_client = RedisClient.from_config()
 
     feature_service = FeatureService(features)
 

@@ -5,11 +5,13 @@ import uuid
 
 import redis
 
+from config.manager import load_config
+
 
 class RedisClient:
     """Client for managing Redis task queue"""
 
-    def __init__(self, host="localhost", port=6379, password=None, db=0):
+    def __init__(self, host, port, password=None, db=0):
         self.redis = redis.Redis(
             host=host,
             port=port,
@@ -24,6 +26,17 @@ class RedisClient:
         self.result_prefix = "result:"
         self.telemetry_prefix = "telemetry:node:"
         self.placement_prefix = "placement:node:"
+
+    @classmethod
+    def from_config(cls, host=None, port=None, password=None):
+        """A client for the redis block of config/infrastructure.yaml;
+        arguments that are not None override it."""
+        cfg = load_config("infrastructure")["redis"]
+        return cls(
+            host=host or cfg["host"],
+            port=port or int(cfg["port"]),
+            password=password or cfg.get("password"),
+        )
 
     def enqueue_task(self, task_data, queue_name):
         """Add task to queue and return task ID"""
