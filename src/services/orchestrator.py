@@ -62,21 +62,18 @@ class Orchestrator:
         self.dataset_configs = dataset_configs or {}
 
     def _dataset_settings(self, dataset):
-        """(extraction_method, evaluation_metric, generation_parameters) for a
-        known dataset, mirroring how data/process.py prepares queries offline.
-        All None for an unknown or missing dataset."""
+        """(extraction_method, evaluation_metric, generation_parameters) of a
+        dataset in datasets.yaml, mirroring how data/process.py prepares
+        queries offline; raw text, exact match and no generation settings for
+        an unknown or missing dataset."""
         cfg = self.dataset_configs.get(dataset)
         if not cfg:
-            return None, None, None
-        extraction = cfg.get("extraction") or {}
-        extraction_method = extraction.get("method", "raw")
+            return "raw", "exact_match", {}
+        extraction = cfg["extraction"]
+        extraction_method = extraction["method"]
         if extraction_method == "regex":
-            extraction_method = f"regex_{extraction.get('pattern', '')}"
-        return (
-            extraction_method,
-            cfg.get("evaluation_metric", "exact_match"),
-            dict(cfg.get("generation") or {}),
-        )
+            extraction_method = f"regex_{extraction['pattern']}"
+        return extraction_method, cfg["evaluation_metric"], dict(cfg["generation"])
 
     def _network_delay(self, tier):
         return float(self.network_delay_by_tier.get(tier, 0.0))
@@ -338,22 +335,18 @@ class Orchestrator:
             worker_metrics = result.get("metrics") or {}
             response["metrics"] = dict(worker_metrics)
             if reference:
-                task_type = (
-                    features.get("task_type", "default") if features else "default"
-                )
-
                 energy_consumption = worker_metrics.get("energy_consumption", 0)
                 input_tokens = worker_metrics.get("input_tokens", 0)
                 output_tokens = worker_metrics.get("output_tokens", 0)
                 metrics = self.evaluation_service.evaluate_and_calculate_reward(
                     response=result["response"],
                     reference=reference,
-                    task_type=task_type,
+                    task_type=features["task_type"],
                     energy_consumption=energy_consumption,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
-                    evaluation_metric=evaluation_metric or "exact_match",
-                    extraction_method=extraction_method or "raw",
+                    evaluation_metric=evaluation_metric,
+                    extraction_method=extraction_method,
                 )
                 self.router_service.update(features, model_id, metrics["reward"])
                 response["metrics"].update(metrics)

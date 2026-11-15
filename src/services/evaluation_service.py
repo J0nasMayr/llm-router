@@ -20,8 +20,8 @@ class EvaluationService:
         self,
         response,
         reference,
-        extraction_method="raw",
-        evaluation_metric="exact_match",
+        extraction_method,
+        evaluation_metric,
     ):
         """Score the response against the reference."""
 
@@ -80,8 +80,8 @@ class EvaluationService:
         energy_consumption,
         input_tokens,
         output_tokens,
-        evaluation_metric="exact_match",
-        extraction_method="raw",
+        evaluation_metric,
+        extraction_method,
     ):
         """Evaluate response and calculate reward r = alpha*Acc - beta*E.
 

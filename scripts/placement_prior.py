@@ -3,9 +3,8 @@
 For each of the 2,500 queries GreenServ profiled offline (table
 pregenerated_results in db/llm_db_backup.sql.gz), computes the reward of
 every model with the live system's reward (EvaluationService.reward; accuracy
-and energy per token normalized with the bounds of config/metrics.yaml, which
-the live system later widens) and counts which model gives
-the highest reward. The share of queries each model wins is written to
+and energy per token normalized with the fixed bounds of config/metrics.yaml)
+and counts which model gives the highest reward. The share of queries each model wins is written to
 config/placement_prior.yaml.
 
 Run from the repository root: ./venv/bin/python -m scripts.placement_prior

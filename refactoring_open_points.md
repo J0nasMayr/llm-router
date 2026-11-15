@@ -39,7 +39,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B2 | `run_api.py` indexes the YAML values directly (except Redis, see B4); the YAML-backed constructor parameters of `Orchestrator` and `AllocationController` have no default | `ebbcfc7` |
 | B3 | `load_config` raises on a missing or invalid file and resolves `config/` relative to itself, not the current directory | `4c126b8` |
 | B4 | `RedisClient.from_config()` reads the redis block for the API and the worker (flags override it); the constructor has no host/port defaults | `15ba151` |
-| B5 | `EvaluationService` holds the reward weights and the formula (`reward`); the orchestrator no longer passes them, and `scripts/placement_prior.py` reuses them | uncommitted |
+| B5 | `EvaluationService` holds the reward weights and the formula (`reward`); the orchestrator no longer passes them, and `scripts/placement_prior.py` reuses them | `7c18241` |
+| B6 | The `"raw"`/`"exact_match"` defaults only in `_dataset_settings`; known datasets read their keys directly; `task_type` read without a guard. Also corrects the docstring of `scripts/placement_prior.py` from B5 (the live system does not widen its bounds, see A10) | uncommitted |
 
 ## A. Dead code
 
@@ -85,6 +86,23 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 - **Fix, if unused:** remove the flag and `queue_name` from the telemetry, and
   derive the name from the node id on both sides (see C2).
 - **Open question:** is any worker ever started with `--dedicated-queue`?
+
+### A10. `update_bounds` has no effect
+
+- **Where:** the call `self.metric_normalizer.update_bounds(...)` in
+  `EvaluationService._normalize_metric` (`src/services/evaluation_service.py`),
+  and `MetricNormalizer.update_bounds` in `src/metrics/normalizer.py`. Both
+  are GreenServ's (its `evaluation_service.py` already makes the call).
+- **Problem:** `update_bounds` stores a widened range under a top-level key
+  like `"accuracy_gsm8k"`, but `normalize` reads `bounds["gsm8k"]["accuracy"]`.
+  It never sees what `update_bounds` writes, so the live system always uses
+  the fixed bounds of `config/metrics.yaml`, clamped to [0, 1]. The thesis
+  says exactly that (`model.tex:53`), so the code only looks as if it adapted
+  its bounds online.
+- **Fix:** remove the call in `_normalize_metric`. `src/metrics/` is out of
+  scope, so `update_bounds` itself stays (or goes, if you decide otherwise).
+- **Text:** none; the thesis already describes fixed bounds.
+- Found on 2026-11-15 while doing B6.
 
 ## B. One value, several defaults
 
@@ -346,7 +364,7 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 
 ## Suggested order
 
-1. A6–A8, B1, C3–C5, E3, E4: mechanical, no change in behaviour.
+1. A6–A10, B1, C3–C5, E3, E4: mechanical, no change in behaviour.
 2. B2–B9: these change what happens on a bad setup (it fails at startup
    instead of running with defaults).
 3. C1, C2, C6, D1–D4: the real refactors; D1 and D2 touch the tests.
