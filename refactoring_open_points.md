@@ -42,7 +42,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B5 | `EvaluationService` holds the reward weights and the formula (`reward`); the orchestrator no longer passes them, and `scripts/placement_prior.py` reuses them | `7c18241` |
 | B6 | The `"raw"`/`"exact_match"` defaults only in `_dataset_settings`; known datasets read their keys directly; `task_type` read without a guard. Also corrects the docstring of `scripts/placement_prior.py` from B5 (the live system does not widen its bounds, see A10) | `c08687c` |
 | B7 | `min_free_gpu_memory_gb` is read once from the `feasibility` block and passed to the orchestrator and the controller; no constructor defaults | `32c33a7` |
-| B8 | The worker's energy method defaults only in `--energy-method` (`zeus`); the constructor parameter is required | uncommitted |
+| B8 | The worker's energy method defaults only in `--energy-method` (`zeus`); the constructor parameter is required | `ab8838a` |
+| B9 | The deviation rule's warm-up, sigma floor and smoothing, and the worker's `load_window` and `reconcile_interval`, are constructor defaults (the optional `keep_bonus` and solver time limit stay as they are) | uncommitted |
 
 ## A. Dead code
 

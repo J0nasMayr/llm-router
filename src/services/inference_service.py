@@ -60,6 +60,8 @@ class InferenceService:
         node_id=None,
         telemetry_interval=5.0,
         telemetry_window=20,
+        load_window=5,
+        reconcile_interval=1.0,
         memory_budget_gb=None,
         memory_headroom_gb=4.0,
         max_models=None,
@@ -84,7 +86,7 @@ class InferenceService:
         # to keep loaded, most important first), or None without a plan. It is
         # read from Redis at most every reconcile_interval seconds.
         self._target = None
-        self.reconcile_interval = 1.0
+        self.reconcile_interval = reconcile_interval
         self._last_reconcile = 0.0
         if memory_budget_gb is None and torch.cuda.is_available():
             # The headroom stays free for activations and the KV cache.
@@ -111,7 +113,7 @@ class InferenceService:
         # (model_id, start time) and the durations of recent loads per model.
         self._loading = None
         self._load_time_by_model = {}
-        self._load_window = 5
+        self._load_window = load_window
         self._load_lock = threading.Lock()
         self._telemetry_stop = threading.Event()
         self._telemetry_thread = None

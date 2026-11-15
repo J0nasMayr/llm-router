@@ -209,6 +209,9 @@ class AllocationController:
         theta_down: float = 0.5,
         R_min: float = 0.1,
         kappa: float = 2.0,
+        deviation_min_samples: int = 5,
+        deviation_sigma_floor: float = 0.1,
+        deviation_smoothing: float = 0.9,
         tick_interval: float = 5.0,
         Q: float = 0.01,
         D: float = 1.0,
@@ -228,6 +231,9 @@ class AllocationController:
         self.T_cool = T_cool
         self.R_min = R_min
         self.kappa = kappa
+        self.deviation_min_samples = deviation_min_samples
+        self.deviation_sigma_floor = deviation_sigma_floor
+        self.deviation_smoothing = deviation_smoothing
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.tick_interval = tick_interval
         # Target placements expire unless renewed; like node telemetry, they
@@ -315,8 +321,6 @@ class AllocationController:
         observation exceeds its prediction by more than kappa standard
         deviations. Must run every tick so the filters stay current even when
         another rule fires first."""
-        MIN_SAMPLES = 5
-        EW = 0.9  # residual-variance smoothing
         reason = None
         for t in telemetry_list:
             nid = t.get("node_id")
@@ -333,18 +337,19 @@ class AllocationController:
                 n = self._lat_samples.get(key, 0)
                 # Sigma floor: a perfectly stable latency history has zero
                 # residual variance, which would make any deviation threshold
-                # unreachable; floor at 10% of the predicted latency.
-                sigma = max(var**0.5, 0.1 * max(kf.R, 1e-6))
+                # unreachable; floor at a fraction of the predicted latency.
+                sigma = max(var**0.5, self.deviation_sigma_floor * max(kf.R, 1e-6))
                 if (
                     reason is None
-                    and n >= MIN_SAMPLES
+                    and n >= self.deviation_min_samples
                     and residual > self.kappa * sigma
                 ):
                     reason = (
                         f"latency_deviation({m}@{nid}: obs={obs:.2f}s > "
                         f"pred={kf.R:.2f}s + {self.kappa}σ)"
                     )
-                self._lat_resvar[key] = EW * var + (1 - EW) * residual**2
+                ew = self.deviation_smoothing
+                self._lat_resvar[key] = ew * var + (1 - ew) * residual**2
                 self._lat_samples[key] = n + 1
                 kf.update(obs)
         return reason
