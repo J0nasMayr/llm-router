@@ -43,12 +43,6 @@ class EvaluationService:
 
         return score
 
-    def _normalize_metric(self, metric_name, value, task_type=None):
-        """Normalize a metric value to [0,1] range."""
-        normalized = self.metric_normalizer.normalize(metric_name, value, task_type)
-        self.metric_normalizer.update_bounds(metric_name, value, task_type)
-        return normalized
-
     def _calculate_energy_metrics(
         self, energy_consumption, input_tokens, output_tokens, task_type=None
     ):
@@ -58,7 +52,7 @@ class EvaluationService:
         )
         # Bounds in metrics.yaml are per dataset; without task_type the
         # normalizer finds none and returns a constant 0.5.
-        normalized_energy = self._normalize_metric(
+        normalized_energy = self.metric_normalizer.normalize(
             "energy_per_token", energy_per_token, task_type
         )
 
@@ -99,7 +93,9 @@ class EvaluationService:
         )
         # metrics.yaml keys the quality bounds as "accuracy" for every dataset,
         # whichever evaluation_metric (exact_match, rouge, ...) produced it.
-        normalized_accuracy = self._normalize_metric("accuracy", accuracy, task_type)
+        normalized_accuracy = self.metric_normalizer.normalize(
+            "accuracy", accuracy, task_type
+        )
         reward = self.reward(normalized_accuracy, energy_metrics["normalized_energy"])
 
         return {
