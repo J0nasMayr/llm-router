@@ -44,7 +44,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B7 | `min_free_gpu_memory_gb` is read once from the `feasibility` block and passed to the orchestrator and the controller; no constructor defaults | `32c33a7` |
 | B8 | The worker's energy method defaults only in `--energy-method` (`zeus`); the constructor parameter is required | `ab8838a` |
 | B9 | The deviation rule's warm-up, sigma floor and smoothing, and the worker's `load_window` and `reconcile_interval`, are constructor defaults (the optional `keep_bonus` and solver time limit stay as they are) | `9d451df` |
-| A10 | Removed the ineffective `update_bounds` call and inlined `_normalize_metric` | uncommitted |
+| A10 | Removed the ineffective `update_bounds` call and inlined `_normalize_metric` | `4adfa45` |
+| C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | uncommitted |
 
 ## A. Dead code
 

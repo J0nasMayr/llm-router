@@ -4,7 +4,7 @@ import gc
 import logging
 import threading
 import time
-from collections import OrderedDict, deque
+from collections import OrderedDict, defaultdict, deque
 
 # os.environ['TORCH_USE_CUDA_DSA'] = '1'
 import torch
@@ -44,6 +44,11 @@ class KeywordsStoppingCriteria(StoppingCriteria):
             ):
                 return True
         return False
+
+
+def _window_means(windows):
+    """{model_id: mean} of the non-empty rolling windows."""
+    return {mid: sum(w) / len(w) for mid, w in windows.items() if w}
 
 
 class InferenceService:
@@ -105,15 +110,13 @@ class InferenceService:
         if tier_queue not in self.listen_queues:
             self.listen_queues.append(tier_queue)
         self.telemetry_interval = telemetry_interval
-        self._telemetry_window = telemetry_window
-        self._latency_by_model = {}
+        self._latency_by_model = defaultdict(lambda: deque(maxlen=telemetry_window))
         self._latency_lock = threading.Lock()
         # Model loads block the worker and are not part of latency_by_model,
         # so they are tracked separately for telemetry: the load in progress
         # (model_id, start time) and the durations of recent loads per model.
         self._loading = None
-        self._load_time_by_model = {}
-        self._load_window = load_window
+        self._load_time_by_model = defaultdict(lambda: deque(maxlen=load_window))
         self._load_lock = threading.Lock()
         self._telemetry_stop = threading.Event()
         self._telemetry_thread = None
@@ -232,11 +235,7 @@ class InferenceService:
             self._resident[model_id] = (model, tokenizer)
             if allocated_before is not None:
                 self._model_memory_gb[model_id] = allocated_after - allocated_before
-            window = self._load_time_by_model.get(model_id)
-            if window is None:
-                window = deque(maxlen=self._load_window)
-                self._load_time_by_model[model_id] = window
-            window.append(load_seconds)
+            self._load_time_by_model[model_id].append(load_seconds)
 
         return model, tokenizer, load_seconds
 
@@ -300,11 +299,7 @@ class InferenceService:
             outputs = model.generate(inputs.input_ids, **gen_params)
         latency = time.time() - start_time
         with self._latency_lock:
-            window = self._latency_by_model.get(model_id)
-            if window is None:
-                window = deque(maxlen=self._telemetry_window)
-                self._latency_by_model[model_id] = window
-            window.append(latency)
+            self._latency_by_model[model_id].append(latency)
         energy = self.energy_measurement.stop()
         output_tokens = outputs.shape[1] - input_tokens
         output_text = tokenizer.decode(
@@ -378,11 +373,7 @@ class InferenceService:
     def _latency_by_model_snapshot(self):
         """Per-model average latency plus a node-wide average."""
         with self._latency_lock:
-            per_model = {
-                mid: (sum(window) / len(window))
-                for mid, window in self._latency_by_model.items()
-                if window
-            }
+            per_model = _window_means(self._latency_by_model)
         if per_model:
             overall = sum(per_model.values()) / len(per_model)
         else:
@@ -404,11 +395,7 @@ class InferenceService:
                     "model_id": loading_model,
                     "elapsed_s": round(time.time() - started_at, 3),
                 }
-            load_times = {
-                mid: (sum(window) / len(window))
-                for mid, window in self._load_time_by_model.items()
-                if window
-            }
+            load_times = _window_means(self._load_time_by_model)
             model_memory = {
                 mid: round(gb, 3) for mid, gb in self._model_memory_gb.items()
             }
