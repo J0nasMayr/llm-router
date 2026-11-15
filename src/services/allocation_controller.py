@@ -19,8 +19,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 
-from src.services.model_memory import (
+from src.services.node_telemetry import (
     fits_on_node,
+    free_memory_gb,
+    latency_on_node,
     load_time_on_node,
     size_on_node_gb,
 )
@@ -258,17 +260,10 @@ class AllocationController:
 
     # ---------- telemetry helpers ----------
 
-    @staticmethod
-    def _node_free_memory_gb(telemetry) -> Optional[float]:
-        free = (telemetry.get("hardware_state") or {}).get("gpu_memory_free_gb")
-        return None if free is None else float(free)
-
-    @staticmethod
-    def _latency_for_pair(telemetry, model_id) -> float:
-        per_model = telemetry.get("latency_by_model") or {}
-        if model_id in per_model:
-            return float(per_model[model_id])
-        return float(telemetry.get("avg_task_latency", 0.0) or 0.0)
+    def _pair_latency(self, telemetry, model_id) -> float:
+        """τ̄(m, n), or the nominal τ̄_0 for a node without any history."""
+        lat = latency_on_node(telemetry, model_id)
+        return lat if lat > 0 else self.nominal_latency_s
 
     def _eligible_pair(self, model_id, telemetry) -> bool:
         if telemetry.get("tier") != self.model_configs.get(model_id, {}).get("tier"):
@@ -277,7 +272,7 @@ class AllocationController:
         # cannot hold is never placed there.
         if not fits_on_node(telemetry, model_id, self.model_configs.get(model_id)):
             return False
-        free_gb = self._node_free_memory_gb(telemetry)
+        free_gb = free_memory_gb(telemetry)
         if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
             return False
         return True
@@ -302,10 +297,7 @@ class AllocationController:
                 if t is None:
                     continue
                 replicated.add(m)
-                lat = self._latency_for_pair(t, m)
-                if lat <= 0:
-                    lat = self.nominal_latency_s
-                loads[n] = loads.get(n, 0.0) + R * w * lat
+                loads[n] = loads.get(n, 0.0) + R * w * self._pair_latency(t, m)
         return loads, replicated
 
     # ---------- trigger ----------
@@ -365,7 +357,7 @@ class AllocationController:
 
         # Memory-pressure (any node low)
         for t in telemetry_list:
-            free_gb = self._node_free_memory_gb(t)
+            free_gb = free_memory_gb(t)
             if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
                 return f"memory_pressure(node={t.get('node_id')}, free={free_gb:.2f}GB)"
 
@@ -418,9 +410,7 @@ class AllocationController:
                     continue
                 cfg = self.model_configs.get(m)
                 eligible[(m, n)] = True
-                lat = self._latency_for_pair(t, m)
-                # Nominal latency for pairs without any history.
-                latency[(m, n)] = lat if lat > 0 else self.nominal_latency_s
+                latency[(m, n)] = self._pair_latency(t, m)
                 load_time[(m, n)] = load_time_on_node(
                     t, m, cfg, self.load_bandwidth_gb_per_s
                 )

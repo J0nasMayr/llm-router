@@ -51,7 +51,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | E3 | Removed the path comment on line 1 of the fifteen in-scope files (`src/feature_extractor/` and `src/models/registry.py` keep theirs) | `de0ac8e` |
 | E4 | Removed the commented-out `TORCH_USE_CUDA_DSA` line from the worker; the "Setting task_type to None" warning is now a debug message that says what happens (the classifier branch itself is untouched) | `de0ac8e` |
 | E6 | README: `config/mab.yaml`, `config/feature_extraction.yaml`, `config/manager.py` and `feature_service.py` under "Extended"; the cosmetic-edits sentence names the path comments in GreenServ's files | `de0ac8e` |
-| C2 | `node_queue_name` and `tier_queue_name` in `redis_client.py`, used by the worker, the orchestrator and the test; the Redis key prefixes are class attributes of `RedisClient` | uncommitted |
+| C2 | `node_queue_name` and `tier_queue_name` in `redis_client.py`, used by the worker, the orchestrator and the test; the Redis key prefixes are class attributes of `RedisClient` | `ac5edf9` |
+| C1 | `free_memory_gb` and `latency_on_node` shared in `node_telemetry.py` (renamed from `model_memory.py`); the controller's nominal latency in one `_pair_latency`; `_expected_latency` docstring corrected | uncommitted |
 
 ## A. Dead code
 

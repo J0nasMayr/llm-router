@@ -16,7 +16,7 @@ from transformers import (
 from config.manager import load_config
 from src.metrics.energy import EnergyMeasurement
 from src.queue.redis_client import RedisClient, node_queue_name, tier_queue_name
-from src.services.model_memory import estimated_size_gb
+from src.services.node_telemetry import estimated_size_gb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("worker")

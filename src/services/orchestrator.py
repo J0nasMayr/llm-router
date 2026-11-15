@@ -4,7 +4,12 @@ import random
 import time
 
 from src.queue.redis_client import node_queue_name, tier_queue_name
-from src.services.model_memory import fits_on_node, load_time_on_node
+from src.services.node_telemetry import (
+    fits_on_node,
+    free_memory_gb,
+    latency_on_node,
+    load_time_on_node,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,18 +83,6 @@ class Orchestrator:
     def _network_delay(self, tier):
         return float(self.network_delay_by_tier.get(tier, 0.0))
 
-    def _node_free_memory_gb(self, telemetry):
-        free = (telemetry.get("hardware_state") or {}).get("gpu_memory_free_gb")
-        return None if free is None else float(free)
-
-    def _avg_latency_for_model(self, telemetry, model_id):
-        """Per-model avg latency on this node, falling back to the node-wide avg
-        when this model hasn't run here yet."""
-        per_model = telemetry.get("latency_by_model") or {}
-        if model_id in per_model:
-            return float(per_model[model_id])
-        return float(telemetry.get("avg_task_latency", 0.0) or 0.0)
-
     def _load_time(self, telemetry, model_id):
         """Seconds this node needs to load `model_id`: the node's measured
         average, or before its first load of the model, an estimate from the
@@ -123,15 +116,15 @@ class Orchestrator:
         return own_load
 
     def _expected_latency(self, telemetry, model_id):
-        """expected_latency = network_delay(tier) + pending_load_time + (queue_length + 1) * avg_task_latency.
+        """expected_latency = network_delay(tier) + pending_load_time + (queue_length + 1) * avg_latency.
 
-        avg_task_latency of 0 means the node hasn't processed this model yet —
-        treat as immediately available rather than infinitely fast: the (+1)
-        still accounts for the new task. Queued tasks are assumed to need no
-        further model change; this can be optimistic when they need models the
-        node does not hold, as loading those may also unload `model_id`.
+        avg_latency is latency_on_node: 0 for a node that has run nothing yet,
+        so only the network delay and the load time count for it. Queued tasks
+        are assumed to need no further model change; this can be optimistic
+        when they need models the node does not hold, as loading those may
+        also unload `model_id`.
         """
-        avg = self._avg_latency_for_model(telemetry, model_id)
+        avg = latency_on_node(telemetry, model_id)
         qlen = int(telemetry.get("queue_length", 0) or 0)
         return (
             self._network_delay(telemetry.get("tier"))
@@ -145,7 +138,7 @@ class Orchestrator:
         depends on the chosen model's per-model average latency."""
         surviving = []
         for t in telemetry_list:
-            free_gb = self._node_free_memory_gb(t)
+            free_gb = free_memory_gb(t)
             if free_gb is not None and free_gb < self.min_free_gpu_memory_gb:
                 continue
             surviving.append(t)
