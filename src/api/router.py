@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
@@ -25,9 +25,9 @@ class QueryResponse(BaseModel):
     error: Optional[str] = None
 
 
-def get_orchestrator():
-    from run_api import orchestrator
-
+def get_orchestrator(request: Request):
+    """The orchestrator that run_api's lifespan put on the app state."""
+    orchestrator = getattr(request.app.state, "orchestrator", None)
     if orchestrator is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
     return orchestrator
@@ -46,11 +46,9 @@ async def inference_endpoint(
             model_id=request.model_id,
             wait_for_result=request.wait_for_result,
         )
-
-        if "error" in result:
-            raise HTTPException(status_code=500, detail=result["error"])
-
-        return result
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.exception("Inference failed")
         raise HTTPException(status_code=500, detail=str(e))
+    if "error" in result:
+        raise HTTPException(status_code=500, detail=result["error"])
+    return result

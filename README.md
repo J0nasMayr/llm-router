@@ -16,11 +16,12 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-The only edits to these files, and to GreenServ's `config/general.yaml` and `src/api/router.py`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml`, `config/general.yaml` and `src/api/router.py`.
+The only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
 
 **Extended**
 
 - `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
+- `src/api/router.py`: reads the orchestrator from the app state, and passes the orchestrator's error message to the client unchanged.
 - `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
 - `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry.
@@ -38,7 +39,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml` and `src
 - `src/services/node_telemetry.py`: readers of the node telemetry (free GPU memory, average latency, model size and load time on a node) and the model-size estimate they fall back to, shared by the worker, the filter and the controller.
 - `run_api.py`: wires the services together and starts the API and the controller.
 - `config/allocation.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
-- `tests/`: unit tests for the latency estimate of the filter, the worker and the placement controller.
+- `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.
 
 -------------------------------------------------------------------------------------------------------------------------------------------------

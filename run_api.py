@@ -8,9 +8,8 @@ FastAPI lifespan.
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from config.manager import load_config
 from src.api.router import router as inference_router
@@ -24,10 +23,6 @@ from src.services.router_service import RouterService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("run_api")
-
-# Module-level singletons. router.py reads `orchestrator` lazily.
-orchestrator: Optional[Orchestrator] = None
-allocation_controller: Optional[AllocationController] = None
 
 
 def _build_services():
@@ -115,16 +110,17 @@ def _build_controller(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global orchestrator, allocation_controller
-    orchestrator, allocation_controller = _build_services()
-    if allocation_controller:
-        allocation_controller.start()
+    orchestrator, controller = _build_services()
+    app.state.orchestrator = orchestrator
+    app.state.allocation_controller = controller
+    if controller:
+        controller.start()
     logger.info("API ready")
     try:
         yield
     finally:
-        if allocation_controller:
-            await allocation_controller.stop()
+        if controller:
+            await controller.stop()
         logger.info("API shutdown complete")
 
 
@@ -133,12 +129,13 @@ app.include_router(inference_router)
 
 
 @app.get("/health")
-def health():
+def health(request: Request):
+    state = request.app.state
+    controller = getattr(state, "allocation_controller", None)
     return {
         "status": "ok",
-        "orchestrator_ready": orchestrator is not None,
-        "controller_ready": allocation_controller is not None
-        and allocation_controller.has_plan(),
+        "orchestrator_ready": getattr(state, "orchestrator", None) is not None,
+        "controller_ready": controller is not None and controller.has_plan(),
     }
 
 
