@@ -43,6 +43,10 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 - `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.
 
+**Removed**
+
+- `src/models/registry.py` (an unused `ModelRegistry` stub) and the empty `src/api/schemas.py`: GreenServ's leftovers that nothing imported.
+
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Contextual Multi-Armed Bandits for LLM Routing
