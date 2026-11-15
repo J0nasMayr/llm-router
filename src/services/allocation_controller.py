@@ -14,6 +14,7 @@ the most recently used ones.
 import asyncio
 import logging
 import time
+from collections import defaultdict
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -54,6 +55,42 @@ class ScalarKalman:
         self.R = self.R + K * (observation - self.R)
         self.P = (1 - K) * P_pred
         return self.R
+
+
+class LatencyFilter:
+    """The latency-deviation rule for one (model, node) pair: a Kalman
+    prediction of the pair's latency, starting at its first report, and an
+    exponentially weighted variance of the residuals."""
+
+    def __init__(self, first_obs, Q, D, kappa, min_samples, sigma_floor, smoothing):
+        self.kalman = ScalarKalman(Q=Q, D=D, R0=first_obs)
+        self.residual_var = 0.0
+        self.samples = 0
+        self.kappa = kappa
+        self.min_samples = min_samples
+        self.sigma_floor = sigma_floor
+        self.smoothing = smoothing
+
+    @property
+    def prediction(self) -> float:
+        return self.kalman.R
+
+    def update(self, obs: float) -> bool:
+        """Feed one observation; True if, after the warm-up, it exceeds the
+        prediction by more than kappa standard deviations of the residuals."""
+        residual = obs - self.prediction
+        # Sigma floor: a perfectly stable latency history has zero residual
+        # variance, which would make any deviation threshold unreachable.
+        sigma = max(
+            self.residual_var**0.5, self.sigma_floor * max(self.prediction, 1e-6)
+        )
+        deviates = self.samples >= self.min_samples and residual > self.kappa * sigma
+        self.residual_var = (
+            self.smoothing * self.residual_var + (1 - self.smoothing) * residual**2
+        )
+        self.samples += 1
+        self.kalman.update(obs)
+        return deviates
 
 
 Pair = Tuple[str, str]
@@ -243,13 +280,10 @@ class AllocationController:
         self.placement_ttl_s = int(tick_interval * 3) + 1
         self.nominal_latency_s = nominal_latency_s
         self._Q, self._D = Q, D
-        self._kalman: Dict[str, ScalarKalman] = {}
-        # Per-(model, node) latency tracking for the deviation trigger:
-        # a Kalman prediction of the pair's latency plus an exponentially
-        # weighted variance of its residuals.
-        self._lat_kalman: Dict[Pair, ScalarKalman] = {}
-        self._lat_resvar: Dict[Pair, float] = {}
-        self._lat_samples: Dict[Pair, int] = {}
+        self._demand_kalman: Dict[str, ScalarKalman] = defaultdict(
+            lambda: ScalarKalman(Q=Q, D=D)
+        )
+        self._latency_filters: Dict[Pair, LatencyFilter] = {}
         self._last_rerun: float = 0.0
         self._planned = False
         # Last plan: models each node should keep loaded, and traffic shares.
@@ -302,11 +336,6 @@ class AllocationController:
 
     # ---------- trigger ----------
 
-    def _kalman_for(self, model_id) -> ScalarKalman:
-        if model_id not in self._kalman:
-            self._kalman[model_id] = ScalarKalman(Q=self._Q, D=self._D)
-        return self._kalman[model_id]
-
     def _update_latency_filters(self, telemetry_list) -> Optional[str]:
         """Feed per-(model, node) latency observations into their Kalman filters
         and residual-variance trackers. Returns a deviation reason when an
@@ -316,34 +345,25 @@ class AllocationController:
         reason = None
         for t in telemetry_list:
             nid = t.get("node_id")
-            per_model = t.get("latency_by_model") or {}
-            for m, obs in per_model.items():
+            for m, obs in (t.get("latency_by_model") or {}).items():
                 obs = float(obs)
-                key = (m, nid)
-                kf = self._lat_kalman.get(key)
-                if kf is None:
-                    kf = ScalarKalman(Q=self._Q, D=self._D, R0=obs)
-                    self._lat_kalman[key] = kf
-                residual = obs - kf.R
-                var = self._lat_resvar.get(key, 0.0)
-                n = self._lat_samples.get(key, 0)
-                # Sigma floor: a perfectly stable latency history has zero
-                # residual variance, which would make any deviation threshold
-                # unreachable; floor at a fraction of the predicted latency.
-                sigma = max(var**0.5, self.deviation_sigma_floor * max(kf.R, 1e-6))
-                if (
-                    reason is None
-                    and n >= self.deviation_min_samples
-                    and residual > self.kappa * sigma
-                ):
+                f = self._latency_filters.get((m, nid))
+                if f is None:
+                    f = self._latency_filters[(m, nid)] = LatencyFilter(
+                        obs,
+                        Q=self._Q,
+                        D=self._D,
+                        kappa=self.kappa,
+                        min_samples=self.deviation_min_samples,
+                        sigma_floor=self.deviation_sigma_floor,
+                        smoothing=self.deviation_smoothing,
+                    )
+                pred = f.prediction
+                if f.update(obs) and reason is None:
                     reason = (
                         f"latency_deviation({m}@{nid}: obs={obs:.2f}s > "
-                        f"pred={kf.R:.2f}s + {self.kappa}σ)"
+                        f"pred={pred:.2f}s + {self.kappa}σ)"
                     )
-                ew = self.deviation_smoothing
-                self._lat_resvar[key] = ew * var + (1 - ew) * residual**2
-                self._lat_samples[key] = n + 1
-                kf.update(obs)
         return reason
 
     def _trigger_reason(
@@ -462,7 +482,7 @@ class AllocationController:
         # traffic), so a model's prediction decays instead of freezing at its
         # last non-zero value.
         predicted_rps = {
-            m: self._kalman_for(m).update(observed_rps.get(m, 0.0))
+            m: self._demand_kalman[m].update(observed_rps.get(m, 0.0))
             for m in self.model_configs
         }
         latency_reason = self._update_latency_filters(telemetry_list)
