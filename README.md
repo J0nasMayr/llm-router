@@ -16,16 +16,20 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-The only edits to these files are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`, and the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it.
+The only edits to these files, and to GreenServ's `config/general.yaml` and `src/api/router.py`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml`, `config/general.yaml` and `src/api/router.py`.
 
 **Extended**
 
 - `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
+- `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and the demand counters the placement controller reads.
 - `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
 - `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
 - `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
+- `config/mab.yaml`: an `algorithm` key selects the bandit, with one block of constructor parameters per bandit (GreenServ's file held a single epsilon-greedy block).
+- `config/feature_extraction.yaml`: complexity bins that every score falls into (with the bounds in GreenServ's file, the first slot stayed unused and the hardest texts got none), and the `feasibility` block: latency deadline, assumed load speed and minimum free GPU memory.
+- `config/manager.py`: a missing or invalid config file raises instead of loading as empty, and `config/` is found from any working directory.
 
 **New**
 

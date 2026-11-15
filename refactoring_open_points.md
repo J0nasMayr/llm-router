@@ -47,7 +47,10 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A10 | Removed the ineffective `update_bounds` call and inlined `_normalize_metric` | `4adfa45` |
 | C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | `e7c5b3d` |
 | C4 | `_pick_queue_for_model` → `_pick_node` with `random.choices`; options computed once per query (`_options_by_model`); `has_plan()` check dropped; Stage 3 comment corrected (first bullet of E4) | `c74cd8f` |
-| C5 | `_get_context_vector` builds three `_one_hot` blocks; always `context_dimension` long, a missing feature raises | uncommitted |
+| C5 | `_get_context_vector` builds three `_one_hot` blocks; always `context_dimension` long, a missing feature raises | `822841a` |
+| E3 | Removed the path comment on line 1 of the fifteen in-scope files (`src/feature_extractor/` and `src/models/registry.py` keep theirs) | uncommitted |
+| E4 | Removed the commented-out `TORCH_USE_CUDA_DSA` line from the worker; the "Setting task_type to None" warning is now a debug message that says what happens (the classifier branch itself is untouched) | uncommitted |
+| E6 | README: `config/mab.yaml`, `config/feature_extraction.yaml`, `config/manager.py` and `feature_service.py` under "Extended"; the cosmetic-edits sentence names the path comments in GreenServ's files | uncommitted |
 
 ## A. Dead code
 
@@ -290,7 +293,9 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 - **Bug in the same file:** the endpoint raises an `HTTPException` inside its
   own `try` (`router.py:52`) and catches it again (`:55`), so a client sees
   `"500: Timeout waiting for response"` as the detail. Reproduced.
-- **Note:** `src/api/router.py` is currently identical to GreenServ's.
+- **Note:** `src/api/router.py` is GreenServ's; since E3 it differs only by
+  the removed path comment. The README's cosmetic-edits sentence names it, so
+  update the README when D3 changes the file.
 
 ### D4. The `feasibility` block sits in `feature_extraction.yaml`
 
@@ -399,8 +404,8 @@ None of the points changes a value in the thesis table.
   pays for an embedding and a failing `predict`. Simpler and as described:
   `task_type = None` without calling the extractor (same vector, same
   reward; only the `task_type` in the response metrics becomes `None`), and
-  possibly not building `TaskTypeExtractor` at all. Belongs with the second
-  bullet of E4. Left alone for now, as decided on 2026-11-15.
+  possibly not building `TaskTypeExtractor` at all. Left alone for now, as
+  decided on 2026-11-15; E4 only reworded the log message of that branch.
 - `EnergyMeasurement.create` (`src/metrics/energy.py`, GreenServ's) falls
   back to PyNVML with only a `print` when Zeus cannot be imported, so a worker
   started with `--energy-method zeus` may measure with PyNVML without any

@@ -1,4 +1,3 @@
-# config/features.yaml
 feature_extraction:
   task_classification:
     task_types: 

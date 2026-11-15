@@ -1,4 +1,3 @@
-# src/bandit/epsilon_greedy.py
 import ast
 import logging
 import random

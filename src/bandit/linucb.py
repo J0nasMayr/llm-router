@@ -1,4 +1,3 @@
-# src/bandit/linucb.py
 import logging
 
 import numpy as np

@@ -1,4 +1,3 @@
-# src/services/router_service.py
 from src.bandit.epsilon_greedy import ContextualEpsilonGreedy, EpsilonGreedy
 from src.bandit.linucb import LinUCB
 from src.bandit.thompson_sampling import ThompsonSampling

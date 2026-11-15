@@ -1,4 +1,3 @@
-# src/services/feature_service.py
 import logging
 
 from src.feature_extractor.complexity import ComplexityExtractor
@@ -47,8 +46,9 @@ class FeatureService:
             features["task_type"] = dataset_name
             logger.debug(f"Using dataset '{dataset_name}' directly as task_type.")
         else:
-            logger.warning(
-                f"Dataset '{dataset_name}' not in configured task_types {self.task_types} or not provided. Setting task_type to None."
+            logger.debug(
+                f"Dataset '{dataset_name}' is not one of the task types "
+                f"{self.task_types}; classifying the query from its text."
             )
             features["task_type"] = self.task_extractor.extract(
                 query_text, query_metadata

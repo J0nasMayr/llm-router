@@ -1,4 +1,3 @@
-# src/api/router.py
 import logging
 from typing import Any, Dict, Optional
 

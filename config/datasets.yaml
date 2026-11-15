@@ -1,4 +1,3 @@
-# config/datasets.yaml
 mmlu:
   load_params:
     path: "cais/mmlu"

@@ -1,4 +1,3 @@
-# src/bandit/base.py
 from abc import ABC, abstractmethod
 
 

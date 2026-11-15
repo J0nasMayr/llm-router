@@ -1,4 +1,3 @@
-# config/general.yaml
 random_seed: 40
 samples_per_dataset: 500
 

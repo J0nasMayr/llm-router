@@ -1,4 +1,3 @@
-# src/worker.py
 import argparse
 import gc
 import logging
@@ -6,7 +5,6 @@ import threading
 import time
 from collections import OrderedDict, defaultdict, deque
 
-# os.environ['TORCH_USE_CUDA_DSA'] = '1'
 import torch
 from transformers import (
     AutoModelForCausalLM,

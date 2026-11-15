@@ -1,4 +1,3 @@
-# config/mab.yaml
 # `algorithm` names the bandit the API uses; the valid names are the keys of
 # ALGORITHM_TO_CLASS_MAP in src/services/router_service.py. The keys of each
 # block must match the bandit constructor signatures in src/bandit/.
