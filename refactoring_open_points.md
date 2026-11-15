@@ -45,7 +45,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B8 | The worker's energy method defaults only in `--energy-method` (`zeus`); the constructor parameter is required | `ab8838a` |
 | B9 | The deviation rule's warm-up, sigma floor and smoothing, and the worker's `load_window` and `reconcile_interval`, are constructor defaults (the optional `keep_bonus` and solver time limit stay as they are) | `9d451df` |
 | A10 | Removed the ineffective `update_bounds` call and inlined `_normalize_metric` | `4adfa45` |
-| C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | uncommitted |
+| C3 | The worker's rolling windows are `defaultdict`s of deques; one `_window_means` helper for both averages | `e7c5b3d` |
+| C4 | `_pick_queue_for_model` → `_pick_node` with `random.choices`; options computed once per query (`_options_by_model`); `has_plan()` check dropped; Stage 3 comment corrected (first bullet of E4) | uncommitted |
 
 ## A. Dead code
 
@@ -262,8 +263,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
   return self._evaluate_and_update(result, features, model_id, reference)
   ```
 
-- **Tests:** they call `process_query`, `_node_options_for_model` (8 times) and
-  `_pick_queue_for_model` (once).
+- **Tests:** they call `process_query`, `_node_options_for_model` (8 times),
+  and `_options_by_model` and `_pick_node` (once each, since C4).
 
 ### D2. Orchestrator and controller need each other
 
@@ -343,8 +344,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 ### E4. Stale comments
 
 - **Where and problem:**
-  - `orchestrator.py:317` says "Pick the lowest-latency surviving node",
-    although a plan with replicas uses the traffic shares.
+  - ~~`orchestrator.py:317` says "Pick the lowest-latency surviving node",
+    although a plan with replicas uses the traffic shares.~~ Done with C4.
   - `feature_service.py:51` logs "Setting task_type to None" at warning level
     for every query without a dataset, and then classifies the query anyway.
     This message is GreenServ's.

@@ -159,8 +159,6 @@ class Orchestrator:
         demand."""
         if self.allocation_controller is None:
             return None
-        if not self.allocation_controller.has_plan():
-            return None
         weights = dict(self.allocation_controller.traffic_shares(model_id))
         return weights or None
 
@@ -193,39 +191,22 @@ class Orchestrator:
         options.sort(key=lambda x: x[1])
         return options
 
-    def _available_models(self, surviving_nodes):
-        """Models with at least one node that meets the deadline T_max."""
-        return [
-            mid
+    def _options_by_model(self, surviving_nodes):
+        """{model_id: options} for every model; see _node_options_for_model."""
+        return {
+            mid: self._node_options_for_model(mid, surviving_nodes)
             for mid in self.model_configs
-            if self._node_options_for_model(mid, surviving_nodes)
-        ]
+        }
 
-    def _pick_queue_for_model(self, model_id, surviving_nodes):
-        options = self._node_options_for_model(model_id, surviving_nodes)
-        if not options:
-            return None
-        weights = self._traffic_shares(model_id)
-        if weights:
-            # Weighted random selection over the options that meet T_max; falls back
-            # to lowest-latency when none of them has a weight (overflow).
-            pool = [(n, weights.get(n.get("node_id"), 0.0)) for n, _ in options]
-            total = sum(w for _, w in pool)
-            if total > 0:
-                pick = random.random() * total
-                acc = 0.0
-                for node, w in pool:
-                    acc += w
-                    if pick <= acc:
-                        best_node = node
-                        break
-                else:
-                    best_node = pool[-1][0]
-            else:
-                best_node = options[0][0]
-        else:
-            best_node = options[0][0]
-        return f"llm_tasks_node_{best_node['node_id']}"
+    def _pick_node(self, model_id, options):
+        """The node a query for `model_id` goes to: among the options that hold
+        a replica, chosen at random in proportion to the traffic shares; else
+        the option with the lowest expected latency."""
+        shares = self._traffic_shares(model_id) or {}
+        weights = [shares.get(n["node_id"], 0.0) for n, _ in options]
+        if sum(weights) > 0:
+            return random.choices([n for n, _ in options], weights=weights)[0]
+        return options[0][0]
 
     def _count(self, window, model_id):
         counters, _ = self._windows[window]
@@ -267,7 +248,8 @@ class Orchestrator:
         # - Derive the per-model feasible set from per-model expected latency
         telemetry_list = self.queue_client.get_all_node_telemetry()
         surviving_nodes = self._filter_nodes(telemetry_list)
-        available_models = self._available_models(surviving_nodes)
+        options_by_model = self._options_by_model(surviving_nodes)
+        available_models = [m for m, options in options_by_model.items() if options]
 
         features = self.feature_service.extract_features(query_text, metadata)
         preferred_model = model_id
@@ -295,11 +277,14 @@ class Orchestrator:
             "generation_parameters": generation_parameters,
         }
 
-        # Stage 3: 
-        # Pick the lowest-latency surviving node of the chosen model's tier
-        # Falls back to the tier-broadcast queue when no telemetry is available (cold start) or no node matches
-        target_queue = self._pick_queue_for_model(model_id, surviving_nodes)
-        if target_queue is None:
+        # Stage 3: dispatch to a node of the chosen model (see _pick_node), or
+        # to the tier-broadcast queue when no node meets the deadline or no
+        # telemetry is available yet (cold start).
+        options = options_by_model.get(model_id)
+        if options:
+            node = self._pick_node(model_id, options)
+            target_queue = f"llm_tasks_node_{node['node_id']}"
+        else:
             model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
             target_queue = f"llm_inference_tasks_{model_tier}"
 

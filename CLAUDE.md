@@ -26,7 +26,7 @@ This is described in README.md and also in Chapter 3 of the thesis.
 - _filter_nodes: feasibility filter on the node telemetry (Stage 1)
 - extract_features ([feature_service.py](./src/services/feature_service.py))
 - select_model ([router_service.py](./src/services/router_service.py)), LinUCB with the infeasible models masked
-- _pick_queue_for_model: dispatch to a node (traffic shares of the plan, else lowest expected latency)
+- _pick_node: dispatch to a node (traffic shares of the plan, else lowest expected latency)
 - enqueue_task ([redis_client.py](./src/queue/redis_client.py))
 - get_result ([redis_client.py](./src/queue/redis_client.py))
 - evaluate_and_calculate_reward ([evaluation_service.py](./src/services/evaluation_service.py)) and the update of the bandit, if the query has a reference

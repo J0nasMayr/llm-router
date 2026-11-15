@@ -341,16 +341,14 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
         orch = make_orchestrator()
         orch.allocation_controller = controller
         surviving = orch._filter_nodes(store.get_all_node_telemetry())
-        self.assertEqual(orch._pick_queue_for_model("big", surviving), worker.queue_name)
+        node = orch._pick_node("big", orch._options_by_model(surviving)["big"])
+        self.assertEqual(f"llm_tasks_node_{node['node_id']}", worker.queue_name)
         self.assertEqual(orch._pending_load_time(surviving[0], "big"), 0.0)
 
 
 class StubController:
     def __init__(self, weights):
         self.weights = weights
-
-    def has_plan(self):
-        return True
 
     def traffic_shares(self, model_id):
         return self.weights.get(model_id, [])
