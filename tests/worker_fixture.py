@@ -14,6 +14,14 @@ MODELS = {
     "big": {"name": "org/big", "tier": "edge", "parameter_count": 8},
 }
 
+# As in config/allocation.yaml and config/feature_extraction.yaml.
+CONTROLLER_SETTINGS = {
+    "policy": "dynamic",
+    "load_bandwidth_gb_per_s": 2.0,
+    "planning_horizon_s": 300.0,
+    "T_cool": 30.0,
+}
+
 
 class FakeWorkerTestCase(unittest.TestCase):
     """Builds workers whose model loads take a few milliseconds and can be

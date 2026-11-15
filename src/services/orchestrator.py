@@ -20,6 +20,7 @@ class Orchestrator:
         queue_client,
         model_configs,
         T_max,
+        load_bandwidth_gb_per_s,
         alpha=0.5,
         beta=0.5,
         min_free_gpu_memory_gb=0.5,
@@ -27,7 +28,6 @@ class Orchestrator:
         allocation_controller=None,
         result_timeout_seconds=None,
         dataset_configs=None,
-        load_bandwidth_gb_per_s=2.0,
     ):
         self.feature_service = feature_service
         self.router_service = router_service

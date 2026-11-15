@@ -11,7 +11,7 @@ policy: dynamic
 demand: shadow
 # Share of queries per model for the first plan, from GreenServ's offline
 # data (config/placement_prior.yaml, made by scripts/placement_prior.py),
-# and the total request rate it assumes.
+# and the total request rate it assumes. prior: null starts without a prior.
 prior: placement_prior
 prior_total_rps: 1.0
 # A new load must pay off within this horizon: a model is worth loading once

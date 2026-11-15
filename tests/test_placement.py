@@ -20,7 +20,7 @@ from src.bandit.linucb import LinUCB
 from src.services.allocation_controller import AllocationController, solve_placement
 from src.services.orchestrator import Orchestrator
 from tests.test_load_time import make_orchestrator, node
-from tests.worker_fixture import MODELS, FakeWorkerTestCase
+from tests.worker_fixture import CONTROLLER_SETTINGS, MODELS, FakeWorkerTestCase
 
 
 def plan(demand, nodes=("e1",), budget=20.0, current=(), horizon=300.0, latency=1.0):
@@ -112,7 +112,7 @@ class ControllerTest(unittest.TestCase):
                 queue_client=queue,
                 model_configs=MODELS,
                 demand_provider=lambda: dict(demand or {}),
-                **kwargs,
+                **{**CONTROLLER_SETTINGS, **kwargs},
             )
             for _ in range(ticks):
                 await controller._tick()
@@ -174,7 +174,7 @@ class TriggerTest(unittest.TestCase):
                 queue_client=mock.MagicMock(),
                 model_configs=MODELS,
                 demand_provider=dict,
-                T_cool=0.0,
+                **{**CONTROLLER_SETTINGS, "T_cool": 0.0},
             )
             controller._weights = weights
             loads, replicated = controller._node_loads(demand, telemetry)
@@ -322,6 +322,7 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
                 model_configs=MODELS,
                 demand_provider=dict,
                 prior_demand={"big": 0.05, "mid": 0.02},
+                **CONTROLLER_SETTINGS,
             )
             await controller._tick()
             return controller
@@ -393,6 +394,7 @@ class OrchestratorPlacementTest(unittest.TestCase):
             queue_client=queue,
             model_configs=MODELS,
             T_max=30.0,
+            load_bandwidth_gb_per_s=2.0,
         )
         asyncio.run(orch.process_query("q", wait_for_result=False))
         self.assertEqual(list(orch.consume_rps_window()), ["small"])

@@ -47,6 +47,7 @@ class ProcessQueryResponseTest(unittest.TestCase):
             queue_client=self.queue,
             model_configs=MODELS,
             T_max=30.0,
+            load_bandwidth_gb_per_s=2.0,
         )
 
     def query(self, **kwargs):

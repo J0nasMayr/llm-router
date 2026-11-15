@@ -35,7 +35,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A7 | Removed the telemetry `try/except` and `or []` (orchestrator, controller), the `TypeError` retry and the `features` guards in `RouterService` | `6de24ca` |
 | A8 | Removed `task_type` from `EvaluationService._evaluate` and `type: "general"` from `config/models.yaml` (both already unused in GreenServ) | `1d5b6c9` |
 | A9 | Removed `--dedicated-queue` and `queue_name` from the telemetry; the orchestrator derives the queue from the node id | `55fc2c8` |
-| B1 | `T_max` is a required argument of `Orchestrator`; `run_api.py` reads `max_latency` without a default | uncommitted |
+| B1 | `T_max` is a required argument of `Orchestrator`; `run_api.py` reads `max_latency` without a default | `5ed51f7` |
+| B2 | `run_api.py` indexes the YAML values directly (except Redis, see B4); the YAML-backed constructor parameters of `Orchestrator` and `AllocationController` have no default | uncommitted |
 
 ## A. Dead code
 

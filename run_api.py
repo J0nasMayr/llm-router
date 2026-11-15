@@ -57,9 +57,9 @@ def _build_services():
 
     evaluation_service = EvaluationService()
 
-    feasibility = features.get("feasibility") or {}
+    feasibility = features["feasibility"]
     T_max = float(feasibility["max_latency"])
-    load_bandwidth = float(feasibility.get("load_bandwidth_gb_per_s", 2.0))
+    load_bandwidth = float(feasibility["load_bandwidth_gb_per_s"])
     orch = Orchestrator(
         feature_service=feature_service,
         router_service=router_service,
@@ -80,19 +80,19 @@ def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
     """The allocation controller configured in allocation.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
     cfg = load_config("allocation")
-    policy = cfg.get("policy", "dynamic")
+    policy = cfg["policy"]
     if policy == "none":
         logger.info("Allocation controller disabled (policy: none)")
         return None
-    demand = cfg.get("demand", "shadow")
+    demand = cfg["demand"]
     if demand not in ("shadow", "realized"):
         raise ValueError(f"Unknown demand signal: {demand}")
     # The first plan uses the prior shares of queries per model, scaled to an
     # assumed total request rate.
     prior_demand = None
-    if cfg.get("prior"):
+    if cfg["prior"]:
         shares = load_config(cfg["prior"])
-        total_rps = float(cfg.get("prior_total_rps", 1.0))
+        total_rps = float(cfg["prior_total_rps"])
         prior_demand = {m: float(s) * total_rps for m, s in shares.items() if m in models}
     return AllocationController(
         queue_client=redis_client,
@@ -103,8 +103,8 @@ def _build_controller(redis_client, models, orch, load_bandwidth_gb_per_s):
         policy=policy,
         prior_demand=prior_demand,
         load_bandwidth_gb_per_s=load_bandwidth_gb_per_s,
-        planning_horizon_s=float(cfg.get("planning_horizon_s", 300.0)),
-        T_cool=float(cfg.get("cooldown_s", 30.0)),
+        planning_horizon_s=float(cfg["planning_horizon_s"]),
+        T_cool=float(cfg["cooldown_s"]),
     )
 
 

@@ -10,7 +10,7 @@ import weakref
 
 from src.services.allocation_controller import AllocationController
 from tests.test_load_time import make_orchestrator, node
-from tests.worker_fixture import MODELS, FakeWorkerTestCase
+from tests.worker_fixture import CONTROLLER_SETTINGS, MODELS, FakeWorkerTestCase
 
 
 class WorkerResidencyTest(FakeWorkerTestCase):
@@ -82,7 +82,10 @@ class FitCheckTest(unittest.TestCase):
     def test_controller_gives_no_share_where_the_model_does_not_fit(self):
         async def build():
             return AllocationController(
-                queue_client=None, model_configs=MODELS, demand_provider=dict
+                queue_client=None,
+                model_configs=MODELS,
+                demand_provider=dict,
+                **CONTROLLER_SETTINGS,
             )
 
         controller = asyncio.run(build())
