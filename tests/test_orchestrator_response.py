@@ -9,6 +9,7 @@ import asyncio
 import unittest
 from unittest import mock
 
+from src.services.demand_counter import DemandCounter
 from src.services.orchestrator import Orchestrator
 from tests.worker_fixture import MODELS
 
@@ -45,6 +46,7 @@ class ProcessQueryResponseTest(unittest.TestCase):
             router_service=self.router,
             evaluation_service=self.evaluation,
             queue_client=self.queue,
+            demand_counter=DemandCounter(),
             model_configs=MODELS,
             T_max=30.0,
             load_bandwidth_gb_per_s=2.0,

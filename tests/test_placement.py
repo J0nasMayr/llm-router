@@ -19,6 +19,7 @@ from scripts.placement_prior import model_shares, read_tables
 from src.bandit.linucb import LinUCB
 from src.queue.redis_client import node_queue_name
 from src.services.allocation_controller import AllocationController, solve_placement
+from src.services.demand_counter import DemandCounter
 from src.services.evaluation_service import EvaluationService
 from src.services.orchestrator import Orchestrator
 from tests.test_load_time import make_orchestrator, node
@@ -386,20 +387,22 @@ class OrchestratorPlacementTest(unittest.TestCase):
         router.preferred_model.return_value = "big"
         queue = mock.MagicMock()
         queue.get_all_node_telemetry.return_value = []
+        demand = DemandCounter()
         orch = Orchestrator(
             feature_service=mock.MagicMock(),
             router_service=router,
             evaluation_service=mock.MagicMock(),
             queue_client=queue,
+            demand_counter=demand,
             model_configs=MODELS,
             T_max=30.0,
             load_bandwidth_gb_per_s=2.0,
             min_free_gpu_memory_gb=0.5,
         )
         asyncio.run(orch.process_query("q", wait_for_result=False))
-        self.assertEqual(list(orch.consume_rps_window()), ["small"])
-        self.assertEqual(list(orch.consume_shadow_window()), ["big"])
-        self.assertEqual(orch.consume_shadow_window(), {})  # reset after reading
+        self.assertEqual(list(demand.consume("realized")), ["small"])
+        self.assertEqual(list(demand.consume("shadow")), ["big"])
+        self.assertEqual(demand.consume("shadow"), {})  # reset after reading
 
 
 class PreferredModelTest(unittest.TestCase):

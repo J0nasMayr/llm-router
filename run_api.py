@@ -16,6 +16,7 @@ from config.manager import load_config
 from src.api.router import router as inference_router
 from src.queue.redis_client import RedisClient
 from src.services.allocation_controller import AllocationController
+from src.services.demand_counter import DemandCounter
 from src.services.evaluation_service import EvaluationService
 from src.services.feature_service import FeatureService
 from src.services.orchestrator import Orchestrator
@@ -54,27 +55,33 @@ def _build_services():
     T_max = float(feasibility["max_latency"])
     load_bandwidth = float(feasibility["load_bandwidth_gb_per_s"])
     min_free_gb = float(feasibility["min_free_gpu_memory_gb"])
+
+    demand_counter = DemandCounter()
+    controller = _build_controller(
+        redis_client, models, demand_counter, load_bandwidth, min_free_gb
+    )
     orch = Orchestrator(
         feature_service=feature_service,
         router_service=router_service,
         evaluation_service=evaluation_service,
         queue_client=redis_client,
+        demand_counter=demand_counter,
         model_configs=models,
         T_max=T_max,
         dataset_configs=datasets,
         load_bandwidth_gb_per_s=load_bandwidth,
         min_free_gpu_memory_gb=min_free_gb,
+        allocation_controller=controller,
     )
-
-    controller = _build_controller(
-        redis_client, models, orch, load_bandwidth, min_free_gb
-    )
-    orch.allocation_controller = controller
     return orch, controller
 
 
 def _build_controller(
-    redis_client, models, orch, load_bandwidth_gb_per_s, min_free_gpu_memory_gb
+    redis_client,
+    models,
+    demand_counter,
+    load_bandwidth_gb_per_s,
+    min_free_gpu_memory_gb,
 ):
     """The allocation controller configured in allocation.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
@@ -83,9 +90,9 @@ def _build_controller(
     if policy == "none":
         logger.info("Allocation controller disabled (policy: none)")
         return None
-    demand = cfg["demand"]
-    if demand not in ("shadow", "realized"):
-        raise ValueError(f"Unknown demand signal: {demand}")
+    signal = cfg["demand"]
+    if signal not in DemandCounter.SIGNALS:
+        raise ValueError(f"Unknown demand signal: {signal}")
     # The first plan uses the prior shares of queries per model, scaled to an
     # assumed total request rate.
     prior_demand = None
@@ -96,9 +103,7 @@ def _build_controller(
     return AllocationController(
         queue_client=redis_client,
         model_configs=models,
-        demand_provider=(
-            orch.consume_shadow_window if demand == "shadow" else orch.consume_rps_window
-        ),
+        demand_provider=lambda: demand_counter.consume(signal),
         policy=policy,
         prior_demand=prior_demand,
         load_bandwidth_gb_per_s=load_bandwidth_gb_per_s,

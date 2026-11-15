@@ -5,6 +5,7 @@ Run from the repository root: ./venv/bin/python -m unittest discover -s tests -v
 
 import unittest
 
+from src.services.demand_counter import DemandCounter
 from src.services.orchestrator import Orchestrator
 from tests.worker_fixture import MODELS, FakeWorkerTestCase
 
@@ -15,6 +16,7 @@ def make_orchestrator(T_max=30.0):
         router_service=None,
         evaluation_service=None,
         queue_client=None,
+        demand_counter=DemandCounter(),
         model_configs=MODELS,
         T_max=T_max,
         load_bandwidth_gb_per_s=2.0,

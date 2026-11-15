@@ -53,7 +53,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | E6 | README: `config/mab.yaml`, `config/feature_extraction.yaml`, `config/manager.py` and `feature_service.py` under "Extended"; the cosmetic-edits sentence names the path comments in GreenServ's files | `de0ac8e` |
 | C2 | `node_queue_name` and `tier_queue_name` in `redis_client.py`, used by the worker, the orchestrator and the test; the Redis key prefixes are class attributes of `RedisClient` | `ac5edf9` |
 | C1 | `free_memory_gb` and `latency_on_node` shared in `node_telemetry.py` (renamed from `model_memory.py`); the controller's nominal latency in one `_pair_latency`; `_expected_latency` docstring corrected | `e245e35` |
-| C6 | `LatencyFilter` per (model, node) pair replaces the three parallel dicts; the demand filters are a `defaultdict` named `_demand_kalman` (no `_kalman_for`) | uncommitted |
+| C6 | `LatencyFilter` per (model, node) pair replaces the three parallel dicts; the demand filters are a `defaultdict` named `_demand_kalman` (no `_kalman_for`) | `7476dc4` |
+| D2 | `DemandCounter` (`src/services/demand_counter.py`) holds the realized and shadow counts; the orchestrator records into it, the controller reads `consume(signal)`; `run_api.py` builds counter, controller, orchestrator in that order | uncommitted |
 
 ## A. Dead code
 
@@ -335,10 +336,11 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
   `allocation_controller.py` and `orchestrator.py`; `consume_rps_window` next
   to `consume_shadow_window` (`orchestrator.py:257`), where the config says
   `realized`.
-- **Fix:** use "shares" throughout and `consume_realized_window`. Storing the
-  shares as `{model: {node: share}}` also removes two conversions between
-  lists of pairs and dicts.
-- **Note:** if D2 is done first, the two `consume_*` methods move anyway.
+- **Fix:** use "shares" throughout. Storing the shares as
+  `{model: {node: share}}` also removes two conversions between lists of
+  pairs and dicts.
+- **Note:** the `consume_*` naming is done: D2 replaced both methods with
+  `DemandCounter.consume("realized" | "shadow")`.
 
 ### E3. Path comments on line 1
 

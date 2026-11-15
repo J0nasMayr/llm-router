@@ -23,6 +23,7 @@ class Orchestrator:
         router_service,
         evaluation_service,
         queue_client,
+        demand_counter,
         model_configs,
         T_max,
         load_bandwidth_gb_per_s,
@@ -36,6 +37,7 @@ class Orchestrator:
         self.router_service = router_service
         self.evaluation_service = evaluation_service
         self.queue_client = queue_client
+        self.demand_counter = demand_counter
         self.model_configs = model_configs
         self.T_max = T_max
         # How long to wait for a worker result. Must exceed the deadline T_max,
@@ -57,11 +59,6 @@ class Orchestrator:
         # with replicas is routed to the nodes that hold it, in proportion to
         # its traffic weights; see _node_options_for_model.
         self.allocation_controller = allocation_controller
-        # Per-model arrival counters, read and reset by the controller:
-        # "realized" counts the model each query was routed to, "shadow" the
-        # model the bandit would have chosen if every model were available.
-        now = time.time()
-        self._windows = {"realized": ({}, now), "shadow": ({}, now)}
         # Per-dataset scoring and generation settings (datasets.yaml), applied
         # when a request names its dataset in metadata.
         self.dataset_configs = dataset_configs or {}
@@ -201,31 +198,6 @@ class Orchestrator:
             return random.choices([n for n, _ in options], weights=weights)[0]
         return options[0][0]
 
-    def _count(self, window, model_id):
-        counters, _ = self._windows[window]
-        counters[model_id] = counters.get(model_id, 0) + 1
-
-    def _consume_window(self, window):
-        """Per-model arrival rate (req/s) counted in `window` since its last
-        consumption; the window is then reset."""
-        counters, started = self._windows[window]
-        now = time.time()
-        self._windows[window] = ({}, now)
-        elapsed = max(now - started, 1e-6)
-        return {m: c / elapsed for m, c in counters.items()}
-
-    def consume_rps_window(self):
-        """Realized demand: queries routed to each model. One of the demand
-        providers of the allocation controller."""
-        return self._consume_window("realized")
-
-    def consume_shadow_window(self):
-        """Shadow demand: queries for which the bandit would have chosen each
-        model if every model were available. The default demand provider of
-        the allocation controller: unlike realized demand, it also counts
-        models the filter currently masks, e.g. because no node holds them."""
-        return self._consume_window("shadow")
-
     async def process_query(
         self,
         query_text,
@@ -255,8 +227,7 @@ class Orchestrator:
                 available_models=available_models or None,
             )
             preferred_model = self.router_service.preferred_model() or model_id
-        self._count("realized", model_id)
-        self._count("shadow", preferred_model)
+        self.demand_counter.record(model_id, preferred_model)
         # The dataset's own extraction, metric and generation settings, so
         # online rewards are computed the same way as in the offline GreenServ
         # setup.

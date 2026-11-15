@@ -22,7 +22,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml` and `src
 
 - `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
 - `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
-- `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and the demand counters the placement controller reads.
+- `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
 - `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
 - `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
@@ -34,6 +34,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml` and `src
 **New**
 
 - `src/services/allocation_controller.py`: the placement controller (Kalman trigger and placement program).
+- `src/services/demand_counter.py`: per-model arrival rates, realized and shadow, that the orchestrator records and the placement controller reads as its demand signal.
 - `src/services/node_telemetry.py`: readers of the node telemetry (free GPU memory, average latency, model size and load time on a node) and the model-size estimate they fall back to, shared by the worker, the filter and the controller.
 - `run_api.py`: wires the services together and starts the API and the controller.
 - `config/allocation.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
