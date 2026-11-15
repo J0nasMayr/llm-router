@@ -85,7 +85,7 @@ class InferenceService:
         self._resident = OrderedDict()
         self._model_memory_gb = {}
         self.max_models = max_models
-        # The allocation controller's target placement for this node (models
+        # The placement controller's target placement for this node (models
         # to keep loaded, most important first), or None without a plan. It is
         # read from Redis at most every reconcile_interval seconds.
         self._target = None
@@ -235,7 +235,7 @@ class InferenceService:
         return model, tokenizer, load_seconds
 
     def _reconcile_placement(self):
-        """Follow the allocation controller's target placement. The target is
+        """Follow the placement controller's target placement. The target is
         read at most every reconcile_interval seconds. A missing target model
         is loaded only while the node's queue is empty, one per call, so that
         loading for the plan never delays a waiting task; a target model that a

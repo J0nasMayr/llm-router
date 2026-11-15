@@ -57,7 +57,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | D2 | `DemandCounter` (`src/services/demand_counter.py`) holds the realized and shadow counts; the orchestrator records into it, the controller reads `consume(signal)`; `run_api.py` builds counter, controller, orchestrator in that order | `3ad0c82` |
 | D3 | The services live on `app.state` (no globals, no import inside `get_orchestrator`); the orchestrator's error reaches the client without the `"500: "` prefix; new `tests/test_api.py`; README moves `router.py` to "Extended" | `a4fae27` |
 | D1 | `process_query` calls `_choose_model`, `_dispatch`, `_wait_for_result` and `_evaluate_and_update`; CLAUDE.md's step list names them | `3488e4a` |
-| D4 | The filter's parameters moved to `config/feasibility.yaml` (`max_latency` → `max_latency_s`). `feature_extraction.yaml` is flat, and so is the experiments' copy (`experiments/config/feature_extraction.yaml`), which X1–X4 pass to the same `FeatureService`; it now reads its keys directly, so a wrapped config raises instead of falling back silently to 2 clusters and 1 bin. CLAUDE.md states the rule that every config file is flat; README names the experiments' copy among the cosmetic edits | uncommitted |
+| D4 | The filter's parameters moved to `config/feasibility.yaml` (`max_latency` → `max_latency_s`). `feature_extraction.yaml` is flat, and so is the experiments' copy (`experiments/config/feature_extraction.yaml`), which X1–X4 pass to the same `FeatureService`; it now reads its keys directly, so a wrapped config raises instead of falling back silently to 2 clusters and 1 bin. CLAUDE.md states the rule that every config file is flat; README names the experiments' copy among the cosmetic edits | `9bf75ca` |
+| E1 | "allocation" → "placement": `placement_controller.py`, `PlacementController`, `config/placement.yaml`, `placement_controller` in the orchestrator and on `app.state`, all comments and log messages; LaTeX labels `sec:placement`, `sec:eval-placement`; CLAUDE.md, README, `evaluation.tex`, `evaluation_plan.md` | uncommitted |
 
 ## A. Dead code
 
@@ -336,9 +337,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 ### E2. One concept under three names
 
 - **Where:** `traffic_shares()`, `weights` and `_weights` in
-  `allocation_controller.py` and `orchestrator.py`; `consume_rps_window` next
-  to `consume_shadow_window` (`orchestrator.py:257`), where the config says
-  `realized`.
+  `placement_controller.py` (named `allocation_controller.py` before E1) and
+  `orchestrator.py`.
 - **Fix:** use "shares" throughout. Storing the shares as
   `{model: {node: share}}` also removes two conversions between lists of
   pairs and dicts.
@@ -419,5 +419,5 @@ None of the points changes a value in the thesis table.
   started with `--energy-method zeus` may measure with PyNVML without any
   trace in its results. The worker could log the class it got, or `create`
   could raise. Found on 2026-11-15 while doing B8.
-- `AllocationController._tick` is declared `async` but never awaits, so a
+- `PlacementController._tick` is declared `async` but never awaits, so a
   placement solve (time limit 10 s) blocks the API's event loop while it runs.

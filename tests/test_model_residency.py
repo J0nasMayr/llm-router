@@ -1,5 +1,5 @@
 """Several models per node: memory budget, least-recently-used unloading, and
-the fit checks of the routing filter and the allocation controller.
+the fit checks of the routing filter and the placement controller.
 
 Run from the repository root: ./venv/bin/python -m unittest discover -s tests -v
 """
@@ -8,7 +8,7 @@ import asyncio
 import unittest
 import weakref
 
-from src.services.allocation_controller import AllocationController
+from src.services.placement_controller import PlacementController
 from tests.test_load_time import make_orchestrator, node
 from tests.worker_fixture import CONTROLLER_SETTINGS, MODELS, FakeWorkerTestCase
 
@@ -81,7 +81,7 @@ class FitCheckTest(unittest.TestCase):
 
     def test_controller_gives_no_share_where_the_model_does_not_fit(self):
         async def build():
-            return AllocationController(
+            return PlacementController(
                 queue_client=None,
                 model_configs=MODELS,
                 demand_provider=dict,

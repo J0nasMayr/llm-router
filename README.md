@@ -34,12 +34,12 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 
 **New**
 
-- `src/services/allocation_controller.py`: the placement controller (Kalman trigger and placement program).
+- `src/services/placement_controller.py`: the placement controller (Kalman trigger and placement program).
 - `src/services/demand_counter.py`: per-model arrival rates, realized and shadow, that the orchestrator records and the placement controller reads as its demand signal.
 - `src/services/node_telemetry.py`: readers of the node telemetry (free GPU memory, average latency, model size and load time on a node) and the model-size estimate they fall back to, shared by the worker, the filter and the controller.
 - `run_api.py`: wires the services together and starts the API and the controller.
 - `config/feasibility.yaml`: the feasibility filter's latency deadline, assumed load speed and minimum free GPU memory.
-- `config/allocation.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
+- `config/placement.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
 - `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.
 

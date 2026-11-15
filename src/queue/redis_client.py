@@ -112,7 +112,7 @@ class RedisClient:
 
     def set_node_placement(self, node_id, model_ids, ttl_seconds=None):
         """Publish the models a node should keep loaded (its target placement,
-        most important first). The allocation controller renews it with a TTL,
+        most important first). The placement controller renews it with a TTL,
         so a plan expires once the controller stops renewing it."""
         key = f"{self.placement_prefix}{node_id}"
         body = json.dumps(list(model_ids))

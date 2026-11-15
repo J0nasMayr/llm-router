@@ -1,4 +1,4 @@
-"""Per-model allocation controller.
+"""Per-model placement controller.
 
 Decides which models each node keeps loaded (the placement) and how each
 model's traffic is split across the nodes that hold it. Adopts HAS-GPU's
@@ -224,7 +224,7 @@ def solve_placement(
     return placement, weights
 
 
-class AllocationController:
+class PlacementController:
     """Periodic loop: read telemetry, evaluate the trigger, and re-plan which
     models each node keeps loaded and how each model's traffic is split.
 
@@ -257,7 +257,7 @@ class AllocationController:
         nominal_latency_s: float = 1.0,
     ):
         if policy not in ("dynamic", "static"):
-            raise ValueError(f"Unknown allocation policy: {policy}")
+            raise ValueError(f"Unknown placement policy: {policy}")
         self.queue_client = queue_client
         self.model_configs = model_configs
         self.demand_provider = demand_provider
@@ -498,7 +498,7 @@ class AllocationController:
             predicted_rps, node_loads, replicated, telemetry_list, latency_reason
         )
         if reason:
-            logger.info(f"Allocation trigger fired: {reason}")
+            logger.info(f"Placement trigger fired: {reason}")
             self._replan(telemetry_list, predicted_rps, reason)
         else:
             self._publish_targets()
@@ -508,7 +508,7 @@ class AllocationController:
             try:
                 await self._tick()
             except Exception as e:
-                logger.warning(f"Allocation controller tick failed: {e}")
+                logger.warning(f"Placement controller tick failed: {e}")
             try:
                 await asyncio.wait_for(self._stop.wait(), timeout=self.tick_interval)
             except asyncio.TimeoutError:
@@ -518,7 +518,7 @@ class AllocationController:
         if self._task is None or self._task.done():
             self._stop.clear()
             self._task = asyncio.create_task(self._loop())
-            logger.info("Allocation controller started")
+            logger.info("Placement controller started")
 
     async def stop(self):
         self._stop.set()

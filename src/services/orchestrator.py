@@ -29,7 +29,7 @@ class Orchestrator:
         load_bandwidth_gb_per_s,
         min_free_gpu_memory_gb,
         network_delay_by_tier=None,
-        allocation_controller=None,
+        placement_controller=None,
         result_timeout_seconds=None,
         dataset_configs=None,
     ):
@@ -55,10 +55,10 @@ class Orchestrator:
         # Assumed disk-to-GPU speed for estimating the load time of a model a
         # node has not loaded yet.
         self.load_bandwidth_gb_per_s = load_bandwidth_gb_per_s
-        # Optional allocation controller. Once it has a placement, a model
+        # Optional placement controller. Once it has a placement, a model
         # with replicas is routed to the nodes that hold it, in proportion to
         # its traffic weights; see _node_options_for_model.
-        self.allocation_controller = allocation_controller
+        self.placement_controller = placement_controller
         # Per-dataset scoring and generation settings (datasets.yaml), applied
         # when a request names its dataset in metadata.
         self.dataset_configs = dataset_configs or {}
@@ -147,9 +147,9 @@ class Orchestrator:
         no plan yet, or no replica of the model in it. A model without replicas
         is not restricted: it runs wherever the filter allows, loaded on
         demand."""
-        if self.allocation_controller is None:
+        if self.placement_controller is None:
             return None
-        weights = dict(self.allocation_controller.traffic_shares(model_id))
+        weights = dict(self.placement_controller.traffic_shares(model_id))
         return weights or None
 
     def _node_options_for_model(self, model_id, surviving_nodes):

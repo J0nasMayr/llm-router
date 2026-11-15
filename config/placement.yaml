@@ -1,4 +1,4 @@
-# Allocation controller (thesis Section 3.3): decides which models each node
+# Placement controller (thesis Section 3.3): decides which models each node
 # keeps loaded and how each model's traffic is split across them.
 # dynamic: first plan from the prior, then re-plan when a trigger fires.
 # static:  the first plan only (a fixed placement).

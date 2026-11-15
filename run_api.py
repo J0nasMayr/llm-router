@@ -1,8 +1,8 @@
 """FastAPI bootstrap for the LLM router.
 
 Constructs the service graph (feature / router / evaluation / orchestrator /
-allocation controller), wires them together, and exposes the inference router
-from src.api.router. The allocation controller is started/stopped via the
+placement controller), wires them together, and exposes the inference router
+from src.api.router. The placement controller is started/stopped via the
 FastAPI lifespan.
 """
 
@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request
 from config.manager import load_config
 from src.api.router import router as inference_router
 from src.queue.redis_client import RedisClient
-from src.services.allocation_controller import AllocationController
+from src.services.placement_controller import PlacementController
 from src.services.demand_counter import DemandCounter
 from src.services.evaluation_service import EvaluationService
 from src.services.feature_service import FeatureService
@@ -26,7 +26,7 @@ logger = logging.getLogger("run_api")
 
 
 def _build_services():
-    """Wire the service graph. Returns (orchestrator, allocation_controller)."""
+    """Wire the service graph. Returns (orchestrator, placement_controller)."""
     models = load_config("models")
     features = load_config("feature_extraction")
     mab = load_config("mab")
@@ -66,7 +66,7 @@ def _build_services():
         dataset_configs=datasets,
         load_bandwidth_gb_per_s=load_bandwidth,
         min_free_gpu_memory_gb=min_free_gb,
-        allocation_controller=controller,
+        placement_controller=controller,
     )
     return orch, controller
 
@@ -78,12 +78,12 @@ def _build_controller(
     load_bandwidth_gb_per_s,
     min_free_gpu_memory_gb,
 ):
-    """The allocation controller configured in allocation.yaml, or None for
+    """The placement controller configured in placement.yaml, or None for
     policy "none" (nodes then load models on demand only)."""
-    cfg = load_config("allocation")
+    cfg = load_config("placement")
     policy = cfg["policy"]
     if policy == "none":
-        logger.info("Allocation controller disabled (policy: none)")
+        logger.info("Placement controller disabled (policy: none)")
         return None
     signal = cfg["demand"]
     if signal not in DemandCounter.SIGNALS:
@@ -95,7 +95,7 @@ def _build_controller(
         shares = load_config(cfg["prior"])
         total_rps = float(cfg["prior_total_rps"])
         prior_demand = {m: float(s) * total_rps for m, s in shares.items() if m in models}
-    return AllocationController(
+    return PlacementController(
         queue_client=redis_client,
         model_configs=models,
         demand_provider=lambda: demand_counter.consume(signal),
@@ -112,7 +112,7 @@ def _build_controller(
 async def lifespan(app: FastAPI):
     orchestrator, controller = _build_services()
     app.state.orchestrator = orchestrator
-    app.state.allocation_controller = controller
+    app.state.placement_controller = controller
     if controller:
         controller.start()
     logger.info("API ready")
@@ -131,7 +131,7 @@ app.include_router(inference_router)
 @app.get("/health")
 def health(request: Request):
     state = request.app.state
-    controller = getattr(state, "allocation_controller", None)
+    controller = getattr(state, "placement_controller", None)
     return {
         "status": "ok",
         "orchestrator_ready": getattr(state, "orchestrator", None) is not None,

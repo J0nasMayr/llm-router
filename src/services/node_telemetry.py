@@ -1,6 +1,6 @@
 """Readers of a node's telemetry, and the model-size estimate they fall back
 to, shared by the inference workers, the orchestrator's feasibility filter and
-the allocation controller."""
+the placement controller."""
 
 # Workers load weights in bf16: 2 bytes per parameter, i.e. 2 GB per billion.
 GB_PER_BILLION_PARAMS = 2.0

@@ -14,7 +14,7 @@ It replaces `step3_placement_plan.md`; the design notes and the status log of th
 | Full system | The placement controller | `policy: dynamic` |
 | Ablation | The full system with realized instead of shadow demand (shows the lock-in) | `demand: realized` |
 
-The settings are in `config/allocation.yaml`. The baselines (a)–(d) for RQ1 and RQ2 are described in `tex/sources/evaluation.tex`.
+The settings are in `config/placement.yaml`. The baselines (a)–(d) for RQ1 and RQ2 are described in `tex/sources/evaluation.tex`.
 
 ## 2. Workload
 

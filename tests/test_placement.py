@@ -18,7 +18,7 @@ import numpy as np
 from scripts.placement_prior import model_shares, read_tables
 from src.bandit.linucb import LinUCB
 from src.queue.redis_client import node_queue_name
-from src.services.allocation_controller import AllocationController, solve_placement
+from src.services.placement_controller import PlacementController, solve_placement
 from src.services.demand_counter import DemandCounter
 from src.services.evaluation_service import EvaluationService
 from src.services.orchestrator import Orchestrator
@@ -111,7 +111,7 @@ class ControllerTest(unittest.TestCase):
         queue.get_all_node_telemetry.return_value = telemetry
 
         async def scenario():
-            controller = AllocationController(
+            controller = PlacementController(
                 queue_client=queue,
                 model_configs=MODELS,
                 demand_provider=lambda: dict(demand or {}),
@@ -142,7 +142,7 @@ class ControllerTest(unittest.TestCase):
 
     def test_static_policy_plans_only_once(self):
         with mock.patch(
-            "src.services.allocation_controller.solve_placement", wraps=solve_placement
+            "src.services.placement_controller.solve_placement", wraps=solve_placement
         ) as solver:
             _, queue = self._run_controller(
                 3, [edge_node()], demand={"big": 5.0}, policy="static", T_cool=0.0
@@ -173,7 +173,7 @@ class TriggerTest(unittest.TestCase):
 
     def _reason(self, weights, demand, telemetry):
         async def scenario():
-            controller = AllocationController(
+            controller = PlacementController(
                 queue_client=mock.MagicMock(),
                 model_configs=MODELS,
                 demand_provider=dict,
@@ -319,7 +319,7 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
         worker._publish_telemetry()
 
         async def scenario():
-            controller = AllocationController(
+            controller = PlacementController(
                 queue_client=store,
                 model_configs=MODELS,
                 demand_provider=dict,
@@ -340,7 +340,7 @@ class EndToEndPlacementTest(FakeWorkerTestCase):
         self.assertEqual(telemetry["target_models"], ["big", "mid"])
 
         orch = make_orchestrator()
-        orch.allocation_controller = controller
+        orch.placement_controller = controller
         surviving = orch._filter_nodes(store.get_all_node_telemetry())
         node = orch._pick_node("big", orch._options_by_model(surviving)["big"])
         self.assertEqual(node_queue_name(node["node_id"]), worker.queue_name)
@@ -364,13 +364,13 @@ class OrchestratorPlacementTest(unittest.TestCase):
 
     def test_replicas_are_used_when_they_meet_the_deadline(self):
         orch = make_orchestrator()
-        orch.allocation_controller = StubController({"big": [("a", 1.0)]})
+        orch.placement_controller = StubController({"big": [("a", 1.0)]})
         options = orch._node_options_for_model("big", self._nodes())
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 
     def test_other_nodes_serve_as_overflow(self):
         orch = make_orchestrator()
-        orch.allocation_controller = StubController({"big": [("a", 1.0)]})
+        orch.placement_controller = StubController({"big": [("a", 1.0)]})
         busy_a, b = self._nodes()
         busy_a["queue_length"] = 100
         options = orch._node_options_for_model("big", [busy_a, b])
@@ -378,7 +378,7 @@ class OrchestratorPlacementTest(unittest.TestCase):
 
     def test_model_without_replica_is_not_restricted(self):
         orch = make_orchestrator()
-        orch.allocation_controller = StubController({})
+        orch.placement_controller = StubController({})
         self.assertEqual(len(orch._node_options_for_model("big", self._nodes())), 2)
 
     def test_shadow_demand_counts_the_unmasked_choice(self):
