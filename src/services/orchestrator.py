@@ -198,6 +198,76 @@ class Orchestrator:
             return random.choices([n for n, _ in options], weights=weights)[0]
         return options[0][0]
 
+    def _choose_model(self, features, options_by_model, model_id=None):
+        """Stage 2: (model_id, preferred_model). The bandit chooses among the
+        models with at least one option; with no options at all (no telemetry
+        yet, cold start) it sees every model. preferred_model is its shadow
+        choice, the model it would choose if no model were masked. A model_id
+        fixed by the caller is used as both."""
+        if model_id is not None:
+            return model_id, model_id
+        available_models = [m for m, options in options_by_model.items() if options]
+        model_id = self.router_service.select_model(
+            features, available_models=available_models or None
+        )
+        return model_id, self.router_service.preferred_model() or model_id
+
+    def _dispatch(self, query_text, model_id, generation_parameters, options):
+        """Stage 3: enqueue the task on a node of the chosen model (see
+        _pick_node), or on the tier queue when no node meets the deadline or
+        no telemetry is available yet (cold start). Returns the task id, which
+        the queue client assigns."""
+        task = {
+            "query_text": query_text,
+            "selected_model": model_id,
+            "generation_parameters": generation_parameters,
+        }
+        if options:
+            node = self._pick_node(model_id, options)
+            target_queue = node_queue_name(node["node_id"])
+        else:
+            model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
+            target_queue = tier_queue_name(model_tier)
+        return self.queue_client.enqueue_task(task, queue_name=target_queue)
+
+    async def _wait_for_result(self, task_id):
+        """The worker's result for the task, or None if it does not arrive
+        within result_timeout_seconds."""
+        start_time = time.time()
+        while time.time() - start_time < self.result_timeout_seconds:
+            result = self.queue_client.get_result(task_id)
+            if result:
+                return result
+            await asyncio.sleep(0.2)
+        return None
+
+    def _evaluate_and_update(
+        self,
+        result,
+        reference,
+        features,
+        model_id,
+        extraction_method,
+        evaluation_metric,
+    ):
+        """Compute the reward of the worker's answer and update the bandit
+        with it. Returns the evaluation metrics, reward included."""
+        # The worker nests its measurements under "metrics" (see
+        # InferenceService._run_inference).
+        worker_metrics = result.get("metrics") or {}
+        metrics = self.evaluation_service.evaluate_and_calculate_reward(
+            response=result["response"],
+            reference=reference,
+            task_type=features["task_type"],
+            energy_consumption=worker_metrics.get("energy_consumption", 0),
+            input_tokens=worker_metrics.get("input_tokens", 0),
+            output_tokens=worker_metrics.get("output_tokens", 0),
+            evaluation_metric=evaluation_metric,
+            extraction_method=extraction_method,
+        )
+        self.router_service.update(features, model_id, metrics["reward"])
+        return metrics
+
     async def process_query(
         self,
         query_text,
@@ -206,102 +276,52 @@ class Orchestrator:
         model_id=None,
         wait_for_result=True,
     ):
-        """Process a query through the routing pipeline"""
-
-        # Stage 1: 
-        # - Pull telemetry, prune nodes lacking free GPU memory
-        # - Derive the per-model feasible set from per-model expected latency
-        telemetry_list = self.queue_client.get_all_node_telemetry()
-        surviving_nodes = self._filter_nodes(telemetry_list)
-        options_by_model = self._options_by_model(surviving_nodes)
-        available_models = [m for m, options in options_by_model.items() if options]
-
+        """Route one query through Stages 1-3 and return its task id and
+        model. Unless wait_for_result is False, also wait for the worker's
+        answer and add it with its metrics; with a reference, compute the
+        reward and update the bandit."""
+        nodes = self._filter_nodes(self.queue_client.get_all_node_telemetry())
+        options_by_model = self._options_by_model(nodes)
         features = self.feature_service.extract_features(query_text, metadata)
-        preferred_model = model_id
-        if model_id is None:
-            # Stage 2:
-            # - Bandit chooses among physically viable arms (mask)
-            # - Empty available_models (no telemetry yet) => bandit sees all arms
-            model_id = self.router_service.select_model(
-                features,
-                available_models=available_models or None,
-            )
-            preferred_model = self.router_service.preferred_model() or model_id
+        model_id, preferred_model = self._choose_model(
+            features, options_by_model, model_id
+        )
         self.demand_counter.record(model_id, preferred_model)
-        # The dataset's own extraction, metric and generation settings, so
-        # online rewards are computed the same way as in the offline GreenServ
-        # setup.
         extraction_method, evaluation_metric, generation_parameters = (
             self._dataset_settings((metadata or {}).get("dataset"))
         )
-        # Note: the queue client assigns the definitive task id in enqueue_task.
-        task = {
-            "query_text": query_text,
-            "selected_model": model_id,
-            "generation_parameters": generation_parameters,
-        }
-
-        # Stage 3: dispatch to a node of the chosen model (see _pick_node), or
-        # to the tier-broadcast queue when no node meets the deadline or no
-        # telemetry is available yet (cold start).
-        options = options_by_model.get(model_id)
-        if options:
-            node = self._pick_node(model_id, options)
-            target_queue = node_queue_name(node["node_id"])
-        else:
-            model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
-            target_queue = tier_queue_name(model_tier)
-
-        # Pass the targeted queue to the redis client
-        task_id = self.queue_client.enqueue_task(task, queue_name=target_queue)
-
+        task_id = self._dispatch(
+            query_text, model_id, generation_parameters, options_by_model.get(model_id)
+        )
         response = {"task_id": task_id, "model_id": model_id}
         if not wait_for_result:
             return response
         try:
-            timeout = self.result_timeout_seconds
-            start_time = time.time()
-            result = None
-
-            while time.time() - start_time < timeout:
-                result = self.queue_client.get_result(task_id)
-                if result:
-                    break
-                await asyncio.sleep(0.2)
-
-            if not result:
+            result = await self._wait_for_result(task_id)
+            if result is None:
                 response["error"] = "Timeout waiting for response"
-                return response
-            if result.get("status") == "failed":
+            elif result.get("status") == "failed":
                 # Keep the worker's message (e.g. running out of GPU memory).
                 response["error"] = result.get("error") or "Inference failed"
-                return response
-            response["response"] = result["response"]
-            # The worker nests its measurements under "metrics" (see
-            # InferenceService._run_inference): generation latency and energy,
-            # token counts and model load time. They are returned with every
-            # response so that clients, e.g. a load generator, can log them.
-            worker_metrics = result.get("metrics") or {}
-            response["metrics"] = dict(worker_metrics)
-            if reference:
-                energy_consumption = worker_metrics.get("energy_consumption", 0)
-                input_tokens = worker_metrics.get("input_tokens", 0)
-                output_tokens = worker_metrics.get("output_tokens", 0)
-                metrics = self.evaluation_service.evaluate_and_calculate_reward(
-                    response=result["response"],
-                    reference=reference,
-                    task_type=features["task_type"],
-                    energy_consumption=energy_consumption,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    evaluation_metric=evaluation_metric,
-                    extraction_method=extraction_method,
-                )
-                self.router_service.update(features, model_id, metrics["reward"])
-                response["metrics"].update(metrics)
-
+            else:
+                response["response"] = result["response"]
+                # The worker's measurements: generation latency and energy,
+                # token counts and model load time. They are returned with
+                # every response so that clients, e.g. a load generator, can
+                # log them.
+                response["metrics"] = dict(result.get("metrics") or {})
+                if reference:
+                    response["metrics"].update(
+                        self._evaluate_and_update(
+                            result,
+                            reference,
+                            features,
+                            model_id,
+                            extraction_method,
+                            evaluation_metric,
+                        )
+                    )
         except Exception as e:
             logger.error(f"Error waiting for result: {e}")
             response["error"] = str(e)
-
         return response

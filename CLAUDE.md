@@ -22,14 +22,13 @@ This is described in README.md and also in Chapter 3 of the thesis.
 
 [router.py](./src/api/router.py) is the entry point for inference; This is where the `api-endpoint` for inference is defined/served ([run_api.py](./run_api.py) starts the API).
 
-[orchestrator.py](./src/services/orchestrator.py) then does steps:
-- _filter_nodes: feasibility filter on the node telemetry (Stage 1)
+[orchestrator.py](./src/services/orchestrator.py) then does steps (`process_query`, one method per step):
+- _filter_nodes and _options_by_model: feasibility filter on the node telemetry (Stage 1)
 - extract_features ([feature_service.py](./src/services/feature_service.py))
-- select_model ([router_service.py](./src/services/router_service.py)), LinUCB with the infeasible models masked
-- _pick_node: dispatch to a node (traffic shares of the plan, else lowest expected latency)
-- enqueue_task ([redis_client.py](./src/queue/redis_client.py))
-- get_result ([redis_client.py](./src/queue/redis_client.py))
-- evaluate_and_calculate_reward ([evaluation_service.py](./src/services/evaluation_service.py)) and the update of the bandit, if the query has a reference
+- _choose_model: select_model ([router_service.py](./src/services/router_service.py)), LinUCB with the infeasible models masked (Stage 2)
+- _dispatch: _pick_node, a node of the chosen model (traffic shares of the plan, else lowest expected latency), then enqueue_task ([redis_client.py](./src/queue/redis_client.py)) (Stage 3)
+- _wait_for_result: get_result ([redis_client.py](./src/queue/redis_client.py))
+- _evaluate_and_update: evaluate_and_calculate_reward ([evaluation_service.py](./src/services/evaluation_service.py)) and the update of the bandit, if the query has a reference
 
 Running alongside:
 - [inference_service.py](./src/services/inference_service.py): the worker on each node. It executes tasks from its queue, keeps several models in GPU memory, follows its target placement and publishes telemetry.

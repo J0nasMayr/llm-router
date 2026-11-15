@@ -55,7 +55,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | C1 | `free_memory_gb` and `latency_on_node` shared in `node_telemetry.py` (renamed from `model_memory.py`); the controller's nominal latency in one `_pair_latency`; `_expected_latency` docstring corrected | `e245e35` |
 | C6 | `LatencyFilter` per (model, node) pair replaces the three parallel dicts; the demand filters are a `defaultdict` named `_demand_kalman` (no `_kalman_for`) | `7476dc4` |
 | D2 | `DemandCounter` (`src/services/demand_counter.py`) holds the realized and shadow counts; the orchestrator records into it, the controller reads `consume(signal)`; `run_api.py` builds counter, controller, orchestrator in that order | `3ad0c82` |
-| D3 | The services live on `app.state` (no globals, no import inside `get_orchestrator`); the orchestrator's error reaches the client without the `"500: "` prefix; new `tests/test_api.py`; README moves `router.py` to "Extended" | uncommitted |
+| D3 | The services live on `app.state` (no globals, no import inside `get_orchestrator`); the orchestrator's error reaches the client without the `"500: "` prefix; new `tests/test_api.py`; README moves `router.py` to "Extended" | `a4fae27` |
+| D1 | `process_query` calls `_choose_model`, `_dispatch`, `_wait_for_result` and `_evaluate_and_update`; CLAUDE.md's step list names them | uncommitted |
 
 ## A. Dead code
 
