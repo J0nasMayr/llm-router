@@ -14,7 +14,7 @@ MODELS = {
     "big": {"name": "org/big", "tier": "edge", "parameter_count": 8},
 }
 
-# As in config/allocation.yaml and config/feature_extraction.yaml.
+# As in config/allocation.yaml and config/feasibility.yaml.
 CONTROLLER_SETTINGS = {
     "policy": "dynamic",
     "load_bandwidth_gb_per_s": 2.0,

@@ -11,16 +11,9 @@ class FeatureService:
     """Service for extracting features from queries using specialized extractors"""
 
     def __init__(self, config):
-        feature_config = config.get("feature_extraction", {})
-        self.task_extractor = TaskTypeExtractor(
-            feature_config.get("task_classification", {})
-        )
-        self.semantic_extractor = SemanticClusterExtractor(
-            feature_config.get("semantic_clustering", {})
-        )
-        self.complexity_extractor = ComplexityExtractor(
-            feature_config.get("complexity", {})
-        )
+        self.task_extractor = TaskTypeExtractor(config["task_classification"])
+        self.semantic_extractor = SemanticClusterExtractor(config["semantic_clustering"])
+        self.complexity_extractor = ComplexityExtractor(config["complexity"])
         self.task_types = self.task_extractor.task_types
         self.num_clusters = self.semantic_extractor.k
         self.num_complexity_bins = len(self.complexity_extractor.complexity_bins)

@@ -16,7 +16,7 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-The only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of the redundant `datasets:` root key from `config/datasets.yaml` and the three `data/` files that read it; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
+The only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of a redundant root key from `config/datasets.yaml` (and the three `data/` files that read it) and from `experiments/config/feature_extraction.yaml`; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
 
 **Extended**
 
@@ -29,7 +29,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 - `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
 - `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
 - `config/mab.yaml`: an `algorithm` key selects the bandit, with one block of constructor parameters per bandit (GreenServ's file held a single epsilon-greedy block).
-- `config/feature_extraction.yaml`: complexity bins that every score falls into (with the bounds in GreenServ's file, the first slot stayed unused and the hardest texts got none), and the `feasibility` block: latency deadline, assumed load speed and minimum free GPU memory.
+- `config/feature_extraction.yaml`: complexity bins that every score falls into (with the bounds in GreenServ's file, the first slot stayed unused and the hardest texts got none).
 - `config/manager.py`: a missing or invalid config file raises instead of loading as empty, and `config/` is found from any working directory.
 
 **New**
@@ -38,6 +38,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 - `src/services/demand_counter.py`: per-model arrival rates, realized and shadow, that the orchestrator records and the placement controller reads as its demand signal.
 - `src/services/node_telemetry.py`: readers of the node telemetry (free GPU memory, average latency, model size and load time on a node) and the model-size estimate they fall back to, shared by the worker, the filter and the controller.
 - `run_api.py`: wires the services together and starts the API and the controller.
+- `config/feasibility.yaml`: the feasibility filter's latency deadline, assumed load speed and minimum free GPU memory.
 - `config/allocation.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
 - `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.

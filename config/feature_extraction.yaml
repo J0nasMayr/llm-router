@@ -1,49 +1,33 @@
-feature_extraction:
-  task_classification:
-    task_types: 
-      - mmlu
-      - gsm8k
-      - hellaswag
-      - winogrande
-      - cnn_dailymail
+task_classification:
+  task_types:
+    - mmlu
+    - gsm8k
+    - hellaswag
+    - winogrande
+    - cnn_dailymail
 
-    embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-    embedding_dim: 384
-    instruction_max_length: 50
-    classifier_path: "models/task_classifier.pkl"
-    
-  semantic_clustering:
-    num_clusters: 3
-    online_update: true
-    centroids_path: "models/cluster_centroids.pkl"
-    
-  complexity:
-    measure: "flesch_reading_ease"
-    # Exclusive upper bound of each bin over the inverted Flesch score, which
-    # is clamped to [0, 100]: [0,33), [33,67), [67,100]. One one-hot slot per
-    # bin; the last bound must exceed 100 so every score falls into a slot.
-    bins:
-      - 33
-      - 67
-      - 101
-    use_binned: true
-    
-  context_vector:
-    one_hot_encode: true
-    include_raw_embeddings: false
-    normalize_numeric: true
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
+  embedding_dim: 384
+  instruction_max_length: 50
+  classifier_path: "models/task_classifier.pkl"
 
-# Latency deadline T_max (seconds) of the orchestrator's feasibility filter.
-# Tune per deployment: must exceed the realistic single-inference latency of
-# the largest model, or every node gets filtered and routing degrades to the
-# cold-start fallback path.
-feasibility:
-  max_latency: 30
-  # Assumed disk-to-GPU speed (GB/s) for estimating how long a node needs to
-  # load a model it has not loaded before; after the first load, the node's
-  # measured load time is used instead. Pre-download all weights, otherwise
-  # the first measured load includes the download.
-  load_bandwidth_gb_per_s: 2.0
-  # G_min: a node with less free GPU memory receives no queries and no new
-  # replicas, and triggers a re-plan of the placement controller.
-  min_free_gpu_memory_gb: 0.5
+semantic_clustering:
+  num_clusters: 3
+  online_update: true
+  centroids_path: "models/cluster_centroids.pkl"
+
+complexity:
+  measure: "flesch_reading_ease"
+  # Exclusive upper bound of each bin over the inverted Flesch score, which
+  # is clamped to [0, 100]: [0,33), [33,67), [67,100]. One one-hot slot per
+  # bin; the last bound must exceed 100 so every score falls into a slot.
+  bins:
+    - 33
+    - 67
+    - 101
+  use_binned: true
+
+context_vector:
+  one_hot_encode: true
+  include_raw_embeddings: false
+  normalize_numeric: true

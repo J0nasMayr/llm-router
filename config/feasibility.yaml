@@ -1,0 +1,15 @@
+# Parameters of the orchestrator's feasibility filter (Stage 1).
+# The placement controller uses the load speed and G_min as well.
+
+# Latency deadline T_max (seconds). Tune per deployment: must exceed the
+# realistic single-inference latency of the largest model, or every node gets
+# filtered and routing degrades to the cold-start fallback path.
+max_latency_s: 30
+# Assumed disk-to-GPU speed (GB/s) for estimating how long a node needs to
+# load a model it has not loaded before; after the first load, the node's
+# measured load time is used instead. Pre-download all weights, otherwise
+# the first measured load includes the download.
+load_bandwidth_gb_per_s: 2.0
+# G_min: a node with less free GPU memory receives no queries and no new
+# replicas, and triggers a re-plan of the placement controller.
+min_free_gpu_memory_gb: 0.5

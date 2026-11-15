@@ -46,8 +46,8 @@ def _build_services():
 
     evaluation_service = EvaluationService()
 
-    feasibility = features["feasibility"]
-    T_max = float(feasibility["max_latency"])
+    feasibility = load_config("feasibility")
+    T_max = float(feasibility["max_latency_s"])
     load_bandwidth = float(feasibility["load_bandwidth_gb_per_s"])
     min_free_gb = float(feasibility["min_free_gpu_memory_gb"])
 
