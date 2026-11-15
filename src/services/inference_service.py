@@ -18,8 +18,7 @@ from src.metrics.energy import EnergyMeasurement
 from src.queue.redis_client import RedisClient, node_queue_name, tier_queue_name
 from src.services.node_telemetry import estimated_size_gb
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("worker")
+logger = logging.getLogger(__name__)
 
 
 class KeywordsStoppingCriteria(StoppingCriteria):
@@ -489,6 +488,7 @@ class InferenceService:
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description="LLM Inference Worker")
     parser.add_argument(
         "--redis-host", default=None, help="Overrides redis.host of the config"

@@ -58,7 +58,7 @@ class WorkerResidencyTest(FakeWorkerTestCase):
     def test_model_larger_than_budget_loads_alone(self):
         worker = self.make_worker(memory_budget_gb=10.0)
         worker._load_model("small")
-        with self.assertLogs("worker", level="WARNING"):
+        with self.assertLogs("src.services.inference_service", level="WARNING"):
             worker._load_model("big")
         self.assertEqual(worker._model_state_snapshot()["resident_models"], ["big"])
 

@@ -4,8 +4,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("api")
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 

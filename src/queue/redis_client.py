@@ -1,10 +1,13 @@
 import json
+import logging
 import time
 import uuid
 
 import redis
 
 from config.manager import load_config
+
+logger = logging.getLogger(__name__)
 
 
 def node_queue_name(node_id):
@@ -36,7 +39,7 @@ class RedisClient:
         )
         # Test connection
         self.redis.ping()
-        print(f"Successfully connected to Redis at {host}:{port}")
+        logger.info(f"Connected to Redis at {host}:{port}")
 
     @classmethod
     def from_config(cls, host=None, port=None, password=None):

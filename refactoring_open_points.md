@@ -59,7 +59,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | D1 | `process_query` calls `_choose_model`, `_dispatch`, `_wait_for_result` and `_evaluate_and_update`; CLAUDE.md's step list names them | `3488e4a` |
 | D4 | The filter's parameters moved to `config/feasibility.yaml` (`max_latency` → `max_latency_s`). `feature_extraction.yaml` is flat, and so is the experiments' copy (`experiments/config/feature_extraction.yaml`), which X1–X4 pass to the same `FeatureService`; it now reads its keys directly, so a wrapped config raises instead of falling back silently to 2 clusters and 1 bin. CLAUDE.md states the rule that every config file is flat; README names the experiments' copy among the cosmetic edits | `9bf75ca` |
 | E1 | "allocation" → "placement": `placement_controller.py`, `PlacementController`, `config/placement.yaml`, `placement_controller` in the orchestrator and on `app.state`, all comments and log messages; LaTeX labels `sec:placement`, `sec:eval-placement`; CLAUDE.md, README, `evaluation.tex`, `evaluation_plan.md` | `963e9ae` |
-| E2 | One name and one shape for the traffic shares: `solve_placement` returns and the controller stores `{model: {node: share}}` (`_shares`), `traffic_shares()` returns `{node: share}`, no `dict(...)` conversion in the orchestrator | uncommitted |
+| E2 | One name and one shape for the traffic shares: `solve_placement` returns and the controller stores `{model: {node: share}}` (`_shares`), `traffic_shares()` returns `{node: share}`, no `dict(...)` conversion in the orchestrator | `4ef62d4` |
+| E5 | `basicConfig` only in `run_api.py` and the worker's `main()`; `getLogger(__name__)` everywhere (the worker logs as `__main__` when started with `-m`); the prints in `config/manager.py` (now `debug`), `redis_client.py` and `feature_service.py` are log messages | uncommitted |
 
 ## A. Dead code
 

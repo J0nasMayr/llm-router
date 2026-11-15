@@ -22,7 +22,7 @@ from src.services.orchestrator import Orchestrator
 from src.services.router_service import RouterService
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("run_api")
+logger = logging.getLogger(__name__)
 
 
 def _build_services():
