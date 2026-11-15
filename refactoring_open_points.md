@@ -62,7 +62,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | E2 | One name and one shape for the traffic shares: `solve_placement` returns and the controller stores `{model: {node: share}}` (`_shares`), `traffic_shares()` returns `{node: share}`, no `dict(...)` conversion in the orchestrator | `4ef62d4` |
 | E5 | `basicConfig` only in `run_api.py` and the worker's `main()`; `getLogger(__name__)` everywhere (the worker logs as `__main__` when started with `-m`); the prints in `config/manager.py` (now `debug`), `redis_client.py` and `feature_service.py` are log messages | `bf7f50d` |
 | — | Removed GreenServ's leftovers that nothing imported (not even in GreenServ): `src/models/` with its `ModelRegistry` stub, and the empty `src/api/schemas.py`; README lists them under "Removed" | `a2f5cf9` |
-| — | Zeus only: `zeus-ml` 0.10.0 → 0.11.0.post1 (measures the GPU without root; venv upgraded, adds `amdsmi`); the worker creates `ZeusMeasurement` directly, `--energy-method` and `energy_method` are gone, and `_check_zeus` in `main()` exits at startup if Zeus cannot measure the GPU. GreenServ's paper measured with Zeus too; its PyNVML fallback in `src/metrics/energy.py` stays, unused | uncommitted |
+| — | Zeus only: `zeus-ml` 0.10.0 → 0.11.0.post1 (measures the GPU without root; venv upgraded, adds `amdsmi`); the worker creates `ZeusMeasurement` directly, `--energy-method` and `energy_method` are gone, and `_check_zeus` in `main()` exits at startup if Zeus cannot measure the GPU. GreenServ's paper measured with Zeus too | uncommitted |
+| — | Removed the dead code in GreenServ's `src/metrics/energy.py` (a deliberate exception to the scope, like the leftovers): `PynvmlMeasurement`, the `EnergyMeasurement` factory, `BasePowerMeasurement`, the `ZEUS_AVAILABLE` import guard and four imports; `ZeusMeasurement` and `EnergyMetrics` stay. The `pynvml` pin is gone from `requirements.txt` (the module comes from `nvidia-ml-py`, which Zeus requires). README lists both under "Removed" | uncommitted |
 
 ## A. Dead code
 
@@ -429,8 +430,9 @@ None of the points changes a value in the thesis table.
     (`ZeusMeasurement.start` creates a new `ZeusMonitor` per task; the
     startup check does not absorb it). This happens outside the latency the
     worker reports (`start` before its timer, `stop` after), so it is not in
-    τ̄(m, n), but it is in the end-to-end latency the client measures. (The
-    unused PyNVML would have added about 54 ms to every query's stop.)
+    τ̄(m, n), but it is in the end-to-end latency the client measures.
+    (GreenServ's PyNVML measurement, now removed, added about 54 ms to
+    every query's stop.)
   - Zeus 0.11 prints two lines about a missing `/opt/rocm/lib/libamd_smi.so`
     when imported on a machine without AMD's ROCm: its AMD backend finding
     no AMD GPU. Harmless.

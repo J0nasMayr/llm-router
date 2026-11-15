@@ -13,6 +13,7 @@ from transformers import (
     StoppingCriteria,
     StoppingCriteriaList,
 )
+from zeus.monitor import ZeusMonitor
 
 from config.manager import load_config
 from src.metrics.energy import ZeusMeasurement
@@ -490,8 +491,6 @@ def _check_zeus(device_id):
     instead of the worker's start: ZeusMeasurement.start only prints why it
     cannot measure."""
     try:
-        from zeus.monitor import ZeusMonitor
-
         # As ZeusMeasurement.start creates it for every task.
         ZeusMonitor(gpu_indices=[device_id])
     except Exception as e:

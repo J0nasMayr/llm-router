@@ -16,7 +16,7 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-The only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of a redundant root key from `config/datasets.yaml` (and the three `data/` files that read it) and from `experiments/config/feature_extraction.yaml`; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
+Apart from the removals listed below, the only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of a redundant root key from `config/datasets.yaml` (and the three `data/` files that read it) and from `experiments/config/feature_extraction.yaml`; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
 
 **Extended**
 
@@ -24,7 +24,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 - `src/api/router.py`: reads the orchestrator from the app state, and passes the orchestrator's error message to the client unchanged.
 - `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
-- `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry. It measures energy with Zeus only, as GreenServ's paper did (GreenServ's PyNVML fallback is not used), and exits at startup if Zeus cannot measure its GPU.
+- `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry. It measures energy with Zeus only, as GreenServ's paper did, and exits at startup if Zeus cannot measure its GPU.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
 - `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
 - `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
@@ -47,6 +47,7 @@ The only edits to these files, and to GreenServ's `config/general.yaml`, are cos
 **Removed**
 
 - `src/models/registry.py` (an unused `ModelRegistry` stub) and the empty `src/api/schemas.py`: GreenServ's leftovers that nothing imported.
+- From `src/metrics/energy.py`: the PyNVML measurement, the factory that chose between it and Zeus, and their base class, since the worker measures with Zeus only; and from `requirements.txt` the `pynvml` pin, which nothing imports directly any more (Zeus brings its own NVML binding).
 
 -------------------------------------------------------------------------------------------------------------------------------------------------
 
