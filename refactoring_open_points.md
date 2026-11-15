@@ -41,7 +41,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | B4 | `RedisClient.from_config()` reads the redis block for the API and the worker (flags override it); the constructor has no host/port defaults | `15ba151` |
 | B5 | `EvaluationService` holds the reward weights and the formula (`reward`); the orchestrator no longer passes them, and `scripts/placement_prior.py` reuses them | `7c18241` |
 | B6 | The `"raw"`/`"exact_match"` defaults only in `_dataset_settings`; known datasets read their keys directly; `task_type` read without a guard. Also corrects the docstring of `scripts/placement_prior.py` from B5 (the live system does not widen its bounds, see A10) | `c08687c` |
-| B7 | `min_free_gpu_memory_gb` is read once from the `feasibility` block and passed to the orchestrator and the controller; no constructor defaults | uncommitted |
+| B7 | `min_free_gpu_memory_gb` is read once from the `feasibility` block and passed to the orchestrator and the controller; no constructor defaults | `32c33a7` |
+| B8 | The worker's energy method defaults only in `--energy-method` (`zeus`); the constructor parameter is required | uncommitted |
 
 ## A. Dead code
 
@@ -386,5 +387,10 @@ None of the points changes a value in the thesis table.
   whose `predict` raises for every query without a known dataset, and falls
   back to keyword classification. The path is also relative to the current
   directory. Found on 2026-11-15 while doing B3.
+- `EnergyMeasurement.create` (`src/metrics/energy.py`, GreenServ's) falls
+  back to PyNVML with only a `print` when Zeus cannot be imported, so a worker
+  started with `--energy-method zeus` may measure with PyNVML without any
+  trace in its results. The worker could log the class it got, or `create`
+  could raise. Found on 2026-11-15 while doing B8.
 - `AllocationController._tick` is declared `async` but never awaits, so a
   placement solve (time limit 10 s) blocks the API's event loop while it runs.
