@@ -232,7 +232,7 @@ class Orchestrator:
                 best_node = options[0][0]
         else:
             best_node = options[0][0]
-        return best_node.get("queue_name") or f"llm_tasks_node_{best_node.get('node_id')}"
+        return f"llm_tasks_node_{best_node['node_id']}"
 
     def _count(self, window, model_id):
         counters, _ = self._windows[window]

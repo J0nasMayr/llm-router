@@ -57,7 +57,6 @@ class InferenceService:
         device_id=0,
         energy_method="pynvml",
         tier="cloud",
-        dedicated_queue=None,
         node_id=None,
         telemetry_interval=5.0,
         telemetry_window=20,
@@ -95,7 +94,7 @@ class InferenceService:
         self.memory_budget_gb = memory_budget_gb
         self.tier = tier
         self.node_id = node_id or f"{tier}-{device_id}"
-        self.queue_name = dedicated_queue or f"llm_tasks_node_{self.node_id}"
+        self.queue_name = f"llm_tasks_node_{self.node_id}"
         # Listen on the per-node queue (targeted dispatch) AND the tier
         # broadcast queue the orchestrator falls back to when no telemetry is
         # available yet (cold start). Node queue first so targeted tasks win.
@@ -437,7 +436,6 @@ class InferenceService:
         payload = {
             "node_id": self.node_id,
             "tier": self.tier,
-            "queue_name": self.queue_name,
             "queue_length": self.redis_client.get_queue_length(self.queue_name),
             "avg_task_latency": overall_avg,
             "latency_by_model": latency_by_model,
@@ -531,11 +529,6 @@ def main():
     )
     parser.add_argument("--tier", default="cloud", choices=["cloud", "edge"], help="Is this an edge or cloud worker?")
     parser.add_argument(
-        "--dedicated-queue",
-        default=None,
-        help="Override the default per-node queue (e.g. llm_tasks_node_3)",
-    )
-    parser.add_argument(
         "--node-id",
         default=None,
         help="Stable identifier for this worker. Defaults to <tier>-<device>.",
@@ -586,7 +579,6 @@ def main():
         device_id=args.device,
         energy_method=args.energy_method,
         tier=args.tier,
-        dedicated_queue=args.dedicated_queue,
         node_id=args.node_id,
         telemetry_interval=args.telemetry_interval,
         memory_budget_gb=args.memory_budget_gb,

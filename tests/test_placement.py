@@ -94,7 +94,7 @@ class SolvePlacementTest(unittest.TestCase):
 
 
 def edge_node(node_id="e1", **fields):
-    telemetry = node(node_id=node_id, queue_name=f"q_{node_id}", resident_models=[])
+    telemetry = node(node_id=node_id, resident_models=[])
     telemetry["memory_budget_gb"] = 20.0
     telemetry.update(fields)
     return telemetry
@@ -357,8 +357,8 @@ class StubController:
 class OrchestratorPlacementTest(unittest.TestCase):
     def _nodes(self):
         return [
-            node(node_id="a", queue_name="qa", resident_models=["big"]),
-            node(node_id="b", queue_name="qb", resident_models=["big"]),
+            node(node_id="a", resident_models=["big"]),
+            node(node_id="b", resident_models=["big"]),
         ]
 
     def test_replicas_are_used_when_they_meet_the_deadline(self):

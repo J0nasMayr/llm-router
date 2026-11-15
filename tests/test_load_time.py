@@ -25,7 +25,6 @@ def node(**fields):
     telemetry = {
         "node_id": "n1",
         "tier": "edge",
-        "queue_name": "q1",
         "queue_length": 0,
         "avg_task_latency": 1.0,
         "latency_by_model": {"small": 1.0, "big": 2.0},
@@ -67,8 +66,8 @@ class ExpectedLatencyTest(unittest.TestCase):
         self.assertAlmostEqual(make_orchestrator()._expected_latency(t, "big"), 2 * 2.0)
 
     def test_load_time_can_make_a_node_infeasible(self):
-        loaded = node(node_id="a", queue_name="qa", resident_models=["big"])
-        empty = node(node_id="b", queue_name="qb", resident_models=[])
+        loaded = node(node_id="a", resident_models=["big"])
+        empty = node(node_id="b", resident_models=[])
         options = make_orchestrator(T_max=9.0)._node_options_for_model("big", [loaded, empty])
         self.assertEqual([n["node_id"] for n, _ in options], ["a"])
 

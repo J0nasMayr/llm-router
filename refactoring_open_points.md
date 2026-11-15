@@ -33,7 +33,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A5 | Removed task and result fields nobody reads | `abcbba3` |
 | A6 | Removed the used/total fallback for free GPU memory, and the two telemetry fields it read | `778b290` |
 | A7 | Removed the telemetry `try/except` and `or []` (orchestrator, controller), the `TypeError` retry and the `features` guards in `RouterService` | `6de24ca` |
-| A8 | Removed `task_type` from `EvaluationService._evaluate` and `type: "general"` from `config/models.yaml` (both already unused in GreenServ) | uncommitted |
+| A8 | Removed `task_type` from `EvaluationService._evaluate` and `type: "general"` from `config/models.yaml` (both already unused in GreenServ) | `1d5b6c9` |
+| A9 | Removed `--dedicated-queue` and `queue_name` from the telemetry; the orchestrator derives the queue from the node id | uncommitted |
 
 ## A. Dead code
 
