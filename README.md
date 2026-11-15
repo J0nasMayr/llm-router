@@ -22,7 +22,7 @@ Apart from the removals listed below, the only edits to these files, and to Gree
 
 - `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
 - `src/api/router.py`: reads the orchestrator from the app state, and passes the orchestrator's error message to the client unchanged.
-- `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length.
+- `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length. The task type is the query's dataset label; no task classifier is built, so a query without a label gets an all-zero task-type block. GreenServ's paper describes a classifier, but its reported experiments also use the dataset label (see "Task Type" in GreenServ's README below).
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
 - `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry. It measures energy with Zeus only, as GreenServ's paper did, and exits at startup if Zeus cannot measure its GPU.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.

@@ -6,11 +6,6 @@ task_classification:
     - winogrande
     - cnn_dailymail
 
-  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
-  embedding_dim: 384
-  instruction_max_length: 50
-  classifier_path: "models/task_classifier.pkl"
-
 semantic_clustering:
   num_clusters: 3
   online_update: true

@@ -27,7 +27,7 @@ The settings are in `config/placement.yaml`. The baselines (a)–(d) for RQ1 and
 
 ## 3. Metrics
 
-Deadline violations, p95 latency, model loads per 100 queries, share of time spent loading, number of placement changes, accuracy and energy. Energy covers the generation only; the energy of model loads is not measured.
+Deadline violations, p95 latency, model loads per 100 queries, share of time spent loading, number of placement changes, accuracy and energy. Energy covers the generation only; the energy of model loads is not measured. Energy is measured with Zeus, as in GreenServ's paper; the setup section of Chapter 4 should say so.
 
 ## 4. Expected outcome for RQ3
 
@@ -55,7 +55,8 @@ Before the runs, the code still needs:
 - the reward weights α and β in the config, for the sensitivity sweep of RQ2 (TODO in `evaluation.tex`);
 - a report of the loads a node does for its target placement. Today, only on-demand loads appear in the results (`load_time`), so the full system would seem to load less than (e) and (f);
 - a decision on the result timeout. The scheduler gives up after T_max + 30 s = 60 s; slower queries return no latency, energy or accuracy and do not update the bandit. The thesis does not mention it;
-- counters for triggers, plans and placement changes. Today, they are only log lines.
+- counters for triggers, plans and placement changes. Today, they are only log lines;
+- a check of every testbed node: install `requirements.txt` (Zeus 0.11) and start one worker as the user that will run the experiments. It exits at startup if Zeus cannot measure its GPU (Zeus 0.10 needed root on Intel CPUs, for the CPU's RAPL counters; 0.11 does not).
 
 ## 7. Known limits
 
@@ -64,6 +65,7 @@ Before the runs, the code still needs:
 - Load times are estimates until a node has loaded the model once.
 - The estimated load time of Yi-34B (34 s) alone exceeds T_max (30 s). Until a node has measured a shorter load, the filter admits the model only on a node that already holds it.
 - Queued tasks are assumed to need no further model load, so T̂ can be too optimistic.
+- A worker's first query pays a one-time 0.3–1.3 s for setting up Zeus (`ZeusMeasurement` creates a new monitor per task; later queries pay 3–4 ms). It is not in τ̄, but it is in the end-to-end latency; one warm-up query per worker before measuring avoids it.
 
 ## 8. Risks
 

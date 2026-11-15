@@ -2,7 +2,6 @@ import logging
 
 from src.feature_extractor.complexity import ComplexityExtractor
 from src.feature_extractor.semantic_cluster import SemanticClusterExtractor
-from src.feature_extractor.task_type import TaskTypeExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -11,10 +10,9 @@ class FeatureService:
     """Service for extracting features from queries using specialized extractors"""
 
     def __init__(self, config):
-        self.task_extractor = TaskTypeExtractor(config["task_classification"])
+        self.task_types = list(config["task_classification"]["task_types"])
         self.semantic_extractor = SemanticClusterExtractor(config["semantic_clustering"])
         self.complexity_extractor = ComplexityExtractor(config["complexity"])
-        self.task_types = self.task_extractor.task_types
         self.num_clusters = self.semantic_extractor.k
         self.num_complexity_bins = len(self.complexity_extractor.complexity_bins)
         logger.info(
@@ -30,22 +28,14 @@ class FeatureService:
         return len(self.task_types) + self.num_clusters + self.num_complexity_bins
 
     def extract_features(self, query_text, query_metadata=None):
-        """Extract features from query text and metadata"""
+        """Extract features from query text and metadata. The task type is the
+        query's dataset label if it is one of the task types, else None: no
+        classifier is used, so an unlabelled query gets an all-zero task-type
+        block (as GreenServ's experiment code, which always sends the label)."""
         features = {}
         query_metadata = query_metadata or {}
-        dataset_name = query_metadata.get("dataset", None)
-
-        if dataset_name and dataset_name in self.task_types:
-            features["task_type"] = dataset_name
-            logger.debug(f"Using dataset '{dataset_name}' directly as task_type.")
-        else:
-            logger.debug(
-                f"Dataset '{dataset_name}' is not one of the task types "
-                f"{self.task_types}; classifying the query from its text."
-            )
-            features["task_type"] = self.task_extractor.extract(
-                query_text, query_metadata
-            )
+        dataset_name = query_metadata.get("dataset")
+        features["task_type"] = dataset_name if dataset_name in self.task_types else None
         features["semantic_cluster"] = self.semantic_extractor.extract(
             query_text, query_metadata
         )
@@ -60,10 +50,10 @@ class FeatureService:
 
     def _get_context_vector(self, features):
         """Three one-hot blocks in a row (task type, cluster, complexity bin),
-        of length context_dimension. A task type outside task_types leaves its
-        block all zero."""
+        of length context_dimension. A task type of None leaves its block all
+        zero."""
         task = features["task_type"]
-        task_index = self.task_types.index(task) if task in self.task_types else None
+        task_index = None if task is None else self.task_types.index(task)
         return (
             _one_hot(task_index, len(self.task_types))
             + _one_hot(features["semantic_cluster"], self.num_clusters)
