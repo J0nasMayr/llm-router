@@ -459,7 +459,7 @@ class AllocationController:
     # ---------- async loop ----------
 
     async def _tick(self):
-        telemetry_list = self.queue_client.get_all_node_telemetry() or []
+        telemetry_list = self.queue_client.get_all_node_telemetry()
         if not telemetry_list:
             return
         observed_rps = self.demand_provider() or {}

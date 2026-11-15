@@ -32,6 +32,7 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A4 | Removed three unused arguments of `process_query` | `fa93878` |
 | A5 | Removed task and result fields nobody reads | `abcbba3` |
 | A6 | Removed the used/total fallback for free GPU memory, and the two telemetry fields it read | uncommitted |
+| A7 | Removed the telemetry `try/except` and `or []` (orchestrator, controller), the `TypeError` retry and the `features` guards in `RouterService` | uncommitted |
 
 ## A. Dead code
 

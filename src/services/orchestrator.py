@@ -272,11 +272,7 @@ class Orchestrator:
         # Stage 1: 
         # - Pull telemetry, prune nodes lacking free GPU memory
         # - Derive the per-model feasible set from per-model expected latency
-        telemetry_list = []
-        try:
-            telemetry_list = self.queue_client.get_all_node_telemetry() or []
-        except Exception as e:
-            logger.warning(f"Telemetry fetch failed, falling back to tier routing: {e}")
+        telemetry_list = self.queue_client.get_all_node_telemetry()
         surviving_nodes = self._filter_nodes(telemetry_list)
         available_models = self._available_models(surviving_nodes)
 

@@ -20,18 +20,11 @@ class RouterService:
         )
 
     def select_model(self, features, available_models=None):
-        """Select model based on features, optionally constrained to a subset of arms.
-
-        available_models: iterable of model_ids that are physically viable right now
-            (e.g. surviving the orchestrator's resource-state filter). Bandits that
-            support masking will set scores of excluded arms to -inf; if a bandit
-            ignores the kwarg, behavior reduces to the unmasked select.
-        """
-        context = features.get("context_vector") if features else None
-        try:
-            return self.bandit.select_model(context, available_models=available_models)
-        except TypeError:
-            return self.bandit.select_model(context)
+        """Select a model for the features, among `available_models` only
+        (all models if None)."""
+        return self.bandit.select_model(
+            features["context_vector"], available_models=available_models
+        )
 
     def preferred_model(self):
         """The model the bandit would have chosen in its last selection if every
@@ -44,5 +37,4 @@ class RouterService:
         Extracts the numeric context vector from the features dict, mirroring
         `select_model` — the bandit must see the same context in both calls.
         """
-        context = features.get("context_vector") if features else None
-        self.bandit.update(model_id, reward, context=context)
+        self.bandit.update(model_id, reward, context=features["context_vector"])
