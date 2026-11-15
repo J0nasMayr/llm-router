@@ -46,6 +46,7 @@ class ProcessQueryResponseTest(unittest.TestCase):
             evaluation_service=self.evaluation,
             queue_client=self.queue,
             model_configs=MODELS,
+            T_max=30.0,
         )
 
     def query(self, **kwargs):

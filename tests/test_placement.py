@@ -392,6 +392,7 @@ class OrchestratorPlacementTest(unittest.TestCase):
             evaluation_service=mock.MagicMock(),
             queue_client=queue,
             model_configs=MODELS,
+            T_max=30.0,
         )
         asyncio.run(orch.process_query("q", wait_for_result=False))
         self.assertEqual(list(orch.consume_rps_window()), ["small"])

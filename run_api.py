@@ -58,7 +58,7 @@ def _build_services():
     evaluation_service = EvaluationService()
 
     feasibility = features.get("feasibility") or {}
-    T_max = float(feasibility.get("max_latency", 60.0))
+    T_max = float(feasibility["max_latency"])
     load_bandwidth = float(feasibility.get("load_bandwidth_gb_per_s", 2.0))
     orch = Orchestrator(
         feature_service=feature_service,

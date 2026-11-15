@@ -34,7 +34,8 @@ inherited parts (`experiments/`, `data/`, `db/`, `src/feature_extractor/`,
 | A6 | Removed the used/total fallback for free GPU memory, and the two telemetry fields it read | `778b290` |
 | A7 | Removed the telemetry `try/except` and `or []` (orchestrator, controller), the `TypeError` retry and the `features` guards in `RouterService` | `6de24ca` |
 | A8 | Removed `task_type` from `EvaluationService._evaluate` and `type: "general"` from `config/models.yaml` (both already unused in GreenServ) | `1d5b6c9` |
-| A9 | Removed `--dedicated-queue` and `queue_name` from the telemetry; the orchestrator derives the queue from the node id | uncommitted |
+| A9 | Removed `--dedicated-queue` and `queue_name` from the telemetry; the orchestrator derives the queue from the node id | `55fc2c8` |
+| B1 | `T_max` is a required argument of `Orchestrator`; `run_api.py` reads `max_latency` without a default | uncommitted |
 
 ## A. Dead code
 
