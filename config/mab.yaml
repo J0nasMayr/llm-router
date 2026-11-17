@@ -4,8 +4,9 @@
 algorithm: linucb
 
 linucb:
-  alpha: 1.0            # exploration weight, alpha_UCB in the thesis (not the reward weight alpha)
-  regularization: 1.0   # ridge lambda for the per-arm design matrix
+  # GreenServ's values (its paper, Section 6.1.5, and experiments/config/experiments.yaml).
+  alpha: 0.1            # exploration weight, alpha_UCB in the thesis (not the reward weight alpha)
+  regularization: 0.05  # ridge lambda for the per-arm design matrix
   seed: 40
 
 epsilon_greedy:

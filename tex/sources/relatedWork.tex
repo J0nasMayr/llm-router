@@ -120,7 +120,7 @@ an ARIMA traffic forecast predicts per-region demand and an integer linear progr
 The authors report up to 25\% GPU-hour savings against the production baseline.
 They optimize routing and placement together, instead of as separate problems.
 
-RouterWise \cite{routerwise} is the closest to this thesis: it plans the deployment together with a prompt router.
+Of the surveyed systems, RouterWise \cite{routerwise} is the closest to this thesis: it plans the deployment together with a prompt router.
 Its authors argue that the latency of a model is not a fixed property.
 It depends on the GPU resources the model gets and on the load that the router sends to it.
 RouterWise therefore searches over deployments, i.e.\ the GPUs, the compute share and the tensor parallelism of each model.
@@ -146,9 +146,9 @@ It follows this demand as it changes, decides which models stay loaded instead o
 
 The three research areas leave complementary gaps:
 serving systems use the hardware efficiently but never choose the model;
-prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
+most prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
 and autoscaling and placement systems adapt the deployment but take the traffic per model as given.
-Only RouterWise plans the deployment together with a router, and it does so once, offline.
+Among the surveyed systems, only RouterWise plans the deployment together with a router, and it does so once, offline.
 None of the surveyed systems both chooses among separate models per prompt and accounts for the live state of the nodes that would serve it, across edge and cloud.
 CLONE comes closest, since it mixes LoRA adapters per prompt and meets a latency target, but it does so for one model on one device.
 
