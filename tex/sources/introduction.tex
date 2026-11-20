@@ -34,6 +34,7 @@ LLM serving systems \cite{bros, econoserve, dynamollm, nexussched} use the hardw
 Most prompt-aware routers choose a model per prompt but assume it is always available.
 GreenServ formulates a latency constraint, but its released code never checks it \cite{greenserv_code}.
 Autoscaling and placement systems \cite{alpaserve, warmserve, enova, hasgpu, sageserve} adapt the deployment to demand, but take the traffic per model as given rather than chosen by a router.
+RouterWise \cite{routerwise} and POLAR \cite{polar} plan the deployment together with a router, but RouterWise does so once, offline, and POLAR only for the LoRA adapters of one model on one device.
 
 To address this problem, this thesis extends GreenServ to the edge-cloud continuum.
 A lightweight telemetry-driven feasibility filter first prunes nodes and models that are not expected to meet the latency deadline under the current hardware state, yielding a dynamic feasible set $M_t^*$.

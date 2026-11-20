@@ -94,7 +94,7 @@ AlpaServe also only serves models that answer with a single forward pass, not au
 WarmServe \cite{warmserve} decides at runtime which LLMs to load onto which GPUs, and it loads them before the demand for them rises.
 For this, it forecasts the peak and the average number of concurrent requests of each model for the next five minutes.
 The forecast combines the same time window on past days with the error of the most recent windows.
-A greedy algorithm then loads the models whose forecast demand exceeds their running instances the most, and it prefers models that take long to start.
+A greedy algorithm then loads the models whose forecast demand exceeds their running instances, and it prefers models that take long to start.
 One GPU can hold the loaded weights of several models.
 When one of these models needs the GPU, the weights of the others are removed.
 Compared to a state-of-the-art autoscaler, this reduces the tail time to the first token by up to 50.8 times.
@@ -156,7 +156,7 @@ The three research areas leave complementary gaps:
 serving systems use the hardware efficiently but never choose the model;
 most prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
 and autoscaling and placement systems adapt the deployment but take the traffic per model as given.
-Among the surveyed systems, only RouterWise and POLAR plan the deployment together with a router.
+Among the surveyed systems, only RouterWise and POLAR plan the deployment together with a router that decides which model answers each query.
 RouterWise does so once, offline, and POLAR only for the LoRA adapters of one model on one device.
 None of the surveyed systems combines a router that learns online, a deadline test that counts the time to load a missing model, and a placement of models over edge and cloud nodes that follows the demand of the router.
 
@@ -213,7 +213,7 @@ GreenServ \cite{greenserv} & Routing & Yes, Partly, Yes & Utilizes a contextual 
 
 AlpaServe \cite{alpaserve} & Placement & No, Yes, Yes & Places several models on groups of GPUs in a fixed cluster, with replicas and model parallelism, to absorb bursts. A simulator-guided greedy search maximizes the share of requests within the SLO; re-planned periodically from past traces. & None (only each model's arrival process counts); single-forward-pass models only. \\
 
-WarmServe \cite{warmserve} & Placement & No, Yes, Yes & Forecasts the concurrent requests of each LLM for the next five minutes and greedily loads model weights onto GPUs before the demand arrives. One GPU holds several loaded models until one of them needs it. & None (only each model's forecast load counts). \\
+WarmServe \cite{warmserve} & Autoscaling \newline \& Placement & No, Yes, Yes & Forecasts the concurrent requests of each LLM for the next five minutes and greedily loads model weights onto GPUs before the demand arrives. One GPU holds several loaded models until one of them needs it. & None (only each model's forecast load counts). \\
 
 ENOVA \cite{enova} & Autoscaling & No, Yes, Yes & Recommends a serving configuration for each (LLM, GPU type) pair and sets the number of replicas with a linear program. Detects anomalies in live telemetry with a variational autoencoder to trigger autoscaling. & Clusters request embeddings into task groups to limit each group's output length; does not choose the model. \\
 
