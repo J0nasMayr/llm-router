@@ -47,7 +47,7 @@ If the two best LLMs are close, both answer, and a small classifier picks the be
 Judge LLMs are only needed to label its training data: they compare the answers of several LLMs to the same prompts.
 TagRouter \cite{tagrouter} lets a small fine-tuned LLM generate semantic tags for each prompt.
 The model that has historically done best on these tags then does the inference.
-Marinelli et al. \cite{noft} suggest the new metric ``Number of Thoughts'' to describe the prompt's complexity. This single value is then predicted through a random forest and used for routing.
+Marinelli et~al.~\cite{noft} suggest the new metric ``Number of Thoughts'' to describe the prompt's complexity. This single value is then predicted through a random forest and used for routing.
 The IRT-Router \cite{irtrouter} uses Item Response Theory. It learns the abilities of each LLM and the difficulty of each query over 25 dimensions, predicts how well each LLM will answer, and weighs this against the LLM's cost. The router is trained offline; for a new query, it only refines the query's embedding with similar known queries.
 
 Although using the input prompt as the anchor for this choice might already seem like the best approach, there are still clear limitations: the prompt alone does not show how each model would actually answer it \cite{lookahead}.
@@ -120,7 +120,7 @@ an ARIMA traffic forecast predicts per-region demand and an integer linear progr
 The authors report up to 25\% GPU-hour savings against the production baseline.
 They optimize routing and placement together, instead of as separate problems.
 
-Of the surveyed systems, RouterWise \cite{routerwise} is the closest to this thesis: it plans the deployment together with a prompt router.
+RouterWise \cite{routerwise} plans the deployment together with a prompt router.
 Its authors argue that the latency of a model is not a fixed property.
 It depends on the GPU resources the model gets and on the load that the router sends to it.
 RouterWise therefore searches over deployments, i.e.\ the GPUs, the compute share and the tensor parallelism of each model.
@@ -130,7 +130,13 @@ On the same GPUs and under the same SLO, the best achievable quality differs by 
 RouterWise plans only once, offline, for a fixed and known prompt distribution and a fixed load, and it keeps every model of the pool deployed.
 Its authors name the adaptation of routing and deployment at runtime as an open question.
 
-However, apart from RouterWise, these systems take the traffic per model as given, rather than chosen by a router that decides \emph{which model should answer} each query.
+POLAR \cite{polar} serves many LoRA adapters of one LLM on an edge device that can keep only a few of them loaded.
+A LinUCB bandit picks an adapter per request, with a penalty for the load time of one that is not loaded.
+After each epoch of requests, a controller picks the adapters to keep, based on the bandit's estimates.
+An adapter that is not loaded is tried less often, so its value may never be learned and it may never be loaded.
+The variant POLAR+ therefore tries every adapter a few times per epoch.
+
+However, apart from RouterWise and POLAR, these systems take the traffic per model as given, rather than chosen by a router that decides \emph{which model should answer} each query.
 AlpaServe has no trigger; it re-plans periodically from past traces.
 The triggers of the autoscalers differ in how well they capture the cost of a request.
 HAS-GPU's trigger looks at the request rate alone, which misses that LLM requests can differ in cost by orders of magnitude.
@@ -138,9 +144,11 @@ SageServe forecasts tokens per second, which partly captures this cost.
 WarmServe forecasts concurrent requests, whose number also grows with the length of the requests.
 The control loop of the autoscalers -- ingest live telemetry, decide on a reconfiguration, dispatch -- aligns directly with the telemetry surface this thesis uses (per-node queue length, per-model latency, free GPU memory, and the loaded models with their load times and memory).
 This thesis therefore integrates a placement controller of this kind on top of its routing layer: it adopts HAS-GPU's Kalman-plus-threshold trigger design -- applied to the load of each node rather than to request rates, since per-request cost and model selection decouple from the arrival rate, and extended with a placement rule for models without a replica, a per-(model, node) latency-deviation rule and a memory-pressure rule -- and a small mixed-integer program, in the spirit of the replica program of ENOVA and the placement program of SageServe, that decides from the same telemetry which models each node keeps loaded and how each model's traffic is split across them (Chapter~\ref{chapter:model}).
-Unlike the autoscaling and placement systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if no model were masked.
+Unlike most of the systems above, the controller does not take the demand per model as given: it plans with the demand of the router, i.e.\ for every query the model the bandit would choose if no model were masked.
 Unlike RouterWise, it plans at runtime.
 It follows this demand as it changes, decides which models stay loaded instead of keeping every model deployed, and counts the time it takes to load a model.
+Unlike POLAR, it places whole models on several nodes, within the memory and the load limit of each node.
+It uses this demand to break a loop like the one in POLAR, instead of forcing the router to try every model.
 
 \section{Research Gap and Thesis Contribution}
 
@@ -148,9 +156,9 @@ The three research areas leave complementary gaps:
 serving systems use the hardware efficiently but never choose the model;
 most prompt-aware routers, GreenServ included, choose the model but not in view of the hardware state;
 and autoscaling and placement systems adapt the deployment but take the traffic per model as given.
-Among the surveyed systems, only RouterWise plans the deployment together with a router, and it does so once, offline.
-None of the surveyed systems both chooses among separate models per prompt and accounts for the live state of the nodes that would serve it, across edge and cloud.
-CLONE comes closest, since it mixes LoRA adapters per prompt and meets a latency target, but it does so for one model on one device.
+Among the surveyed systems, only RouterWise and POLAR plan the deployment together with a router.
+RouterWise does so once, offline, and POLAR only for the LoRA adapters of one model on one device.
+None of the surveyed systems combines a router that learns online, a deadline test that counts the time to load a missing model, and a placement of models over edge and cloud nodes that follows the demand of the router.
 
 This thesis closes this gap by extending GreenServ's semantic bandit routing in two steps, each tied to the research questions of Chapter~\ref{chapter:introduction}.
 A telemetry-driven feasibility filter restricts the bandit to models that a node can hold and is expected to serve within the latency deadline, counting the time to load a model the node does not hold.
@@ -195,7 +203,7 @@ CARGO \cite{cargo} & Routing & Yes, No, No & Uses LLM judges to label which answ
 
 TagRouter \cite{tagrouter} & Routing & Yes, No, Yes & Maps incoming queries to specific models that have historically performed best for the identified semantic tags. & Generates open-ended semantic tags with a small fine-tuned LLM before inference. \\
 
-Marinelli et al. \cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Estimates the required ``Number of Thoughts'' (reasoning complexity) from TF-IDF features of the prompt text. \\
+Marinelli et~al.~\cite{noft} & Routing & Yes, Yes, Yes & Uses a random forest classifier to predict required reasoning complexity, routing to a model sufficiently capable of handling the load. & Estimates the required ``Number of Thoughts'' (reasoning complexity) from TF-IDF features of the prompt text. \\
 
 IRT-Router \cite{irtrouter} & Routing & Yes, No, Yes & Applies Item Response Theory (IRT) to mathematically model both the latent abilities of 20 LLMs and the difficulty of incoming prompts. & Embeds the prompt and estimates its difficulty and the abilities it needs (25 dimensions). \\
 
@@ -214,6 +222,8 @@ HAS-GPU \cite{hasgpu} & Autoscaling & No, Yes, Yes & Scales serverless GPU funct
 SageServe \cite{sageserve} & Autoscaling \newline \& Placement & No, Yes, Yes & Forecasts the demand per region with ARIMA and solves an integer linear program every hour that scales GPU VMs and places models across data centers; routes requests between regions in the short term. & None (requests are only grouped into interactive and non-interactive latency tiers). \\
 
 RouterWise \cite{routerwise} & Routing \newline \& Placement & Yes, Yes, Yes & Searches offline over deployments (GPUs, compute share and tensor parallelism of each model) and computes for each the routing with the best predicted quality within a latency SLO. One plan for a fixed prompt distribution and load; every model stays deployed. & Predicts each model's answer quality for the prompt with an encoder (DeBERTa) trained offline on RouterBench. \\
+
+POLAR \cite{polar} & Routing \newline \& Placement \newline (Edge) & Yes, Yes, Yes & Keeps a few LoRA adapters of one LLM loaded on an edge device. A LinUCB bandit picks an adapter per request, with a penalty for loading one; after each epoch, a controller picks the adapters to keep from the bandit's estimates. Targets a stable request mix; evaluated in a simulation with measured load times. & Describes each request by a context vector, e.g.\ its task type or input length; in the simulation, the vector encodes the task. \\
 
 \textbf{This work} & \textbf{Routing, Serving \& Placement} & \textbf{Yes, Yes, Yes} & \textbf{Filters out nodes not expected to meet the latency deadline, routes via a semantic LinUCB MAB, and decides which models each node keeps loaded with a Kalman-triggered placement program driven by the router's demand.} & \textbf{Extracts task type, semantic cluster, and text complexity (as in GreenServ).} \\
 \end{xltabular}
