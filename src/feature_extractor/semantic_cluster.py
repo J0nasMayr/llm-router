@@ -21,7 +21,7 @@ class SemanticClusterExtractor(BaseFeatureExtractor):
         self.k = self.config.get("num_clusters", 2)
         if self.k <= 0:
             logger.warning(
-                f"num_clusters must be positive, defaulting to 2. Got: {self.k}"
+                f"num_clusters must be > 0, defaulting to 2. Got: {self.k}"
             )
             self.k = 2
 

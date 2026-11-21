@@ -83,7 +83,7 @@ The bandit then chooses among all models, and the query is placed on a shared fa
 \textbf{2. Semantic Context Extraction.}
 Next, the incoming query $q_t$ is passed through a lightweight context generator.
 This module extracts key semantic features from the prompt to evaluate its complexity without performing full inference.
-Following the methodology established by GreenServ, the module extracts three specific features: task type, semantic cluster (via online $k$-means with $k = 3$ over sentence embeddings \cite{sbert}), and text complexity (via the Flesch Reading Ease formula \cite{flesch}, inverted so that higher values denote harder text and binned into the intervals $[0, 33)$, $[33, 67)$ and $[67, 100]$).
+Following the methodology established by GreenServ, the module extracts three specific features: task type, semantic cluster (via online $k$-means with $k = 3$ over sentence embeddings from the \texttt{all-MiniLM-L6-v2} model \cite{sbert}), and text complexity (via the Flesch Reading Ease formula \cite{flesch}, inverted so that higher values denote harder text and binned into the intervals $[0, 33)$, $[33, 67)$ and $[67, 100]$).
 The GreenServ paper obtains the task type with a logistic-regression classifier on embeddings of the prompt's instruction.
 Its released experiment code, however, uses the label of the benchmark dataset a query is drawn from \cite{greenserv_code}.
 This work does the same: the client submits the dataset label together with the query, and a query without such a label receives an all-zero task-type component.

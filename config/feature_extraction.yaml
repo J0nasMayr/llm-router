@@ -8,6 +8,7 @@ task_classification:
 
 semantic_clustering:
   num_clusters: 3
+  embedding_model: "sentence-transformers/all-MiniLM-L6-v2"
   online_update: true
   centroids_path: "models/cluster_centroids.pkl"
 
