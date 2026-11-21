@@ -4,7 +4,9 @@ Run from the repository root: ./venv/bin/python -m unittest discover -s tests -v
 """
 
 import unittest
+from unittest import mock
 
+from src.queue.redis_client import node_queue_name
 from src.services.demand_counter import DemandCounter
 from src.services.orchestrator import Orchestrator
 from tests.worker_fixture import MODELS, FakeWorkerTestCase
@@ -42,6 +44,32 @@ class ExpectedLatencyTest(unittest.TestCase):
     def test_loaded_model_adds_no_load_time(self):
         t = node(resident_models=["big"], queue_length=2)
         self.assertAlmostEqual(make_orchestrator()._expected_latency(t, "big"), 3 * 2.0)
+
+    def test_tasks_sent_since_the_last_report_count_as_queued(self):
+        orch = make_orchestrator()
+        t = node(resident_models=["small"], updated_at=100.0)
+        orch._record_sent(t)
+        orch._record_sent(t)
+        self.assertAlmostEqual(orch._expected_latency(t, "small"), 3 * 1.0)
+        # A newer report already counts these tasks in its queue length.
+        newer = node(resident_models=["small"], updated_at=105.0, queue_length=1)
+        self.assertAlmostEqual(orch._expected_latency(newer, "small"), 2 * 1.0)
+
+    def test_queries_between_two_reports_spread_over_the_nodes(self):
+        orch = make_orchestrator()
+        orch.queue_client = mock.MagicMock()
+        nodes = [
+            node(node_id=n, resident_models=["small"], updated_at=100.0)
+            for n in ("n1", "n2")
+        ]
+        for _ in range(4):
+            options = orch._node_options_for_model("small", nodes)
+            orch._dispatch("q", "small", {}, options)
+        queues = [
+            call.kwargs["queue_name"]
+            for call in orch.queue_client.enqueue_task.call_args_list
+        ]
+        self.assertEqual(queues, [node_queue_name(n) for n in ("n1", "n2", "n1", "n2")])
 
     def test_missing_model_adds_estimated_load_time(self):
         t = node(resident_models=["small"])

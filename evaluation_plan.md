@@ -75,9 +75,8 @@ Before the runs, the code still needs:
 
 ## 9. Open questions
 
-1. **Supervisor:** does model placement (replica scaling per model) count as "real allocation"?
-2. **Deadline:** how many weeks are left?
-3. **Optional:** allow edge models on cloud nodes, i.e. offloading from edge to cloud? It is one change in the placement program and strengthens the edge-cloud story, but adds evaluation work.
+1. **Deadline:** how many weeks are left?
+2. **Optional:** allow edge models on cloud nodes, i.e. offloading from edge to cloud? It is one change in the placement program and strengthens the edge-cloud story, but adds evaluation work.
 
 ## 10. Future work
 

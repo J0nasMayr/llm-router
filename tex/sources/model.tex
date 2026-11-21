@@ -75,6 +75,7 @@ It also reports the models it holds in GPU memory, a model load in progress with
 Each entry expires shortly after its last update, so nodes that stop reporting drop out automatically.
 To minimize unnecessary network transmission delays, the central scheduler is deployed as a gateway at the edge tier. This allows it to be the initial point of contact and intercept incoming queries.
 When query $q_t$ arrives, the scheduler reads the latest state of all nodes, prunes any node whose free GPU memory falls below $G_{min}$, and evaluates $\hat{T}(m, n)$ for every model on the surviving nodes of its tier that can hold it.
+Since a node reports its queue length only every few seconds, the scheduler adds to $W_n$ the tasks it has sent to the node since that report; otherwise, all queries in between would see the same queue lengths and go to the same node.
 Any model for which no such node meets $T_{max}$ is excluded, yielding the feasible set $M_t^*$.
 If node $n$ has not yet executed $m$, $\bar{\tau}(m, n)$ falls back to the node's average over the models it has served; a node that has served nothing yet reports zero, so only the network delay and the load time of the model count for it.
 This way, new nodes and untried models can still receive traffic. The filter is a best-effort mechanism built on estimates, not a hard guarantee: when no telemetry is available (e.g.\ at start-up) or no model is feasible, the scheduler does not reject the query.

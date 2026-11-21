@@ -63,6 +63,11 @@ class Orchestrator:
         # Per-dataset scoring and generation settings (datasets.yaml), applied
         # when a request names its dataset in metadata.
         self.dataset_configs = dataset_configs or {}
+        # {node_id: (updated_at of a telemetry snapshot, tasks sent to the
+        # node since)}. Nodes report their queue length only every few
+        # seconds; without this count, every query in between would see the
+        # same queue lengths and go to the same node.
+        self._sent_since_report = {}
 
     def _dataset_settings(self, dataset):
         """(extraction_method, evaluation_metric, generation_parameters) of a
@@ -113,8 +118,28 @@ class Orchestrator:
             return remaining + own_load
         return own_load
 
+    def _sent_since(self, telemetry):
+        """Tasks sent to the node since the telemetry snapshot `telemetry`."""
+        reported_at, sent = self._sent_since_report.get(
+            telemetry.get("node_id"), (None, 0)
+        )
+        return sent if reported_at == telemetry.get("updated_at") else 0
+
+    def _queue_length(self, telemetry):
+        """W_n: the queue length the node last reported, plus the tasks sent
+        to it since that report."""
+        reported = int(telemetry.get("queue_length", 0) or 0)
+        return reported + self._sent_since(telemetry)
+
+    def _record_sent(self, telemetry):
+        self._sent_since_report[telemetry.get("node_id")] = (
+            telemetry.get("updated_at"),
+            self._sent_since(telemetry) + 1,
+        )
+
     def _expected_latency(self, telemetry, model_id):
-        """expected_latency = network_delay(tier) + pending_load_time + (queue_length + 1) * avg_latency.
+        """expected_latency = network_delay(tier) + pending_load_time + (W_n + 1) * avg_latency,
+        with W_n from _queue_length.
 
         avg_latency is latency_on_node: 0 for a node that has run nothing yet,
         so only the network delay and the load time count for it. Queued tasks
@@ -123,7 +148,7 @@ class Orchestrator:
         also unload `model_id`.
         """
         avg = latency_on_node(telemetry, model_id)
-        qlen = int(telemetry.get("queue_length", 0) or 0)
+        qlen = self._queue_length(telemetry)
         return (
             self._network_delay(telemetry.get("tier"))
             + self._pending_load_time(telemetry, model_id)
@@ -224,6 +249,7 @@ class Orchestrator:
         }
         if options:
             node = self._pick_node(model_id, options)
+            self._record_sent(node)
             target_queue = node_queue_name(node["node_id"])
         else:
             model_tier = self.model_configs.get(model_id, {}).get("tier", "cloud")
