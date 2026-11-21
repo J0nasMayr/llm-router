@@ -219,8 +219,9 @@ If the solver fails, the controller keeps the current placement and splits each 
 \subsection{Following the Plan}
 
 Each node reads its target placement from the shared store about once per second.
-While its queue is empty, it loads one missing target model at a time.
-Loading for the plan thus starts only when no query is waiting.
+While its own queue is empty, it loads one missing target model at a time.
+Loading for the plan thus starts only when no query waits for this node.
+Tasks on the tier's fallback queue (Stage~1) do not hold it back, since every node of the tier takes them: the node takes one of them after each load, and the other nodes take them meanwhile.
 To make room, it may unload models outside the target, but never another target model.
 A task that needs a model the node does not hold is still served: the node loads the model on demand and unloads models outside the target first, and target models only as a last resort.
 Such a target model returns once the node is idle again.

@@ -235,12 +235,14 @@ class InferenceService:
     def _reconcile_placement(self):
         """Follow the placement controller's target placement. The target is
         read at most every reconcile_interval seconds. A missing target model
-        is loaded only while the node's queue is empty, one per call, so that
-        loading for the plan never delays a waiting task; a target model that a
-        task's on-demand load had to unload thus returns once the node is
-        idle. Models outside the target stay loaded until their memory is
-        needed. Without a target, or once it has expired, the node only loads
-        on demand."""
+        is loaded only while the node's own queue is empty, one per call, so
+        that loading for the plan never delays a task sent to this node; a
+        target model that a task's on-demand load had to unload thus returns
+        once the node is idle. The tier queue is not checked: under overload
+        it may never empty, and every node of the tier takes from it, while
+        run() takes one of its tasks after each load. Models outside the
+        target stay loaded until their memory is needed. Without a target, or
+        once it has expired, the node only loads on demand."""
         now = time.time()
         if now - self._last_reconcile < self.reconcile_interval:
             return
