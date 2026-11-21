@@ -191,7 +191,7 @@ $$ \begin{aligned} \min_{y, f} \;\; & \sum_{m, n} \hat{R}^{(m)} \, \bar{\tau}(m,
 A pair is ineligible, with $y_{m,n} = f_{m,n} = 0$, for a tier mismatch, a model that does not fit into the node's memory budget, or memory pressure.
 Here $\bar{\tau}(m, n)$ is the pair's average latency, with the same fallback as in Stage~1 and a nominal $\bar{\tau}_0$ for nodes without any history;
 $\bar{\tau}_m$ and $\bar{\ell}_m$ are the averages of the latency and the load time over the model's eligible nodes;
-and $y^0$ is the current placement, i.e.\ the last plan.
+and $y^0$ is the current placement, i.e.\ the last plan; for the first plan, and for a node the last plan did not include, it is the set of models the node holds.
 
 All three terms of the objective are node time per second.
 The first is the inference time of the requests that replicas serve.
