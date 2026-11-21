@@ -25,10 +25,10 @@ class RouterService:
             features["context_vector"], available_models=available_models
         )
 
-    def preferred_model(self):
+    def shadow_choice(self):
         """The model the bandit would have chosen in its last selection if every
         model had been available, or None if the bandit does not report it."""
-        return getattr(self.bandit, "last_preferred_model", None)
+        return getattr(self.bandit, "last_shadow_choice", None)
 
     def update(self, features, model_id, reward):
         """Update the bandit algorithm with the observed reward.

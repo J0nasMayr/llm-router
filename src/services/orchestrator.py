@@ -198,18 +198,18 @@ class Orchestrator:
         return options[0][0]
 
     def _choose_model(self, features, options_by_model, model_id=None):
-        """Stage 2: (model_id, preferred_model). The bandit chooses among the
+        """Stage 2: (model_id, shadow_choice). The bandit chooses among the
         models with at least one option; with no options at all (no telemetry
-        yet, cold start) it sees every model. preferred_model is its shadow
-        choice, the model it would choose if no model were masked. A model_id
-        fixed by the caller is used as both."""
+        yet, cold start) it sees every model. shadow_choice is the model it
+        would choose if no model were masked. A model_id fixed by the caller is
+        used as both."""
         if model_id is not None:
             return model_id, model_id
         available_models = [m for m, options in options_by_model.items() if options]
         model_id = self.router_service.select_model(
             features, available_models=available_models or None
         )
-        return model_id, self.router_service.preferred_model() or model_id
+        return model_id, self.router_service.shadow_choice() or model_id
 
     def _dispatch(self, query_text, model_id, generation_parameters, options):
         """Stage 3: enqueue the task on a node of the chosen model (see
@@ -282,10 +282,10 @@ class Orchestrator:
         nodes = self._filter_nodes(self.queue_client.get_all_node_telemetry())
         options_by_model = self._options_by_model(nodes)
         features = self.feature_service.extract_features(query_text, metadata)
-        model_id, preferred_model = self._choose_model(
+        model_id, shadow_choice = self._choose_model(
             features, options_by_model, model_id
         )
-        self.demand_counter.record(model_id, preferred_model)
+        self.demand_counter.record(model_id, shadow_choice)
         extraction_method, evaluation_metric, generation_parameters = (
             self._dataset_settings((metadata or {}).get("dataset"))
         )

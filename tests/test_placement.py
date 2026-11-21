@@ -383,7 +383,7 @@ class OrchestratorPlacementTest(unittest.TestCase):
     def test_shadow_demand_counts_the_unmasked_choice(self):
         router = mock.MagicMock()
         router.select_model.return_value = "small"
-        router.preferred_model.return_value = "big"
+        router.shadow_choice.return_value = "big"
         queue = mock.MagicMock()
         queue.get_all_node_telemetry.return_value = []
         demand = DemandCounter()
@@ -404,22 +404,22 @@ class OrchestratorPlacementTest(unittest.TestCase):
         self.assertEqual(demand.consume("shadow"), {})  # reset after reading
 
 
-class PreferredModelTest(unittest.TestCase):
-    def test_preferred_model_ignores_the_mask(self):
+class ShadowChoiceTest(unittest.TestCase):
+    def test_shadow_choice_ignores_the_mask(self):
         bandit = LinUCB(["a", "b"], context_dimension=2, alpha=0.1, regularization=1.0)
         for _ in range(20):
             bandit.update("a", 1.0, context=[1.0, 0.0])
         chosen = bandit.select_model([1.0, 0.0], available_models=["b"])
         self.assertEqual(chosen, "b")
-        self.assertEqual(bandit.last_preferred_model, "a")
+        self.assertEqual(bandit.last_shadow_choice, "a")
 
     def test_ties_are_broken_at_random(self):
         bandit = LinUCB(["a", "b", "c"], context_dimension=2, alpha=1.0, regularization=1.0, seed=0)
-        preferred = set()
+        shadow_choices = set()
         for _ in range(50):
             bandit.select_model([1.0, 0.0])
-            preferred.add(bandit.last_preferred_model)
-        self.assertEqual(preferred, {"a", "b", "c"})
+            shadow_choices.add(bandit.last_shadow_choice)
+        self.assertEqual(shadow_choices, {"a", "b", "c"})
 
 
 class PlacementPriorTest(unittest.TestCase):

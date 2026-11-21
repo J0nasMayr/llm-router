@@ -52,7 +52,7 @@ class LinUCB(BaseBandit):
         self.ucb_scores = {}
         # The arm with the highest score before the availability mask is
         # applied, i.e. the choice if every model were available.
-        self.last_preferred_model = None
+        self.last_shadow_choice = None
 
     def select_model(self, context=None, available_models=None):
         if context is None:
@@ -84,7 +84,7 @@ class LinUCB(BaseBandit):
         # at random, so that they do not all count for the first model.
         top_score = max(unmasked_scores.values())
         tied = [m for m, s in unmasked_scores.items() if np.isclose(s, top_score)]
-        self.last_preferred_model = tied[np.random.randint(len(tied))]
+        self.last_shadow_choice = tied[np.random.randint(len(tied))]
 
         self.decisions.append(
             {

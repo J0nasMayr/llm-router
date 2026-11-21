@@ -16,10 +16,10 @@ class DemandCounter:
         now = time.time()
         self._windows = {signal: ({}, now) for signal in self.SIGNALS}
 
-    def record(self, routed_model, preferred_model):
+    def record(self, routed_model, shadow_choice):
         """Count one query in both signals."""
         self._count("realized", routed_model)
-        self._count("shadow", preferred_model)
+        self._count("shadow", shadow_choice)
 
     def consume(self, signal) -> Dict[str, float]:
         """Per-model arrival rate (req/s) of `signal` since its last
