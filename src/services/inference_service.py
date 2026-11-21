@@ -358,9 +358,11 @@ class InferenceService:
             query_text, return_tensors="pt", truncation=True, max_length=8192
         ).to(self.device)
         input_tokens = inputs.input_ids.shape[1]
+        # Greedy decoding: reproducible, and the same for every model.
+        # GreenServ's worker sampled with each model's own default settings.
         gen_params = {
             "max_new_tokens": 256,
-            "do_sample": True,
+            "do_sample": False,
         }
         if generation_parameters:
             if "stop_sequence" in generation_parameters:

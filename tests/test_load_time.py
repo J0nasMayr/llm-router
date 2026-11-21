@@ -153,5 +153,15 @@ class WorkerLoadTimeTest(FakeWorkerTestCase):
         self.assertIn("model_memory_gb", payload)
 
 
+class GenerationTest(FakeWorkerTestCase):
+    def test_generation_is_greedy_with_the_task_settings(self):
+        worker = self.make_worker()
+        _, _, params = worker._prepare_generation_params(
+            "q", mock.MagicMock(), {"max_new_tokens": 1}
+        )
+        self.assertFalse(params["do_sample"])
+        self.assertEqual(params["max_new_tokens"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

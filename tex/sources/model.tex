@@ -107,7 +107,8 @@ The query is then enqueued to that node's dedicated task queue.
 
 \textbf{4. Execution and Policy Update (Feedback Loop).}
 The selected node executes the inference task: its worker loads $m_t$ if it is not already in GPU memory, after unloading its least recently used models if $m_t$ does not fit next to them -- first those outside the node's target placement (Section~\ref{sec:placement}).
-The worker then generates the response with the generation settings of the query's task (e.g.\ a single output token for multiple-choice tasks), and measures the GPU energy of the generation step.
+The worker then generates the response by greedy decoding, with the generation settings of the query's task (e.g.\ a single output token for multiple-choice tasks), and measures the GPU energy of the generation step.
+GreenServ's released worker samples instead, with each model's own default settings \cite{greenserv_code}; greedy decoding makes the answers reproducible and treats all models alike.
 Loading a model is not part of these measurements.
 Its duration is measured separately: it includes unloading models to make room and a short warm-up run, is reported with the result, and updates the node's load time $\ell(m_t, n)$.
 The worker also records the memory $s_{m_t}$ the model takes.
