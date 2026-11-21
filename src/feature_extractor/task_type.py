@@ -6,15 +6,17 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from sklearn.linear_model import LogisticRegression
 
+from src.feature_extractor.base import BaseFeatureExtractor
 
-class TaskTypeExtractor:
+
+class TaskTypeExtractor(BaseFeatureExtractor):
     """
     Extracts task type by classifying the instruction part of queries
     using a Logistic Regression model on top of BERT embeddings.
     """
 
     def __init__(self, config=None):
-        self.config = config or {}
+        super().__init__(config)
         self.task_types = self.config.get(
             "task_types", ["mmlu", "gsm8k", "hellaswag", "winogrande", "cnn_dailymail"]
         )

@@ -12,8 +12,8 @@ class FeatureService:
     def __init__(self, config):
         self.task_types = list(config["task_classification"]["task_types"])
         self.semantic_extractor = SemanticClusterExtractor(config["semantic_clustering"])
-        self.complexity_extractor = ComplexityExtractor(config["complexity"])
         self.num_clusters = self.semantic_extractor.k
+        self.complexity_extractor = ComplexityExtractor(config["complexity"])
         self.num_complexity_bins = len(self.complexity_extractor.complexity_bins)
         logger.info(
             f"Task types: {self.task_types}; "
