@@ -43,6 +43,7 @@ The adapted call: `experiments/shared/analysis_utils.py` passes the bounds of `c
 - `run_api.py`: wires the services together and starts the API and the controller.
 - `config/feasibility.yaml`: the feasibility filter's latency deadline, assumed load speed and minimum free GPU memory, and a switch that turns the filter off (GreenServ-style routing: all models, one shared queue per tier).
 - `config/placement.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
+- `config/reward.yaml`: the reward weights α and β (GreenServ's code set them in the evaluation service).
 - `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.
 

@@ -510,7 +510,7 @@ class PlacementPriorTest(unittest.TestCase):
             row("2", "small", 0.0), row("2", "phi-4-14b", 1.0),
         ]
         # GreenServ's id phi-4-14b maps to phi-4 in config/models.yaml.
-        shares = model_shares(results, queries, {"small", "phi-4"}, EvaluationService(load_config("metrics")))
+        shares = model_shares(results, queries, {"small", "phi-4"}, EvaluationService(load_config("metrics"), **load_config("reward")))
         self.assertEqual(shares, {"small": 0.5, "phi-4": 0.5})
 
 

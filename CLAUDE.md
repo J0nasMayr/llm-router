@@ -38,10 +38,11 @@ Running alongside:
 
 - [config/placement.yaml](./config/placement.yaml): placement policy (dynamic, static, none), demand signal (shadow, realized), prior, planning horizon, cooldown
 - [config/feature_extraction.yaml](./config/feature_extraction.yaml): context features
-- [config/feasibility.yaml](./config/feasibility.yaml): feasibility filter: latency deadline, assumed load speed and minimum free GPU memory
+- [config/feasibility.yaml](./config/feasibility.yaml): feasibility filter: on/off switch, latency deadline, assumed load speed and minimum free GPU memory
+- [config/reward.yaml](./config/reward.yaml): reward weights alpha and beta
 - [config/mab.yaml](./config/mab.yaml): bandit parameters
 - [config/models.yaml](./config/models.yaml): the 16 models with their tier (edge or cloud)
-- Everything else is a constructor default or a command-line flag: the other controller parameters in placement_controller.py, the worker parameters in inference_service.py, the reward weights in evaluation_service.py, the network delays in orchestrator.py.
+- Everything else is a constructor default or a command-line flag: the other controller parameters in placement_controller.py, the worker parameters in inference_service.py, the network delays in orchestrator.py.
 - The parameter table at the end of [model.tex](./tex/sources/model.tex) lists all of these values.
 - Every config file is flat: its top-level keys are its settings, with no root key named after the file.
 

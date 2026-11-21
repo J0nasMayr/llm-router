@@ -1,0 +1,7 @@
+# Reward weights: r = alpha * Acc + beta * (1 - E), with Acc and E normalized
+# to [0, 1] (thesis Section 3.1). GreenServ's reward with trade-off weight
+# lambda is alpha = 1 - lambda, beta = lambda. The prior of the placement
+# controller depends on these weights: after changing them, regenerate
+# config/placement_prior.yaml with scripts/placement_prior.py.
+alpha: 0.5
+beta: 0.5

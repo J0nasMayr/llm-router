@@ -84,7 +84,7 @@ def main():
     with open("config/models.yaml") as f:
         model_ids = set(yaml.safe_load(f))
     tables = read_tables(DUMP, {"pregenerated_results", "queries"})
-    evaluation = EvaluationService(load_config("metrics"))
+    evaluation = EvaluationService(load_config("metrics"), **load_config("reward"))
     shares = model_shares(
         tables["pregenerated_results"], tables["queries"], model_ids, evaluation
     )

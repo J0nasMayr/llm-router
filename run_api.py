@@ -45,7 +45,10 @@ def _build_services():
         context_dimension=feature_service.context_dimension,
     )
 
-    evaluation_service = EvaluationService(metric_bounds)
+    reward = load_config("reward")
+    evaluation_service = EvaluationService(
+        metric_bounds, alpha=float(reward["alpha"]), beta=float(reward["beta"])
+    )
 
     feasibility = load_config("feasibility")
     T_max = float(feasibility["max_latency_s"])
