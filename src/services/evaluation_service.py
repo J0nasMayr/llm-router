@@ -12,9 +12,9 @@ class EvaluationService:
         self.alpha = alpha
         self.beta = beta
         self.quality_metrics = QualityMetrics()
-        self.text_normalizer = TextNormalizer()
-        self.metric_normalizer = MetricNormalizer()
         self.energy_metrics = EnergyMetrics()
+        self.metric_normalizer = MetricNormalizer()
+        self.text_normalizer = TextNormalizer()
 
     def _evaluate(
         self,
