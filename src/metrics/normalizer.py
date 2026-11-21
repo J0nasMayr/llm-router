@@ -1,8 +1,6 @@
 import logging
-from pathlib import Path
 
 import numpy as np
-import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -10,61 +8,19 @@ logger = logging.getLogger(__name__)
 
 class MetricNormalizer:
     """
-    Normalize metrics to [0, 1] range using dataset-specific min/max bounds
-    loaded from a configuration file. Assumes 1 is best, 0 is worst.
+    Normalize metrics to [0, 1] range using dataset-specific min/max bounds.
+    Assumes 1 is best, 0 is worst.
     """
 
-    _DEFAULT_CONFIG_PATH = (
-        Path(__file__).resolve().parent.parent.parent / "config" / "metrics.yaml"
-    )
-
-    def __init__(self, config_path=None):
+    def __init__(self, bounds):
         """
-        Initialize the normalizer by loading min/max bounds from a YAML config file.
-
         Args:
-            config_path (str or Path, optional): Path to the metrics bounds YAML file.
-                                                 Defaults to config/metrics.yaml in the project root.
+            bounds (dict): {dataset: {metric: {"min": ..., "max": ...}}}, as in
+                config/metrics.yaml.
         """
-        self.config_path = (
-            Path(config_path) if config_path else self._DEFAULT_CONFIG_PATH
-        )
-        self.bounds = self._load_bounds()
-        if not self.bounds:
-            logger.warning(
-                f"Metric bounds configuration could not be loaded from {self.config_path}. Normalization may use defaults or fail."
-            )
-
-    def _load_bounds(self):
-        """Load normalization bounds from the YAML configuration file."""
-        try:
-            with open(self.config_path, "r") as f:
-                bounds_data = yaml.safe_load(f)
-                logger.info(
-                    f"Successfully loaded metric bounds from {self.config_path}"
-                )
-                if isinstance(bounds_data, dict):
-                    return bounds_data
-                else:
-                    logger.error(
-                        f"Invalid format in metric bounds file {self.config_path}. Expected a dictionary."
-                    )
-                    return {}
-        except FileNotFoundError:
-            logger.error(
-                f"Metric bounds configuration file not found: {self.config_path}"
-            )
-            return {}
-        except yaml.YAMLError as e:
-            logger.error(
-                f"Error parsing metric bounds YAML file {self.config_path}: {e}"
-            )
-            return {}
-        except Exception as e:
-            logger.error(
-                f"An unexpected error occurred loading metric bounds from {self.config_path}: {e}"
-            )
-            return {}
+        if not bounds:
+            raise ValueError("No metric bounds given (is config/metrics.yaml empty?)")
+        self.bounds = bounds
 
     def normalize(self, metric_name, value, dataset):
         """
@@ -88,7 +44,7 @@ class MetricNormalizer:
 
         if not dataset_bounds:
             logger.warning(
-                f"No bounds found for dataset '{dataset}' (and no default) in {self.config_path}. Cannot normalize '{metric_name}'. Returning 0.5."
+                f"No bounds found for dataset '{dataset}' (and no default). Cannot normalize '{metric_name}'. Returning 0.5."
             )
             return 0.5
 

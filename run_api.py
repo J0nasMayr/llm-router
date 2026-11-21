@@ -31,6 +31,7 @@ def _build_services():
     features = load_config("feature_extraction")
     mab = load_config("mab")
     datasets = load_config("datasets")
+    metric_bounds = load_config("metrics")
 
     redis_client = RedisClient.from_config()
 
@@ -44,7 +45,7 @@ def _build_services():
         context_dimension=feature_service.context_dimension,
     )
 
-    evaluation_service = EvaluationService()
+    evaluation_service = EvaluationService(metric_bounds)
 
     feasibility = load_config("feasibility")
     T_max = float(feasibility["max_latency_s"])

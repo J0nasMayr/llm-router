@@ -16,6 +16,7 @@ from pathlib import Path
 
 import yaml
 
+from config.manager import load_config
 from src.services.evaluation_service import EvaluationService
 
 DUMP = Path("db/llm_db_backup.sql.gz")
@@ -83,7 +84,7 @@ def main():
     with open("config/models.yaml") as f:
         model_ids = set(yaml.safe_load(f))
     tables = read_tables(DUMP, {"pregenerated_results", "queries"})
-    evaluation = EvaluationService()
+    evaluation = EvaluationService(load_config("metrics"))
     shares = model_shares(
         tables["pregenerated_results"], tables["queries"], model_ids, evaluation
     )

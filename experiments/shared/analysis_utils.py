@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from config.manager import load_config
 from src.metrics.normalizer import MetricNormalizer
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ def normalize_metrics(inference_results_df: pd.DataFrame):
         return inference_results_df
 
     try:
-        normalizer = MetricNormalizer()
+        normalizer = MetricNormalizer(load_config("metrics"))
         if not normalizer.bounds:
             logger.error(
                 "Failed to load metric normalization bounds. Check config/metrics.yaml."

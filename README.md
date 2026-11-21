@@ -12,11 +12,12 @@ Everything below the horizontal line is GreenServ's original README, unchanged; 
 
 **Inherited from GreenServ, unchanged**
 
-- `src/metrics/`: the accuracy, energy and normalization code behind the reward.
+- `src/metrics/` except `normalizer.py`: the accuracy and energy code behind the reward.
 - `db/`, `data/`, `config/metrics.yaml`, `config/datasets.yaml`: GreenServ's profiling data, the normalization bounds derived from it, and the dataset settings.
 - `experiments/`, `paper_figures/`, `Makefile`: GreenServ's offline experiments X0-X4. The thesis does not reuse them.
 
-Apart from the removals listed below, the only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of a redundant root key from `config/datasets.yaml` (and the three `data/` files that read it) and from `experiments/config/feature_extraction.yaml`; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
+Apart from the removals listed below and one adapted call, the only edits to these files, and to GreenServ's `config/general.yaml`, are cosmetic: an underscore prefix on four internal methods, in `src/metrics/accuracy.py` and `data/process.py`; the removal of a redundant root key from `config/datasets.yaml` (and the three `data/` files that read it) and from `experiments/config/feature_extraction.yaml`; and the removal of a first-line comment that repeated the file's path, from `config/datasets.yaml` and `config/general.yaml`.
+The adapted call: `experiments/shared/analysis_utils.py` passes the bounds of `config/metrics.yaml` to `MetricNormalizer`, which no longer reads the file itself (see `src/metrics/normalizer.py` below).
 
 **Extended**
 
@@ -27,7 +28,7 @@ Apart from the removals listed below, the only edits to these files, and to Gree
 - `src/services/orchestrator.py`: feasibility filter on node telemetry, dispatch to a node, and recording the demand the placement controller reads.
 - `src/services/inference_service.py`: the worker keeps several models in GPU memory, follows a target placement, and publishes telemetry. It measures energy with Zeus only, as GreenServ's paper did, and exits at startup if Zeus cannot measure its GPU.
 - `src/queue/redis_client.py`: a task queue per node, node telemetry and target placements.
-- `src/services/evaluation_service.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset.
+- `src/services/evaluation_service.py`, `src/metrics/normalizer.py`: separate reward weights `alpha` and `beta`, and the normalization bounds are looked up per dataset. The normalizer receives the bounds (`run_api.py` loads `config/metrics.yaml`) instead of reading the file itself, so a missing, invalid or empty file stops the API at startup; before, it only logged an error and every normalized value became 0.5.
 - `config/models.yaml`: reduced to the 16 models GreenServ profiled, each assigned to the edge or cloud tier.
 - `config/mab.yaml`: an `algorithm` key selects the bandit, with one block of constructor parameters per bandit (GreenServ's file held a single epsilon-greedy block).
 - `config/feature_extraction.yaml`: complexity bins that every score falls into (with the bounds in GreenServ's file, the first slot stayed unused and the hardest texts got none). The file also names the embedding model of the semantic clustering, which GreenServ's file left to the code default (the same model).
