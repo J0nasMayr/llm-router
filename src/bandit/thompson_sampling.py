@@ -186,6 +186,7 @@ class ThompsonSampling(BaseBandit):
             self.cov[model_id] = np.identity(self.context_dimension)
 
     def reset(self):
+        """Only GreenServ's offline experiments X3 and X4 call this."""
         if self.prior_variance <= 0:
 
             logger.error(
@@ -211,6 +212,8 @@ class ThompsonSampling(BaseBandit):
         logger.info("ThompsonSampling reset complete.")
 
     def get_state(self):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         state = super().get_state()
         B_serializable = {
             model_id: self.B[model_id].tolist() for model_id in self.model_ids
@@ -231,6 +234,8 @@ class ThompsonSampling(BaseBandit):
         return state
 
     def set_state(self, state):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         super().set_state(state)
 
         self.sigma = state.get("sigma", self.sigma)
@@ -253,6 +258,7 @@ class ThompsonSampling(BaseBandit):
             self.cov[model_id] = None
 
     def get_metrics(self):
+        """Nothing in this repository calls this."""
         metrics = {
             "sigma": self.sigma,
             "decisions_count": len(self.decisions),
@@ -300,6 +306,7 @@ class ThompsonSampling(BaseBandit):
         return avg_rewards
 
     def _get_uncertainty_evolution(self):
+        """Nothing in this repository calls this."""
         uncertainty = {}
         for model_id in self.model_ids:
             if (
@@ -323,7 +330,8 @@ class ThompsonSampling(BaseBandit):
         return uncertainty
 
     def add_model(self, model_id):
-        """Adds a new model arm to the Thompson Sampling bandit."""
+        """Adds a new model arm to the Thompson Sampling bandit. Only GreenServ's
+        offline experiment X4 calls this; the API never changes the arms."""
         if model_id in self.model_ids:
             logger.warning(
                 f"Model '{model_id}' already exists in ThompsonSampling. No action taken."
@@ -342,7 +350,8 @@ class ThompsonSampling(BaseBandit):
         return True
 
     def remove_model(self, model_id):
-        """Removes a model arm from the Thompson Sampling bandit."""
+        """Removes a model arm from the Thompson Sampling bandit. Only GreenServ's
+        offline experiment X4 calls this; the API never changes the arms."""
         if model_id not in self.model_ids:
             logger.warning(
                 f"Model '{model_id}' not found in ThompsonSampling. Cannot remove."

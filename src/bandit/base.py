@@ -28,7 +28,8 @@ class BaseBandit(ABC):
 
     @abstractmethod
     def get_state(self):
-        """Get serializable state of the algorithm"""
+        """Get serializable state of the algorithm. Nothing in this repository calls
+        this; the API does not save or restore the bandit."""
         return {
             "model_ids": self.model_ids,
             "context_dimension": self.context_dimension,
@@ -36,11 +37,13 @@ class BaseBandit(ABC):
 
     @abstractmethod
     def set_state(self, state):
-        """Restore algorithm state from serialized state"""
+        """Restore algorithm state from serialized state. Nothing in this repository
+        calls this; the API does not save or restore the bandit."""
         self.model_ids = state.get("model_ids", self.model_ids)
         self.context_dimension = state.get("context_dimension", self.context_dimension)
 
     @abstractmethod
     def add_model(self, model_id):
-        """Adds a new model (arm) to the bandit algorithm dynamically."""
+        """Adds a new model (arm) to the bandit algorithm dynamically. Only GreenServ's
+        offline experiment X4 calls this; the API never changes the arms."""
         pass

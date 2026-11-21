@@ -39,8 +39,8 @@ def _build_services():
     algo = mab["algorithm"]
     router_service = RouterService(
         algorithm_name=algo,
-        model_ids=list(models.keys()),
         algorithm_params=mab[algo],
+        model_ids=list(models.keys()),
         context_dimension=feature_service.context_dimension,
     )
 

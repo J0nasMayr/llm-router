@@ -13,7 +13,7 @@ class RouterService:
         "thompson_sampling": ThompsonSampling,
     }
 
-    def __init__(self, algorithm_name, model_ids, algorithm_params, context_dimension):
+    def __init__(self, algorithm_name, algorithm_params, model_ids, context_dimension):
         self.bandit = self.ALGORITHM_TO_CLASS_MAP[algorithm_name](
             model_ids, context_dimension=context_dimension, **algorithm_params
         )

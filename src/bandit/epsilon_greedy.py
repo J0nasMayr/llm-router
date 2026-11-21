@@ -79,12 +79,15 @@ class EpsilonGreedy(BaseBandit):
             return random.choice(candidates)
 
     def reset(self):
+        """Only GreenServ's offline experiments X3 and X4 call this."""
         self.reward_sums = {model: 0.0 for model in self.model_ids}
         self.counts = {model: 0 for model in self.model_ids}
         self.epsilon = self.initial_epsilon
         self.decisions = []
 
     def get_state(self):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         state = super().get_state()
         state.update(
             {
@@ -99,6 +102,8 @@ class EpsilonGreedy(BaseBandit):
         return state
 
     def set_state(self, state):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         super().set_state(state)
         self.epsilon = state.get("epsilon", self.epsilon)
         self.initial_epsilon = state.get("initial_epsilon", self.initial_epsilon)
@@ -108,6 +113,7 @@ class EpsilonGreedy(BaseBandit):
         self.counts = state.get("counts", self.counts)
 
     def get_metrics(self):
+        """Nothing in this repository calls this."""
         metrics = {
             "current_epsilon": self.epsilon,
             "exploration_count": sum(
@@ -129,7 +135,8 @@ class EpsilonGreedy(BaseBandit):
         return metrics
 
     def add_model(self, model_id):
-        """Adds a new model arm to the EpsilonGreedy bandit."""
+        """Adds a new model arm to the EpsilonGreedy bandit. Only GreenServ's offline
+        experiment X4 calls this; the API never changes the arms."""
         if model_id not in self.model_ids:
             self.model_ids.append(model_id)
             self.n_models = len(self.model_ids)
@@ -267,6 +274,7 @@ class ContextualEpsilonGreedy(BaseBandit):
         return max(avg_rewards, key=avg_rewards.get)
 
     def reset(self):
+        """Only GreenServ's offline experiments X3 and X4 call this."""
         self.context_reward_sums = defaultdict(
             lambda: {model: 0.0 for model in self.model_ids}
         )
@@ -280,6 +288,8 @@ class ContextualEpsilonGreedy(BaseBandit):
         self.choices_per_context.clear()
 
     def get_state(self):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         state = super().get_state()
         context_reward_sums = {str(k): v for k, v in self.context_reward_sums.items()}
         context_counts = {str(k): v for k, v in self.context_counts.items()}
@@ -299,6 +309,8 @@ class ContextualEpsilonGreedy(BaseBandit):
         return state
 
     def set_state(self, state):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         super().set_state(state)
         self.initial_epsilon = state.get("initial_epsilon", self.initial_epsilon)
         self.epsilon = state.get("epsilon", self.epsilon)
@@ -326,6 +338,7 @@ class ContextualEpsilonGreedy(BaseBandit):
         self.global_counts = state.get("global_counts", self.global_counts)
 
     def get_metrics(self):
+        """Nothing in this repository calls this."""
         metrics = {
             "current_epsilon": self.epsilon,
             "exploration_count": sum(
@@ -353,7 +366,8 @@ class ContextualEpsilonGreedy(BaseBandit):
         return metrics
 
     def add_model(self, model_id):
-        """Adds a new model arm to the ContextualEpsilonGreedy bandit."""
+        """Adds a new model arm to the ContextualEpsilonGreedy bandit. Only GreenServ's
+        offline experiment X4 calls this; the API never changes the arms."""
         if model_id not in self.model_ids:
             self.model_ids.append(model_id)
             self.n_models = len(self.model_ids)
@@ -374,12 +388,14 @@ class ContextualEpsilonGreedy(BaseBandit):
             logger.info(f"Model {model_id} already exists in ContextualEpsilonGreedy.")
 
     def get_context_decisions(self):
-        """Returns the dictionary mapping context keys to lists of chosen models."""
+        """Returns the dictionary mapping context keys to lists of chosen models.
+        Nothing in this repository calls this."""
 
         return dict(self.choices_per_context)
 
     def get_context_average_rewards(self):
-        """Calculates and returns the average reward per model for each learned context."""
+        """Calculates and returns the average reward per model for each learned context.
+        Nothing in this repository calls this."""
         context_avg_rewards = defaultdict(dict)
         for context_key, counts_dict in self.context_counts.items():
             for model_id, count in counts_dict.items():
@@ -397,6 +413,8 @@ class LinearEpsilonGreedy(BaseBandit):
     """
     Epsilon-Greedy bandit that uses a linear model per arm to predict rewards
     based on context, allowing generalization. Uses Ridge Regression for updates.
+    Only GreenServ's offline experiment X2 uses this class; config/mab.yaml cannot
+    select it, since it is not in RouterService.ALGORITHM_TO_CLASS_MAP.
     """
 
     def __init__(

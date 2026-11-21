@@ -126,6 +126,7 @@ class LinUCB(BaseBandit):
         return ucb
 
     def reset(self):
+        """Only GreenServ's offline experiments X3 and X4 call this."""
         for model_id in self.model_ids:
             self.A[model_id] = np.identity(self.context_dimension) * self.regularization
             self.b[model_id] = np.zeros(self.context_dimension)
@@ -137,6 +138,8 @@ class LinUCB(BaseBandit):
         self.ucb_scores = {}
 
     def get_state(self):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         state = super().get_state()
 
         A_serializable = {
@@ -158,6 +161,8 @@ class LinUCB(BaseBandit):
         return state
 
     def set_state(self, state):
+        """Nothing in this repository calls this; the API does not save or restore the
+        bandit."""
         super().set_state(state)
 
         self.alpha = state.get("alpha", self.alpha)
@@ -190,7 +195,8 @@ class LinUCB(BaseBandit):
             )
 
     def add_model(self, model_id):
-        """Adds a new model arm to the LinUCB bandit."""
+        """Adds a new model arm to the LinUCB bandit. Only GreenServ's offline
+        experiment X4 calls this; the API never changes the arms."""
         if model_id in self.model_ids:
             logger.warning(
                 f"Model '{model_id}' already exists in LinUCB. No action taken."
@@ -209,7 +215,8 @@ class LinUCB(BaseBandit):
         return True
 
     def remove_model(self, model_id):
-        """Removes a model arm from the LinUCB bandit."""
+        """Removes a model arm from the LinUCB bandit. Only GreenServ's offline
+        experiment X4 calls this; the API never changes the arms."""
         if model_id not in self.model_ids:
             logger.warning(f"Model '{model_id}' not found in LinUCB. Cannot remove.")
             return False
@@ -244,7 +251,8 @@ class LinUCB(BaseBandit):
             return False
 
     def get_theta(self):
-        """Calculates and returns the learned linear parameters (theta) for all *current* arms."""
+        """Calculates and returns the learned linear parameters (theta) for all
+        *current* arms. Only GreenServ's offline experiment X2 calls this."""
         calculated_theta = {}
         for model_id in self.model_ids:
             try:
@@ -271,6 +279,7 @@ class LinUCB(BaseBandit):
         return calculated_theta
 
     def get_metrics(self):
+        """Nothing in this repository calls this."""
         metrics = {
             "alpha": self.alpha,
             "decisions_count": len(self.decisions),
