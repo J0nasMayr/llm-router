@@ -11,6 +11,7 @@ class FeatureService:
 
     def __init__(self, config):
         self.task_types = list(config["task_classification"]["task_types"])
+        self.num_task_types = len(self.task_types)
         self.semantic_extractor = SemanticClusterExtractor(config["semantic_clustering"])
         self.num_clusters = self.semantic_extractor.k
         self.complexity_extractor = ComplexityExtractor(config["complexity"])
@@ -25,7 +26,7 @@ class FeatureService:
     def context_dimension(self):
         """Length of the context vector built by `_get_context_vector`:
         three one-hot blocks in a row (task type, cluster, complexity bin)."""
-        return len(self.task_types) + self.num_clusters + self.num_complexity_bins
+        return self.num_task_types + self.num_clusters + self.num_complexity_bins
 
     def extract_features(self, query_text, query_metadata=None):
         """Extract features from query text and metadata. The task type is the
@@ -55,7 +56,7 @@ class FeatureService:
         task = features["task_type"]
         task_index = None if task is None else self.task_types.index(task)
         return (
-            _one_hot(task_index, len(self.task_types))
+            _one_hot(task_index, self.num_task_types)
             + _one_hot(features["semantic_cluster"], self.num_clusters)
             + _one_hot(features["complexity_bin"], self.num_complexity_bins)
         )

@@ -28,7 +28,6 @@ class LinUCB(BaseBandit):
         if not isinstance(alpha, (int, float)) or alpha < 0:
             raise ValueError("LinUCB alpha must be a non-negative number.")
         if not isinstance(regularization, (int, float)) or regularization < 0:
-
             raise ValueError("LinUCB regularization must be a non-negative number.")
         if context_dimension is None or context_dimension <= 0:
             raise ValueError("LinUCB requires a positive context_dimension.")
