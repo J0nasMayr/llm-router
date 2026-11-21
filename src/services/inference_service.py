@@ -17,7 +17,12 @@ from zeus.monitor import ZeusMonitor
 
 from config.manager import load_config
 from src.metrics.energy import ZeusMeasurement
-from src.queue.redis_client import RedisClient, node_queue_name, tier_queue_name
+from src.queue.redis_client import (
+    LOAD_EVENTS,
+    RedisClient,
+    node_queue_name,
+    tier_queue_name,
+)
 from src.services.node_telemetry import estimated_size_gb
 
 logger = logging.getLogger(__name__)
@@ -149,10 +154,10 @@ class InferenceService:
         model limit: first models outside the target placement, then target
         models, least recently used first within each group. A load that
         follows the target placement (for_target) never unloads other target
-        models; it returns False, without unloading anything, if the model
+        models; it returns None, without unloading anything, if the model
         would not fit next to them. A load for a waiting task unloads target
         models as a last resort and goes ahead even if the model exceeds the
-        budget."""
+        budget. Returns the unloaded models."""
         needed = self._size_gb(model_id)
         unloaded = []
         with self._load_lock:
@@ -160,7 +165,7 @@ class InferenceService:
             others = [m for m in self._resident if m not in target]
             targets = [m for m in self._resident if m in target]
             if for_target and not self._fits(needed, targets):
-                return False
+                return None
             for victim in others if for_target else others + targets:
                 if self._fits(needed, list(self._resident)):
                     break
@@ -177,7 +182,7 @@ class InferenceService:
                 f"Model {model_id} needs {needed:.1f} GB, more than the "
                 f"memory budget of {self.memory_budget_gb:.1f} GB"
             )
-        return True
+        return unloaded
 
     def _load_model(self, model_id, for_target=False):
         """Return (model, tokenizer, load_seconds) for `model_id`, loading it
@@ -194,7 +199,8 @@ class InferenceService:
         with self._load_lock:
             self._loading = (model_id, start_time)
         try:
-            if not self._make_room_for(model_id, for_target):
+            unloaded = self._make_room_for(model_id, for_target)
+            if unloaded is None:
                 return None
             logger.info(f"Loading model {model_id}")
             model_name = self.model_configs[model_id]["name"]
@@ -229,8 +235,25 @@ class InferenceService:
             if allocated_before is not None:
                 self._model_memory_gb[model_id] = allocated_after - allocated_before
             self._load_time_by_model[model_id].append(load_seconds)
+        self._log_load(model_id, for_target, start_time, load_seconds, unloaded)
 
         return model, tokenizer, load_seconds
+
+    def _log_load(self, model_id, for_target, started_at, seconds, unloaded):
+        """Log a load for the experiments. Unlike the load_time in a task's
+        result, this covers loads for the target placement too."""
+        event = {
+            "node_id": self.node_id,
+            "model_id": model_id,
+            "reason": "plan" if for_target else "on_demand",
+            "started_at": started_at,
+            "duration_s": seconds,
+            "unloaded": unloaded,
+        }
+        try:
+            self.redis_client.log_event(LOAD_EVENTS, event)
+        except Exception as e:
+            logger.warning(f"Logging the load of {model_id} failed: {e}")
 
     def _reconcile_placement(self):
         """Follow the placement controller's target placement. The target is

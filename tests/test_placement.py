@@ -166,6 +166,16 @@ class ControllerTest(unittest.TestCase):
         )
         queue.set_node_placement.assert_called_once_with("e1", [], ttl_seconds=16)
 
+    def test_every_plan_is_logged_with_its_changes(self):
+        _, queue = self._run_controller(
+            2, [edge_node()], prior_demand={"small": 0.0}, demand={"mid": 0.05}, T_cool=0.0
+        )
+        plans = [call.args[1] for call in queue.log_event.call_args_list]
+        self.assertEqual([p["reason"].split("(")[0] for p in plans], ["first_plan", "place"])
+        self.assertEqual(plans[1]["added"], {"e1": ["mid"]})
+        self.assertEqual(plans[1]["removed"], {"e1": []})
+        self.assertEqual(plans[1]["shares"], {"mid": {"e1": 1.0}})
+
 
 class TriggerTest(unittest.TestCase):
     """Scale-up and scale-down compare the predicted load of each node with
@@ -243,6 +253,18 @@ class WorkerTargetTest(FakeWorkerTestCase):
         self._reconcile(["big"])
         # 2 + 16 + 4 > 20: small, outside the target, makes room for mid.
         self.assertEqual(self._reconcile(["big", "mid"]), ["big", "mid"])
+
+    def test_every_load_is_logged_with_its_reason(self):
+        worker = self.make_worker(memory_budget_gb=17.0)
+        worker._load_model("small")
+        # big (16 GB) fits only once small (2 GB) is unloaded.
+        self._reconcile(["big"])
+        loads = [call.args[1] for call in self.redis.log_event.call_args_list]
+        self.assertEqual(
+            [(e["model_id"], e["reason"], e["unloaded"]) for e in loads],
+            [("small", "on_demand", []), ("big", "plan", ["small"])],
+        )
+        self.assertTrue(all(e["node_id"] == "e1" and e["duration_s"] > 0 for e in loads))
 
     def test_task_load_unloads_target_models_only_as_last_resort(self):
         worker = self.make_worker(memory_budget_gb=20.0)

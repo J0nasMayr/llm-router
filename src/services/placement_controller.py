@@ -20,6 +20,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import numpy as np
 from scipy.optimize import Bounds, LinearConstraint, milp
 
+from src.queue.redis_client import PLAN_EVENTS
 from src.services.node_telemetry import (
     fits_on_node,
     free_memory_gb,
@@ -450,16 +451,42 @@ class PlacementController:
             theta_up=self.theta_up,
             planning_horizon_s=self.planning_horizon_s,
         )
+        previous = self._targets
         self._targets = {n: list(placement.get(n, [])) for n in nodes}
         self._shares = shares
         self._planned = True
         self._last_rerun = time.time()
         self._publish_targets()
+        self._log_plan(reason, demand, previous)
         loaded = sum(len(v) for v in self._targets.values())
         logger.info(
             f"Placement planned ({reason}): {loaded} replicas of "
             f"{len(shares)} models on {len(nodes)} nodes"
         )
+
+    def _log_plan(self, reason, demand, previous):
+        """Log a plan for the experiments: the rule that triggered it, the
+        demand it planned with, its targets and shares, and per node the
+        models added to and removed from the target compared to `previous`."""
+        event = {
+            "time": self._last_rerun,
+            "reason": reason,
+            "demand": demand,
+            "targets": self._targets,
+            "shares": self._shares,
+            "added": {
+                n: [m for m in models if m not in previous.get(n, [])]
+                for n, models in self._targets.items()
+            },
+            "removed": {
+                n: [m for m in models if m not in self._targets.get(n, [])]
+                for n, models in previous.items()
+            },
+        }
+        try:
+            self.queue_client.log_event(PLAN_EVENTS, event)
+        except Exception as e:
+            logger.warning(f"Logging the plan failed: {e}")
 
     def _publish_targets(self):
         """Write each node's target placement with an expiry. The controller

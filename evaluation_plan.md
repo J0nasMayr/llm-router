@@ -53,8 +53,6 @@ Before the runs, the code still needs:
 
 - a switch to disable the feasibility filter, for baseline (d) and the ablation of RQ1 (TODO in `evaluation.tex`);
 - the reward weights α and β in the config, for the sensitivity sweep of RQ2 (TODO in `evaluation.tex`);
-- a report of the loads a node does for its target placement. Today, only on-demand loads appear in the results (`load_time`), so the full system would seem to load less than (e) and (f);
-- counters for triggers, plans and placement changes. Today, they are only log lines;
 - a check of every testbed node: install `requirements.txt` (Zeus 0.11) and start one worker as the user that will run the experiments. It exits at startup if Zeus cannot measure its GPU (Zeus 0.10 needed root on Intel CPUs, for the CPU's RAPL counters; 0.11 does not).
 
 ## 7. Known limits

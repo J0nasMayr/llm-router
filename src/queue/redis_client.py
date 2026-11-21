@@ -15,6 +15,12 @@ def node_queue_name(node_id):
     return f"llm_tasks_node_{node_id}"
 
 
+# Event logs for the experiments: one entry per model load (workers) and one
+# per plan (placement controller).
+LOAD_EVENTS = "loads"
+PLAN_EVENTS = "plans"
+
+
 def tier_queue_name(tier):
     """The task queue every worker of a tier also listens on: the
     orchestrator's fallback when no node of the model's tier meets the
@@ -28,6 +34,7 @@ class RedisClient:
     result_prefix = "result:"
     telemetry_prefix = "telemetry:node:"
     placement_prefix = "placement:node:"
+    events_prefix = "events:"
 
     def __init__(self, host, port, password=None, db=0):
         self.redis = redis.Redis(
@@ -131,6 +138,19 @@ class RedisClient:
             return json.loads(raw)
         except json.JSONDecodeError:
             return None
+
+    def log_event(self, stream, event):
+        """Append an event (a dict) to the list events:<stream>."""
+        self.redis.rpush(f"{self.events_prefix}{stream}", json.dumps(event))
+
+    def get_events(self, stream):
+        """The events of events:<stream>, oldest first."""
+        raw_events = self.redis.lrange(f"{self.events_prefix}{stream}", 0, -1)
+        return [json.loads(raw) for raw in raw_events]
+
+    def clear_events(self, stream):
+        """Delete the events of events:<stream>, e.g. before a run."""
+        self.redis.delete(f"{self.events_prefix}{stream}")
 
     def get_all_node_telemetry(self):
         """Return list of telemetry payloads for every active node (TTL'd entries auto-expire)."""
