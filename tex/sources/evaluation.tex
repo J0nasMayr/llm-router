@@ -19,12 +19,13 @@ Queries are drawn from the five datasets underlying the task-type feature -- MML
 (i) deadline violation rate: fraction of queries whose end-to-end latency exceeds $T_{max}$; (ii) answer accuracy per task type; (iii) energy per query, measured at the GPU during generation, without the energy of model loads (the reward itself uses energy per token, Section~\ref{sec:problem}); (iv) the scalarized reward $r_t$; (v) for the placement controller: trigger frequency, number of plans and placement changes, which the controller logs for every plan, and the time to recover after the workload shifts; (vi) the number of model loads and the time spent on them, which the workers log for every load, whether for a task or for the target placement.
 
 \textbf{Baselines.}
-(a) \emph{Largest-model}: every query to the most capable cloud model; (b) \emph{smallest-model}: every query to the cheapest edge model; (c) \emph{random routing}; (d) \emph{GreenServ-style}: the contextual bandit without feasibility filtering or placement control, i.e.\ routing as if every model ran on a single GPU server, as GreenServ assumes.
+(a) \emph{Largest-model}: every query to the most capable cloud model; (b) \emph{smallest-model}: every query to the cheapest edge model; (c) \emph{random routing}; (d) \emph{GreenServ-style}: the contextual bandit without feasibility filtering or placement control, i.e.\ routing as if every model ran on a single GPU server, as GreenServ assumes: the bandit chooses among all models, and every query goes to a queue shared by the nodes of its model's tier, which any free node takes it from.
 All variants run on the same inference workers, which keep several models in GPU memory, so that the comparisons isolate the routing decisions. GreenServ's released worker holds one model at a time \cite{greenserv_code}; the implementation can reproduce this by limiting each node to one model, but this setting is used only as baseline (e) for RQ3.
 For RQ3, the full system is compared with three other ways to decide which models the nodes hold: (e) \emph{on-demand loading}: each node holds one model at a time and loads the requested model whenever a task needs another one, as GreenServ's released worker does; (f) \emph{LRU cache}: nodes keep several models and unload the least recently used one, without a controller; (g) \emph{fixed placement}: the controller's first plan, computed from the prior and never changed. An ablation plans with the realized instead of the shadow demand.
-% TODO: the implementation does not yet offer switches to disable the
-% feasibility filter or to set the reward weights from config. Add these
-% before running (d) and the ablations below. The placement variants are
+% TODO: the implementation does not yet offer a switch to set the reward
+% weights from config. Add it before the sensitivity sweep of RQ2. The
+% filter is turned off with filter: false in config/feasibility.yaml (for
+% (d), together with policy: none). The placement variants are
 % set in config/placement.yaml (policy: none for (e) and (f), static for
 % (g), dynamic for the full system; demand: realized for the ablation) and,
 % for (e), with the workers' --max-models 1.

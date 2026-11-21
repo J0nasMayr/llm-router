@@ -18,7 +18,7 @@ import numpy as np
 from config.manager import load_config
 from scripts.placement_prior import model_shares, read_tables
 from src.bandit.linucb import LinUCB
-from src.queue.redis_client import node_queue_name
+from src.queue.redis_client import node_queue_name, tier_queue_name
 from src.services.placement_controller import PlacementController, solve_placement
 from src.services.demand_counter import DemandCounter
 from src.services.evaluation_service import EvaluationService
@@ -425,6 +425,30 @@ class OrchestratorPlacementTest(unittest.TestCase):
         self.assertEqual(list(demand.consume("realized")), ["small"])
         self.assertEqual(list(demand.consume("shadow")), ["big"])
         self.assertEqual(demand.consume("shadow"), {})  # reset after reading
+
+    def test_without_filter_the_bandit_sees_every_model_and_tasks_go_to_the_tier_queue(self):
+        router = mock.MagicMock()
+        router.select_model.return_value = "small"
+        router.shadow_choice.return_value = "small"
+        queue = mock.MagicMock()
+        orch = Orchestrator(
+            feature_service=mock.MagicMock(),
+            router_service=router,
+            evaluation_service=mock.MagicMock(),
+            queue_client=queue,
+            demand_counter=DemandCounter(),
+            model_configs=MODELS,
+            T_max=30.0,
+            load_bandwidth_gb_per_s=2.0,
+            min_free_gpu_memory_gb=0.5,
+            feasibility_filter=False,
+        )
+        asyncio.run(orch.process_query("q", wait_for_result=False))
+        queue.get_all_node_telemetry.assert_not_called()
+        self.assertIsNone(router.select_model.call_args.kwargs["available_models"])
+        self.assertEqual(
+            queue.enqueue_task.call_args.kwargs["queue_name"], tier_queue_name("edge")
+        )
 
 
 class ShadowChoiceTest(unittest.TestCase):

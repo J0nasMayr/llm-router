@@ -28,6 +28,7 @@ class Orchestrator:
         T_max,
         load_bandwidth_gb_per_s,
         min_free_gpu_memory_gb,
+        feasibility_filter=True,
         network_delay_by_tier=None,
         placement_controller=None,
         result_timeout_seconds=None,
@@ -47,6 +48,7 @@ class Orchestrator:
             result_timeout_seconds if result_timeout_seconds is not None else 600.0
         )
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
+        self.feasibility_filter = feasibility_filter
         self.network_delay_by_tier = network_delay_by_tier or {
             "edge": 0.0,
             "cloud": 0.05,
@@ -277,9 +279,13 @@ class Orchestrator:
         """Route one query through Stages 1-3 and return its task id and
         model. Unless wait_for_result is False, also wait for the worker's
         answer and add it with its metrics; with a reference, compute the
-        reward and update the bandit."""
-        nodes = self._filter_nodes(self.queue_client.get_all_node_telemetry())
-        options_by_model = self._options_by_model(nodes)
+        reward and update the bandit. Without the feasibility filter, Stage 1
+        is skipped: no model has options, so the bandit sees every model and
+        the task goes to the tier queue, as at cold start."""
+        options_by_model = {}
+        if self.feasibility_filter:
+            nodes = self._filter_nodes(self.queue_client.get_all_node_telemetry())
+            options_by_model = self._options_by_model(nodes)
         features = self.feature_service.extract_features(query_text, metadata)
         model_id, shadow_choice = self._choose_model(
             features, options_by_model, model_id

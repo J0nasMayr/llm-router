@@ -67,6 +67,7 @@ def _build_services():
         dataset_configs=datasets,
         load_bandwidth_gb_per_s=load_bandwidth,
         min_free_gpu_memory_gb=min_free_gb,
+        feasibility_filter=bool(feasibility["filter"]),
         placement_controller=controller,
     )
     return orch, controller

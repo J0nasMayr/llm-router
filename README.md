@@ -41,7 +41,7 @@ The adapted call: `experiments/shared/analysis_utils.py` passes the bounds of `c
 - `src/services/demand_counter.py`: per-model arrival rates, realized and shadow, that the orchestrator records and the placement controller reads as its demand signal.
 - `src/services/node_telemetry.py`: readers of the node telemetry (free GPU memory, average latency, model size and load time on a node) and the model-size estimate they fall back to, shared by the worker, the filter and the controller.
 - `run_api.py`: wires the services together and starts the API and the controller.
-- `config/feasibility.yaml`: the feasibility filter's latency deadline, assumed load speed and minimum free GPU memory.
+- `config/feasibility.yaml`: the feasibility filter's latency deadline, assumed load speed and minimum free GPU memory, and a switch that turns the filter off (GreenServ-style routing: all models, one shared queue per tier).
 - `config/placement.yaml`, `config/placement_prior.yaml`, `scripts/placement_prior.py`: controller settings and the prior demand for its first plan.
 - `tests/`: unit tests for the latency estimate of the filter, the worker, the placement controller and the HTTP API.
 - `tex/`: the thesis.

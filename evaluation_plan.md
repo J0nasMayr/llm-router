@@ -51,7 +51,6 @@ Deadline violations, p95 latency, model loads per 100 queries, share of time spe
 
 Before the runs, the code still needs:
 
-- a switch to disable the feasibility filter, for baseline (d) and the ablation of RQ1 (TODO in `evaluation.tex`);
 - the reward weights α and β in the config, for the sensitivity sweep of RQ2 (TODO in `evaluation.tex`);
 - a check of every testbed node: install `requirements.txt` (Zeus 0.11) and start one worker as the user that will run the experiments. It exits at startup if Zeus cannot measure its GPU (Zeus 0.10 needed root on Intel CPUs, for the CPU's RAPL counters; 0.11 does not).
 

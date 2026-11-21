@@ -1,6 +1,11 @@
 # Parameters of the orchestrator's feasibility filter (Stage 1).
 # The placement controller uses the load speed and G_min as well.
 
+# false: no filter and no use of telemetry in routing. The bandit chooses
+# among all models, and every task goes to the shared queue of its model's
+# tier, which any free node of the tier takes from (GreenServ's setup;
+# baseline (d) of the evaluation together with placement policy none).
+filter: true
 # Latency deadline T_max (seconds). Tune per deployment: must exceed the
 # realistic single-inference latency of the largest model, or every node gets
 # filtered and routing degrades to the cold-start fallback path.
