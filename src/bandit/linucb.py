@@ -60,42 +60,47 @@ class LinUCB(BaseBandit):
         context = np.asarray(context).reshape(-1)
 
         allowed = set(available_models) if available_models else None
-        best_model = None
-        highest_ucb = float("-inf")
-        all_ucb_scores = {}
-        unmasked_scores = {}
+        masked_scores = {}
+        scores = {}
 
         for model_id in self.model_ids:
             ucb = self._compute_ucb(model_id, context)
-            unmasked_scores[model_id] = ucb
+            scores[model_id] = ucb
             if allowed is not None and model_id not in allowed:
                 ucb = float("-inf")
-            all_ucb_scores[model_id] = ucb
+            masked_scores[model_id] = ucb
 
-            if ucb > highest_ucb:
-                highest_ucb = ucb
-                best_model = model_id
-
-        if best_model is None and allowed:
-            best_model = next(iter(allowed))
-
-        # Ties (e.g. before any update, when all scores are equal) are broken
-        # at random, so that they do not all count for the first model.
-        top_score = max(unmasked_scores.values())
-        tied = [m for m, s in unmasked_scores.items() if np.isclose(s, top_score)]
-        self.last_shadow_choice = tied[np.random.randint(len(tied))]
+        # Ties (e.g. between models not tried yet, which all have the same score)
+        # are broken by one random ranking per query, shared by the routed model
+        # and the shadow choice: without a mask the two are the same model, and
+        # with one the shadow choice is still a fair draw among all tied models,
+        # masked ones included.
+        rank = dict(zip(self.model_ids, np.random.permutation(len(self.model_ids))))
+        candidates = [m for m in self.model_ids if allowed is None or m in allowed]
+        chosen_model = min(
+            self._top_models(scores, candidates or self.model_ids), key=rank.get
+        )
+        self.last_shadow_choice = min(
+            self._top_models(scores, self.model_ids), key=rank.get
+        )
 
         self.decisions.append(
             {
-                "model": best_model,
+                "model": chosen_model,
                 "context": context.tolist(),
-                "ucb_scores": all_ucb_scores.copy(),
+                "ucb_scores": masked_scores.copy(),
             }
         )
         self.contexts.append(context.tolist())
-        self.ucb_scores = all_ucb_scores
+        self.ucb_scores = masked_scores
 
-        return best_model
+        return chosen_model
+
+    @staticmethod
+    def _top_models(scores, candidates):
+        """The candidates whose score ties for the highest among them."""
+        top = max(scores[m] for m in candidates)
+        return [m for m in candidates if np.isclose(scores[m], top)]
 
     def update(self, model_id, reward, context=None):
         if context is None:

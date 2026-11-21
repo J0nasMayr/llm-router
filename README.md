@@ -21,7 +21,7 @@ The adapted call: `experiments/shared/analysis_utils.py` passes the bounds of `c
 
 **Extended**
 
-- `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked.
+- `src/bandit/`, `src/services/router_service.py`: the bandits accept a mask of feasible models; LinUCB also reports its shadow choice, the model it would pick if no model were masked. LinUCB breaks ties between equal scores at random, with one random ranking per query for both choices (GreenServ's LinUCB takes the first tied model in config order).
 - `src/api/router.py`: reads the orchestrator from the app state, and passes the orchestrator's error message to the client unchanged.
 - `src/services/feature_service.py`: reports the context dimension the bandit is built with, and the context vector always has that length. The task type is the query's dataset label; no task classifier is built, so a query without a label gets an all-zero task-type block. GreenServ's paper describes a classifier, but its reported experiments also use the dataset label (see "Task Type" in GreenServ's README below).
 - `src/feature_extractor/`: the context features (task type, semantic cluster, text complexity). The default complexity bins, used when the config sets none, are those of `config/feature_extraction.yaml` (GreenServ's default `[3]` gave a single one-hot slot that stayed empty for almost every query). `TaskTypeExtractor`, which this fork does not use, inherits from `BaseFeatureExtractor` like the other two extractors.

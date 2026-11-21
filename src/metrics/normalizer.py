@@ -88,7 +88,8 @@ class MetricNormalizer:
         return clamped_value
 
     def update_bounds(self, metric_name, value, task_type=None):
-        """Update bounds if value extends the range."""
+        """Update bounds if value extends the range. Nothing in this repository
+        calls this."""
         key = f"{metric_name}_{task_type}" if task_type else metric_name
 
         if key not in self.bounds:

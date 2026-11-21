@@ -416,9 +416,19 @@ class ShadowChoiceTest(unittest.TestCase):
 
     def test_ties_are_broken_at_random(self):
         bandit = LinUCB(["a", "b", "c"], context_dimension=2, alpha=1.0, regularization=1.0, seed=0)
+        chosen_models = set()
+        for _ in range(50):
+            chosen = bandit.select_model([1.0, 0.0])
+            self.assertEqual(bandit.last_shadow_choice, chosen)
+            chosen_models.add(chosen)
+        self.assertEqual(chosen_models, {"a", "b", "c"})
+
+    def test_masked_ties_are_broken_at_random(self):
+        bandit = LinUCB(["a", "b", "c"], context_dimension=2, alpha=1.0, regularization=1.0, seed=0)
         shadow_choices = set()
         for _ in range(50):
-            bandit.select_model([1.0, 0.0])
+            chosen = bandit.select_model([1.0, 0.0], available_models=["c"])
+            self.assertEqual(chosen, "c")
             shadow_choices.add(bandit.last_shadow_choice)
         self.assertEqual(shadow_choices, {"a", "b", "c"})
 

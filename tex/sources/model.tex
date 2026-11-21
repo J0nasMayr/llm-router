@@ -96,6 +96,7 @@ With the feasible hardware set $M_t^*$ and the semantic context vector $x_t$ est
 Specifically, the Linear Upper Confidence Bound (LinUCB) algorithm \cite{linucb} is utilized. The algorithm assumes a linear relationship between the context $x_t$ and the expected reward of each model arm.
 LinUCB calculates the expected reward for all $m \in M_t^*$, balancing the use of historically successful models for similar prompts with the exploration of uncertain models; models outside $M_t^*$ are masked by forcing their score to $-\infty$, so the bandit can only choose physically viable arms.
 The model $m_t$ that yields the highest upper confidence bound is selected. The bandit also records its \emph{shadow choice}: the model with the highest score before masking, i.e.\ the model it would choose if no model were masked. The placement controller plans with these choices (Section~\ref{sec:placement}).
+Ties, e.g.\ between models that have not been tried yet, are broken at random, with the same draw for both choices; without a mask, the shadow choice is therefore always $m_t$.
 The bandit decides \emph{which model} answers; a final dispatch step decides \emph{which node} executes it.
 Among the surviving nodes of $m_t$'s tier that meet $T_{max}$, the scheduler draws one of $m_t$'s replicas at random in proportion to their traffic shares $w_{m_t,n}$, if the plan of the placement controller (Section~\ref{sec:placement}) has such replicas.
 Otherwise, it selects the node with the lowest estimate $\hat{T}(m_t, n)$.
