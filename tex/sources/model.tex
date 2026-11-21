@@ -110,7 +110,7 @@ The worker then generates the response with the generation settings of the query
 Loading a model is not part of these measurements.
 Its duration is measured separately: it includes unloading models to make room and a short warm-up run, is reported with the result, and updates the node's load time $\ell(m_t, n)$.
 The worker also records the memory $s_{m_t}$ the model takes.
-The scheduler polls for the result and returns the response to the user.
+The scheduler polls for the result, up to a timeout far above $T_{max}$, and returns the response to the user.
 If a reference answer is available, the scheduler computes $Acc(m_t, q_t)$ and $E(m_t, q_t)$ as defined in Section~\ref{sec:problem} and the final reward $r_t$.
 This scalar reward is fed back into the LinUCB agent, which updates its parameter matrices.
 Since several queries can be in flight at once, this feedback arrives with a delay, possibly after later queries have already been routed.
@@ -258,6 +258,7 @@ Table~\ref{tab:parameters} lists the values of all parameters used by the implem
         $B$ & Assumed load speed, used before a node's first load of a model & 2\,GB/s \\
         -- & Window of the average load time $\ell(m, n)$ & last 5 loads \\
         -- & Telemetry publish interval / expiry & 5\,s / 16\,s \\
+        -- & Time the scheduler waits for a worker's result & 600\,s \\
         \midrule
         \multicolumn{3}{l}{\emph{Reward and bandit}} \\
         $\alpha$, $\beta$ & Reward weights (equivalent to $\lambda = 0.5$ in GreenServ's reward) & 0.5, 0.5 \\

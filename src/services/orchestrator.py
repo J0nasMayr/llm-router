@@ -40,12 +40,11 @@ class Orchestrator:
         self.demand_counter = demand_counter
         self.model_configs = model_configs
         self.T_max = T_max
-        # How long to wait for a worker result. Must exceed the deadline T_max,
-        # otherwise a request that just meets it still times out here.
+        # A safety net far above T_max: slow queries still return their
+        # metrics and update the bandit; deadline violations are measured by
+        # the client.
         self.result_timeout_seconds = (
-            result_timeout_seconds
-            if result_timeout_seconds is not None
-            else T_max + 30.0
+            result_timeout_seconds if result_timeout_seconds is not None else 600.0
         )
         self.min_free_gpu_memory_gb = min_free_gpu_memory_gb
         self.network_delay_by_tier = network_delay_by_tier or {
